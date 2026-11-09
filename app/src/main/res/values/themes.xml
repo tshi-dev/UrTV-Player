@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Urtv" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowContentTransitions">false</item>
+    </style>
+    <color name="bg">#0B0D12</color>
+</resources>
