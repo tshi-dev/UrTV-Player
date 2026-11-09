@@ -193,7 +193,7 @@ fun FocusField(
 fun SkeletonBlock(modifier: Modifier, radius: Int = 10) {
     val t = rememberInfiniteTransition(label = "sk")
     val a by t.animateFloat(0.55f, 1f, infiniteRepeatable(tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
-    Box(modifier.graphicsLayer { alpha = a }.clip(Rd(radius)).background(C.glass))
+    Box(modifier.graphicsLayer { alpha = a }.clip(Rd(radius)).background(C.glass2))
 }
 
 /** Rows shaped like the real channel rows (number, logo, two text lines): shown instead of a spinner or an empty state while loading. */
