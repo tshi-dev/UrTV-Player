@@ -204,4 +204,7 @@
     <string name="set_stats_hint">Shows resolution, bitrate and buffer while playing</string>
     <string name="lang_auto">Auto (follow UrTV)</string>
     <string name="set_language_hint">Follows the language of UrTV if installed, otherwise the TV language</string>
+    <string name="unofficial_build">Unofficial build</string>
+    <string name="unofficial_blocked">This build is not signed by the developer. Adding playlists from the phone and restoring backups are turned off. Install the official build from UrTV.</string>
+    <string name="debug_label">Debug</string>
 </resources>

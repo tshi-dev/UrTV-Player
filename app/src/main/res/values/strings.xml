@@ -204,4 +204,7 @@
     <string name="set_stats_hint">يعرض الدقة ومعدل البيانات والمخزن المؤقت أثناء التشغيل</string>
     <string name="lang_auto">تلقائي (حسب UrTV)</string>
     <string name="set_language_hint">يتبع لغة UrTV إن كان مثبّتًا، وإلا لغة التلفاز</string>
+    <string name="unofficial_build">نسخة غير رسمية</string>
+    <string name="unofficial_blocked">هذه النسخة لم تُوقَّع من المطوّر. أُوقفت إضافة القوائم من الجوال واستعادة النسخ الاحتياطية. ثبّت النسخة الرسمية من UrTV.</string>
+    <string name="debug_label">تجريبي</string>
 </resources>

@@ -25,6 +25,8 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     /** Locked groups the user has unlocked with the PIN during this run. */
     var unlocked by mutableStateOf(emptySet<String>())
     var resumeHandled = false
+    /** Official / debug / unofficial build; computed off the main thread at start. Gates the LAN pairing page and backup restore. */
+    var integrity by mutableStateOf(com.urtv.player.data.Integrity.Status.Official)
     /** The launch animation plays once per process. */
     var splashDone by mutableStateOf(false)
 
@@ -37,6 +39,6 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         store = Store(this)                                    // preferences only: cheap
-        Thread({ store.loadHeavy() }, "load-store").start()     // Keystore + encrypted files off the main thread
+        Thread({ store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this) }, "load-store").start()     // Keystore, encrypted files and the certificate check, off the main thread
     }
 }
