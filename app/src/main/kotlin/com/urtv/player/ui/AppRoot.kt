@@ -15,7 +15,7 @@ import com.urtv.player.core.Channel
 import com.urtv.player.data.WatchItem
 import kotlinx.coroutines.launch
 
-private enum class Screen { Home, Player, Add, Groups, HomeRows, Movie, Series, Vod }
+private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, Series, Vod }
 
 @Composable
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
@@ -26,6 +26,7 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     var queue by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var playing by remember { mutableStateOf<Channel?>(null) }
     var restoreKey by remember { mutableStateOf<String?>(null) }
+    var backupRestore by remember { mutableStateOf(false) }
     var detailId by remember { mutableStateOf("") }
     var vodItems by remember { mutableStateOf<List<VodPlay>>(emptyList()) }
     var vodIndex by remember { mutableStateOf(0) }
@@ -69,7 +70,7 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
             app, tab, { tab = it },
             onPlay = { list, ch -> queue = list; playing = ch; screen = Screen.Player },
             onAdd = { screen = Screen.Add }, onLanguage = onLanguageChanged, restoreKey = restoreKey,
-            onManageGroups = { screen = Screen.Groups }, onManageHome = { screen = Screen.HomeRows },
+            onManageGroups = { screen = Screen.Groups }, onManageHome = { screen = Screen.HomeRows }, onBackup = { backupRestore = it; screen = Screen.Backup },
             onOpenMovie = { detailId = it; screen = Screen.Movie }, onOpenSeries = { detailId = it; screen = Screen.Series },
             onCatchup = { ch, p ->
                 val d = def
@@ -85,6 +86,7 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } ?: run { screen = Screen.Home }
         Screen.Add -> AddPlaylistScreen(app) { screen = Screen.Home }
         Screen.Groups -> GroupsManage(app) { tab = Tab.Settings; screen = Screen.Home }
+        Screen.Backup -> BackupScreen(app, backupRestore) { restored -> tab = Tab.Settings; screen = Screen.Home; if (restored) onLanguageChanged() }
         Screen.HomeRows -> HomeManage(app) { tab = Tab.Settings; screen = Screen.Home }
         Screen.Movie -> def?.let { d -> MovieDetail(app, d, detailId, onPlay = { v, at -> playVod(listOf(v), 0, at, Screen.Movie) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Series -> def?.let { d -> SeriesDetail(app, d, detailId, onPlay = { l, i, at -> playVod(l, i, at, Screen.Series) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }

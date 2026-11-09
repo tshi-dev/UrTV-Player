@@ -177,4 +177,21 @@
     <string name="new_list">New list</string>
     <string name="list_default_name">List</string>
     <string name="delete_list_confirm">Delete the list “%s”?</string>
+    <string name="set_backup">Backup</string>
+    <string name="backup_hint">Saves your playlists and settings to a file encrypted with a passphrase you choose on the TV. It does not include the PIN or watch history.</string>
+    <string name="backup_to_phone">Back up to phone</string>
+    <string name="restore_from_phone">Restore from phone</string>
+    <string name="pass_new">Choose a passphrase for the backup</string>
+    <string name="pass_new_hint">It is never stored or sent over the network, and cannot be recovered if you forget it.</string>
+    <string name="pass_enter">Enter the backup passphrase</string>
+    <string name="pass_enter_hint">The file arrived from your phone. Enter the passphrase you chose when you made it.</string>
+    <string name="pass_confirm">Enter the passphrase again</string>
+    <string name="pass_short">At least %d characters</string>
+    <string name="restore_wrong">Wrong passphrase or damaged file</string>
+    <string name="continue_">Continue</string>
+    <string name="working">Encrypting…</string>
+    <string name="backup_step2">Open the address in your phone\'s browser, enter the code, then download the file.</string>
+    <string name="restore_step2">Open the address in your phone\'s browser, enter the code, then choose the backup file.</string>
+    <string name="backup_done">Backup downloaded</string>
+    <string name="restore_done">Restored</string>
 </resources>

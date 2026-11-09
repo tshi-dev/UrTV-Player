@@ -39,11 +39,11 @@ import com.urtv.player.data.Browse
 import com.urtv.player.data.BufferMode
 
 private val REFRESH = listOf(0, 6, 12, 24, 48)
-private enum class Section(val label: Int) { General(R.string.set_general), Playlists(R.string.set_playlists), Playback(R.string.set_playback), Appearance(R.string.set_theme), Home(R.string.set_home), Parental(R.string.set_parental), About(R.string.set_about) }
+private enum class Section(val label: Int) { General(R.string.set_general), Playlists(R.string.set_playlists), Playback(R.string.set_playback), Appearance(R.string.set_theme), Home(R.string.set_home), Parental(R.string.set_parental), Backup(R.string.set_backup), About(R.string.set_about) }
 private val STARTS = listOf("home", "live", "guide", "movies", "series", "last")
 
 @Composable
-fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit, onManageHome: () -> Unit) {
+fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit, onManageHome: () -> Unit, onBackup: (Boolean) -> Unit = {}) {
     val store = app.store
     val playlists by store.playlists.collectAsState()
     val active by store.activeId.collectAsState()
@@ -121,6 +121,11 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.set_pin), stringResource(if (hasPin) R.string.pin_set else R.string.pin_none), stringResource(R.string.set_pin_hint)) {
                         pin = if (hasPin) PinRequest.Verify { pin = PinRequest.SetNew { store.setPin(it) } } else PinRequest.SetNew { store.setPin(it) } } }
                     if (hasPin) item { Setting(stringResource(R.string.pin_remove), "") { pin = PinRequest.Verify { store.setPin(null); app.unlocked = emptySet() } } }
+                }
+                Section.Backup -> {
+                    item { Text(stringResource(R.string.backup_hint), style = T.small, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) }
+                    item { Setting(stringResource(R.string.backup_to_phone), "") { onBackup(false) } }
+                    item { Setting(stringResource(R.string.restore_from_phone), "") { onBackup(true) } }
                 }
                 Section.About -> item { Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted), modifier = Modifier.padding(horizontal = 12.dp).width(900.dp)) }
             }
