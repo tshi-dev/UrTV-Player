@@ -196,4 +196,10 @@
     <string name="restore_done">تمت الاستعادة</string>
     <string name="reminder_hint">اضغط مطوّلًا على OK لتذكيرك عند بدء البرنامج</string>
     <string name="reminder_now">يبدأ الآن: %1$s على %2$s</string>
+    <string name="set_prefetch">تحضير القنوات المجاورة</string>
+    <string name="set_prefetch_hint">يسرّع التنقّل بين القنوات. أوقفه إن كان مزوّدك يحدّد عدد الاتصالات</string>
+    <string name="set_tunnel">التشغيل النفقي</string>
+    <string name="set_tunnel_hint">يحسّن السلاسة على بعض الأجهزة. أوقفه إن ظهرت مشاكل في الصورة أو الصوت</string>
+    <string name="set_stats">إحصاءات التشغيل</string>
+    <string name="set_stats_hint">يعرض الدقة ومعدل البيانات والمخزن المؤقت أثناء التشغيل</string>
 </resources>

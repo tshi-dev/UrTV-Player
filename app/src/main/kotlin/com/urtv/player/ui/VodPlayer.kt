@@ -127,6 +127,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
         },
     ) {
         VideoSurface(ctrl)
+        if (app.store.statsOverlay.collectAsState().value) StatsOverlay(ctrl, Modifier.align(Alignment.TopStart).padding(40.dp))
         val sub by ctrl.cue.collectAsState()
         if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 260.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
         Box(Modifier.align(Alignment.Center)) {
