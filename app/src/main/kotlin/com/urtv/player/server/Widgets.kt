@@ -115,7 +115,7 @@ fun episodeLabel(season: Int?, ep: Int?): String = when {
 }
 
 /** Shown name of a card: the series for an episode (the episode label goes on the second line). */
-fun MediaItem.cardTitle(): String = if (type == ItemType.Episode && !seriesName.isNullOrBlank()) seriesName else name
+fun MediaItem.cardTitle(): String = (if (type == ItemType.Episode) seriesName?.takeIf { it.isNotBlank() } else null) ?: name
 
 @Composable
 fun PosterCard(item: MediaItem, backend: MediaBackend, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 168.dp, onFocus: (Boolean) -> Unit = {}, onLongClick: (() -> Unit)? = null) {
