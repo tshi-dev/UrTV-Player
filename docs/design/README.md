@@ -1,4 +1,7 @@
-# UrTV design direction (mockups, not yet implemented)
+# UrTV design direction (mockups; approved and implemented)
+
+The owner approved these mockups with changes (no middle-dot separators anywhere, series title once, start screen and customisable Home).
+The implemented screens are in `docs/shots/`; the mockups below still show the older `·` separators and are kept as the layout reference.
 
 1920×1080 mockups, Arabic (RTL) and English, placeholder content only (`Example …`, `تجريبية …`; no real channels, logos or artwork).
 Regenerate with `python3 src/mock.py && node src/render.js` (needs Playwright; fonts in `src/fonts`, SIL OFL).

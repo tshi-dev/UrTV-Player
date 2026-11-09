@@ -69,6 +69,8 @@ class PlayerController(private val ctx: Context) {
     /** Where to start (movies/catch-up). Updated while playing so a reconnect resumes in place. */
     private var startAtMs = 0L
     private var vod = false
+    /** Muted live preview inside the channel list (one shared decoder). */
+    private var preview = false
 
     private var current: Channel? = null
     private var forceHls = false
@@ -150,7 +152,11 @@ class PlayerController(private val ctx: Context) {
     /** Seekable on-demand playback (movie, episode, catch-up) starting at [startMs]. */
     fun playVod(title: String, url: String, startMs: Long) { play(Channel(url, title, url), startMs, true) }
 
-    fun play(ch: Channel, startMs: Long = 0L, isVod: Boolean = false) {
+    fun playPreview(ch: Channel) { preview = true; startPlay(ch, 0L, false) }
+
+    fun play(ch: Channel, startMs: Long = 0L, isVod: Boolean = false) { preview = false; startPlay(ch, startMs, isVod) }
+
+    private fun startPlay(ch: Channel, startMs: Long, isVod: Boolean) {
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f
@@ -164,6 +170,7 @@ class PlayerController(private val ctx: Context) {
         retryJob?.cancel()
         if (player == null || builtFor != buffer) { player?.release(); player = build() }
         val p = player!!
+        p.volume = if (preview) 0f else 1f
         _status.value = if (_attempt.value > 0) PlayStatus.Reconnecting else PlayStatus.Loading
         val item = MediaItem.Builder().setUri(Uri.parse(ch.url)).apply {
             if (forceHls || ch.url.contains(".m3u8", true)) setMimeType(MimeTypes.APPLICATION_M3U8)
@@ -188,7 +195,7 @@ class PlayerController(private val ctx: Context) {
         if (vod) player?.currentPosition?.takeIf { it > 0 }?.let { startAtMs = it }
         val n = _attempt.value + 1
         _attempt.value = n
-        if (n > MAX_ATTEMPTS) { _status.value = PlayStatus.Failed; player?.stop(); return }
+        if (n > (if (preview) 1 else MAX_ATTEMPTS)) { _status.value = PlayStatus.Failed; player?.stop(); return }
         _status.value = PlayStatus.Reconnecting
         retryJob?.cancel()
         retryJob = scope.launch { delay(minOf(1000L shl (n - 1), 12_000L)); load(c) }
