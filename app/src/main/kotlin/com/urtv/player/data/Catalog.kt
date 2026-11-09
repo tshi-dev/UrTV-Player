@@ -63,7 +63,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
 
     fun refreshActive() = open(_state.value.playlistId, force = true)
 
-    fun forget(id: String) { chFile(id).delete(); epgFile(id).delete() }
+    fun forget(id: String) { chFile(id).delete(); epgFile(id).delete(); File(dir, "epgurls_$id.txt").delete() }
 
     private fun chFile(id: String) = File(dir, "ch_$id.tsv")
     private fun epgFile(id: String) = File(dir, "epg_$id.xml")
@@ -81,7 +81,10 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
 
     private suspend fun loadEpg(def: PlaylistDef, fetchNew: Boolean, urlsFromPlaylist: List<String>) {
         val file = epgFile(def.id)
-        val urls = (listOf(def.epgUrl).filter { it.isNotBlank() } + urlsFromPlaylist).distinct()
+        val urlFile = File(dir, "epgurls_${def.id}.txt")
+        if (urlsFromPlaylist.isNotEmpty()) runCatching { urlFile.writeText(urlsFromPlaylist.joinToString("\n")) }
+        val remembered = if (urlsFromPlaylist.isEmpty() && urlFile.exists()) runCatching { urlFile.readLines() }.getOrDefault(emptyList()) else urlsFromPlaylist
+        val urls = (listOf(def.epgUrl).filter { it.isNotBlank() } + remembered).filter { it.isNotBlank() }.distinct()
         val keep = HashSet<String>()
         for (c in _state.value.channels) c.epgId?.let { keep += it; keep += it.lowercase() }
         if (keep.isEmpty()) { _epg.value = EpgIndex.EMPTY; return }

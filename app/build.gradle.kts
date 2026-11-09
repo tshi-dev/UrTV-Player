@@ -35,7 +35,7 @@ android {
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
     buildFeatures { compose = true; buildConfig = false }
     packaging { resources.excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/*.version", "DebugProbesKt.bin", "kotlin-tooling-metadata.json", "/kotlin/**", "/META-INF/com/android/build/gradle/app-metadata.properties") }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions { unitTests { isReturnDefaultValues = true; isIncludeAndroidResources = true } }
 }
 
 dependencies {
@@ -58,4 +58,8 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
+    // Screenshots: Compose UI rendered on the JVM (Robolectric native graphics), no emulator needed.
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test:core:1.6.1")
 }
