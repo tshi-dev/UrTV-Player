@@ -79,12 +79,12 @@ fun PinPad(title: String, error: String?, resetKey: Int, onCancel: () -> Unit, o
         },
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.width(420.dp).background(C.surface, RoundedCornerShape(28.dp)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(420.dp).background(C.surface, Rd(28)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, style = T.title)
             Row(Modifier.padding(vertical = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                repeat(4) { Box(Modifier.size(20.dp).background(if (it < pin.length) C.accent2 else C.surfaceHi, CircleShape)) }
+                repeat(4) { Box(Modifier.size(20.dp).background(if (it < pin.length) accentInk() else C.surfaceHi, CircleShape)) }
             }
-            Box(Modifier.height(32.dp)) { if (error != null) Text(error, style = T.small.copy(color = C.danger)) }
+            Box(Modifier.height(32.dp)) { if (error != null) Text(error, style = T.small.copy(color = dangerInk())) }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 for (r in 0 until 3) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     for (c in 1..3) { val d = r * 3 + c; PadKey(d.toString(), Modifier, if (d == 5) first else null) { add(d) } }
@@ -101,7 +101,7 @@ fun PinPad(title: String, error: String?, resetKey: Int, onCancel: () -> Unit, o
 
 @Composable
 private fun PadKey(label: String, modifier: Modifier, fr: FocusRequester? = null, onClick: () -> Unit) {
-    Tv(onClick, modifier.size(width = 108.dp, height = 72.dp), RoundedCornerShape(20.dp), focusRequester = fr, restColor = C.surfaceHi) {
+    Tv(onClick, modifier.size(width = 108.dp, height = 72.dp), Rd(20), focusRequester = fr, restColor = C.surfaceHi) {
         Text(label, style = T.title, modifier = Modifier.align(Alignment.Center))
     }
 }

@@ -85,15 +85,18 @@ fun HomeScreen(
     val tabFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
-    Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 48.dp, vertical = 28.dp)) {
+    LaunchedEffect(tab) { Backdrop.url = null }
+    Box(Modifier.fillMaxSize().background(C.bgBrush)) {
+    PosterBackdrop()
+    Column(Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 28.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("UrTV", style = T.display.copy(fontSize = 36.sp), modifier = Modifier.padding(end = 32.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true }) {
                     val label = stringResource(when (t) { Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Favs -> R.string.tab_favs; Tab.Recents -> R.string.tab_recents; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
-                    Tv({ onTab(t) }, Modifier.height(52.dp), RoundedCornerShape(26.dp), selected = t == tab, onFocus = { if (it) onTab(t) },
+                    Tv({ onTab(t) }, Modifier.height(52.dp), Rd(26), selected = t == tab, onFocus = { if (it) onTab(t) },
                         focusRequester = if (t == tab) tabFocus else null) {
-                        Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp), maxLines = 1, softWrap = false)
+                        Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = mutedInk()), modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp), maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -125,6 +128,7 @@ fun HomeScreen(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -134,7 +138,7 @@ fun EmptyPlaylists(onAdd: () -> Unit) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text(stringResource(R.string.no_playlists_title), style = T.display)
         Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.no_playlists_body), style = T.body.copy(color = C.muted))
+        Text(stringResource(R.string.no_playlists_body), style = T.body.copy(color = mutedInk()))
         Spacer(Modifier.height(32.dp))
         TvButton(stringResource(R.string.add_playlist), onAdd, primary = true, focusRequester = fr)
     }
@@ -165,11 +169,11 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Cha
             items(listOf(Browse.ALL) + groups, key = { it }) { g ->
                 val gk = groupKey(pid, g)
                 val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.OTHER -> stringResource(R.string.group_other); else -> g }
-                Tv({ group = g }, Modifier.fillMaxWidth().height(56.dp), RoundedCornerShape(14.dp), selected = g == group, onFocus = { if (it) group = g },
+                Tv({ group = g }, Modifier.fillMaxWidth().height(56.dp), Rd(14), selected = g == group, onFocus = { if (it) group = g },
                     onLongClick = if (g == Browse.ALL) null else { { pinReq = if (hasPin) PinRequest.Verify { store.toggleLockedGroup(gk) } else PinRequest.SetNew { store.setPin(it); store.toggleLockedGroup(gk) } } }) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(label, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        if (gk in locked) Icon(Glyph.Lock, C.muted, 20)
+                        if (gk in locked) Icon(Glyph.Lock, mutedInk(), 20)
                     }
                 }
             }
@@ -180,7 +184,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Cha
             if (isLocked) {
                 val fr = remember { FocusRequester() }
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Icon(Glyph.Lock, C.muted, 64)
+                    Icon(Glyph.Lock, mutedInk(), 64)
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.group_locked), style = T.title)
                     Spacer(Modifier.height(24.dp))
@@ -203,7 +207,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Cha
 @Composable
 private fun SearchField(query: String, onChange: (String) -> Unit) {
     FocusField(query, onChange, stringResource(R.string.search_hint), Modifier.fillMaxWidth(),
-        leading = { Icon(Glyph.Search, C.muted, 26) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search)
+        leading = { Icon(Glyph.Search, mutedInk(), 26) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search)
 }
 
 @Composable
@@ -234,12 +238,12 @@ fun ChannelGrid(
     Box(Modifier.fillMaxSize()) {
         if (list.isEmpty()) {
             Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (showStatus && cat.loading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
+                if (showStatus && cat.loading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = mutedInk())) }
                 else if (showStatus && cat.error != null) {
                     Text(stringResource(when (cat.error) { LoadError.Network -> R.string.err_network; LoadError.Format -> R.string.err_format; else -> R.string.err_empty }), style = T.title)
                     Spacer(Modifier.height(20.dp))
                     TvButton(stringResource(R.string.retry), { app.catalog.refreshActive() }, primary = true)
-                } else Text(emptyText, style = T.body.copy(color = C.muted))
+                } else Text(emptyText, style = T.body.copy(color = mutedInk()))
             }
         } else LazyVerticalGrid(GridCells.Adaptive(320.dp), Modifier.fillMaxSize(), state, contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -256,7 +260,7 @@ fun ChannelGrid(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChannelCard(ch: Channel, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester? = null, onFocus: (Boolean) -> Unit = {}) {
-    Tv(onClick, Modifier.fillMaxWidth().height(96.dp), RoundedCornerShape(18.dp), focusRequester = focusRequester, onFocus = onFocus, onLongClick = onLong) {
+    Tv(onClick, Modifier.fillMaxWidth().height(96.dp), Rd(18), focusRequester = focusRequester, onFocus = onFocus, onLongClick = onLong) {
         Row(Modifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Logo(ch, 64)
             Spacer(Modifier.width(14.dp))
@@ -268,7 +272,7 @@ fun ChannelCard(ch: Channel, now: Programme?, nowMs: Long, fav: Boolean, onClick
                     ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs))
                 }
             }
-            if (fav) { Spacer(Modifier.width(10.dp)); Icon(Glyph.Heart, C.accent2, 24, filled = true) }
+            if (fav) { Spacer(Modifier.width(10.dp)); Icon(Glyph.Heart, accentInk(), 24, filled = true) }
         }
     }
 }
