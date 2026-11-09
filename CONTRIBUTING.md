@@ -19,7 +19,7 @@ Thank you. Small, safe changes are the best ones: a fix, a test, a clearer line 
 - Never build or publish a release APK from your own machine, never add a signing key (`*.jks`, `*.keystore`, `local.properties`)
   to the repository, and never add a self-updater: updates come from UrTV. Release signing happens in CI from secrets only.
 - Never skip, disable or quarantine a test to make it pass.
-- Permissions stay at `INTERNET` and `ACCESS_NETWORK_STATE`. No storage, overlay, install-packages, analytics, ads or crash SDKs.
+- Permissions stay at `INTERNET`, `ACCESS_NETWORK_STATE` and the normal `sa.urtv.permission.READ_LANG`. No storage, overlay, install-packages, analytics, ads or crash SDKs.
 - No personal data anywhere (code, docs, tests, reports): no IP address, serial, Wi-Fi name, user name or file path.
   Tests use obvious placeholders (`2001:db8::`, `192.0.2.x`, `Example Name`, `example.com`).
 - Country lists never include Israel or Western Sahara.
@@ -49,7 +49,7 @@ Every Arabic string has an English one beside it, and the layout must work right
 - هذا مشغّل فقط: **لا قنوات ولا قوائم ولا روابط** داخله، ولا يُقبل طلب دمج يضيف شيئًا منها (ولا كمثال ولا كقيمة افتراضية). المستخدم يضيف مصادره بنفسه.
 - لا تبنِ نسخة إصدار من جهازك، ولا تضف مفتاح توقيع إلى المستودع، ولا تضف تحديثًا ذاتيًا: التحديثات تأتي من UrTV. التوقيع يتم في CI بالأسرار فقط.
 - لا تتجاوز اختبارًا ولا تعطّله ولا تعزله لتنجح النتيجة.
-- الصلاحيات تبقى `INTERNET` و`ACCESS_NETWORK_STATE` فقط. بلا تخزين ولا تراكب ولا تثبيت ولا تحليلات ولا إعلانات.
+- الصلاحيات تبقى `INTERNET` و`ACCESS_NETWORK_STATE` و`sa.urtv.permission.READ_LANG` العادية فقط. بلا تخزين ولا تراكب ولا تثبيت ولا تحليلات ولا إعلانات.
 - لا بيانات شخصية في أي مكان (الكود، الوثائق، الاختبارات): لا عنوان IP ولا رقم تسلسلي ولا اسم واي فاي ولا اسم مستخدم ولا مسار ملف.
 - قوائم الدول لا تتضمن إسرائيل ولا الصحراء الغربية.
 - الإيداعات باسم صاحب المشروع وبلا أي إشارة إلى الذكاء الاصطناعي.
