@@ -28,7 +28,7 @@ class Store(ctx: Context) {
     val lockedGroups: StateFlow<Set<String>> = _locked
     private val _active = MutableStateFlow(sp.getString("active", null))
     val activeId: StateFlow<String?> = _active
-    private val _lang = MutableStateFlow(sp.getString("lang", "ar")!!)
+    private val _lang = MutableStateFlow(sp.getString("lang", Language.AUTO)!!)
     val lang: StateFlow<String> = _lang
     private val _refreshH = MutableStateFlow(sp.getInt("refreshH", 24))
     val refreshHours: StateFlow<Int> = _refreshH
@@ -229,7 +229,7 @@ class Store(ctx: Context) {
         map("epgOff")?.forEach { (k, v) -> (v as? JsonPrimitive)?.intOrNull?.let { n -> val c = n.coerceIn(-720, 720); _offsets.value = _offsets.value + (k to c); e.putInt("epgoff_$k", c) } }
         map("lists")?.let { m -> saveListsMap(m.associate { (k, v) -> k to ((v as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }?.take(5000)?.toSet() ?: emptySet()) }) }
         (o["start"] as? JsonPrimitive)?.content?.takeIf { it in setOf("home", "live", "guide", "movies", "series", "last") }?.let { _start.value = it; e.putString("start", it) }
-        (o["lang"] as? JsonPrimitive)?.content?.takeIf { it == "ar" || it == "en" }?.let { _lang.value = it; e.putString("lang", it) }
+        (o["lang"] as? JsonPrimitive)?.content?.takeIf { it == "ar" || it == "en" || it == Language.AUTO }?.let { e.apply(); setLang(it) }
         (o["refreshH"] as? JsonPrimitive)?.intOrNull?.takeIf { it in 0..168 }?.let { _refreshH.value = it; e.putInt("refreshH", it) }
         (o["buffer"] as? JsonPrimitive)?.content?.let { n -> BufferMode.entries.firstOrNull { it.name == n }?.let { _buffer.value = it; e.putString("buffer", it.name) } }
         (o["preview"] as? JsonPrimitive)?.booleanOrNull?.let { _preview.value = it; e.putBoolean("preview", it) }
@@ -247,11 +247,26 @@ class Store(ctx: Context) {
     }
 
     // ---- settings
-    fun setLang(v: String) { _lang.value = v; sp.edit().putString("lang", v).apply() }
+    /** Sets the choice (auto, ar, en) and the language to apply now; returns the language that will be used. */
+    fun setLang(v: String): String {
+        val c = if (v == "ar" || v == "en") v else Language.AUTO
+        _lang.value = c
+        val r = Language.resolve(c, sp.getString("urtvLang", null), Language.systemLanguage())
+        sp.edit().putString("lang", c).putString("resolvedLang", r).apply(); return r
+    }
+    /** The language the UI is shown in right now (read synchronously at activity start). */
+    fun resolvedLang(): String = sp.getString("resolvedLang", null) ?: Language.resolve(sp.getString("lang", Language.AUTO)!!, sp.getString("urtvLang", null), Language.systemLanguage())
+    /** Called when UrTV's language (or null: not installed) was read. Returns true when the UI language changed and the screen must be recreated. */
+    fun onUrtvLanguage(urtv: String?): Boolean {
+        sp.edit().apply { if (urtv == null) remove("urtvLang") else putString("urtvLang", urtv) }.apply()
+        val r = Language.resolve(_lang.value, urtv, Language.systemLanguage())
+        val changed = r != resolvedLang()
+        if (changed) sp.edit().putString("resolvedLang", r).apply()
+        return changed
+    }
     fun setRefreshHours(v: Int) { _refreshH.value = v; sp.edit().putInt("refreshH", v).apply() }
     fun setBuffer(v: BufferMode) { _buffer.value = v; sp.edit().putString("buffer", v.name).apply() }
     fun setResume(v: Boolean) { _resume.value = v; sp.edit().putBoolean("resume", v).apply() }
-    fun langNow(): String = sp.getString("lang", "ar")!!
 
     // ---- parental PIN: PBKDF2-HMAC-SHA256 with a random salt (the PIN is never stored) + lockout after repeated mistakes
     private fun hash(pin: String, salt: String): String {

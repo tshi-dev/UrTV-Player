@@ -83,7 +83,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
             when (section) {
                 Section.Server -> serverSettings(app, onAddServer) { removeServer = it }
                 Section.General -> {
-                    item { Setting(stringResource(R.string.set_language), if (lang == "ar") "العربية" else "English") { store.setLang(if (lang == "ar") "en" else "ar"); onLanguage() } }
+                    item { Setting(stringResource(R.string.set_language), when (lang) { "ar" -> "العربية"; "en" -> "English"; else -> stringResource(R.string.lang_auto) }, stringResource(R.string.set_language_hint)) { store.setLang(com.urtv.player.data.Language.next(lang)); onLanguage() } }
                     if (!homeOnly) item { Setting(stringResource(R.string.set_refresh), if (refresh == 0) stringResource(R.string.manual) else stringResource(R.string.every_hours, refresh)) { store.setRefreshHours(REFRESH[(REFRESH.indexOf(refresh) + 1) % REFRESH.size]) } }
                     if (!homeOnly) item { Setting(stringResource(R.string.set_resume), stringResource(if (resume) R.string.on else R.string.off), stringResource(R.string.set_resume_hint)) { store.setResume(!resume) } }
                 }
