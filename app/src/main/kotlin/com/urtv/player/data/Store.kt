@@ -142,6 +142,21 @@ class Store(ctx: Context) {
     fun deleteList(pid: String, name: String) = saveLists(_lists.value - "$pid|$name")
     fun listNames(pid: String): List<String> = _lists.value.keys.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }
 
+    // ---- in-app programme reminders (no background service, so they fire while the app is open)
+    data class Reminder(val key: String, val startMs: Long, val title: String, val channel: String)
+    private val _reminders = MutableStateFlow(sp.getString("reminders", "")!!.lines().mapNotNull { l ->
+        val p = l.split('\t'); if (p.size == 4) p[1].toLongOrNull()?.let { Reminder(p[0], it, p[2], p[3]) } else null })
+    val reminders: StateFlow<List<Reminder>> = _reminders
+    private fun saveReminders(l: List<Reminder>) { _reminders.value = l; sp.edit().putString("reminders", l.joinToString("\n") { listOf(it.key, it.startMs, it.title, it.channel).joinToString("\t") { x -> x.toString().replace('\t', ' ').replace('\n', ' ') } }).apply() }
+    fun toggleReminder(r: Reminder) { val cur = _reminders.value; saveReminders(if (cur.any { it.key == r.key }) cur.filter { it.key != r.key } else (cur + r).sortedBy { it.startMs }.take(100)) }
+    /** Reminders that are due (start within the last minute or the next minute); they are removed so each fires once. */
+    fun takeDueReminders(now: Long): List<Reminder> {
+        val due = _reminders.value.filter { it.startMs - now <= 60_000 && it.startMs - now >= -60_000 }
+        val stale = _reminders.value.filter { it.startMs < now - 60_000 }
+        if (due.isNotEmpty() || stale.isNotEmpty()) saveReminders(_reminders.value - (due + stale).toSet())
+        return due
+    }
+
     // ---- start screen, home rows, live preview, watched marks
     private val _start = MutableStateFlow(sp.getString("start", "home")!!)
     val startScreen: StateFlow<String> = _start          // home | live | guide | movies | series | last

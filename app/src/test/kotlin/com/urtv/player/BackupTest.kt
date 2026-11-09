@@ -116,3 +116,16 @@ class StoreBackupTest {
         assertNotEquals("evil", a.startScreen.value); assertTrue(a.playlists.value.none { it.kind == "file" })
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = UrtvApp::class)
+class ReminderTest {
+    @Test fun dueRemindersFireOnceAndStaleOnesAreDropped() {
+        val s = ApplicationProvider.getApplicationContext<UrtvApp>().store; val now = 1_000_000_000L
+        s.toggleReminder(Store.Reminder("a", now + 30_000, "Soon", "Ch")); s.toggleReminder(Store.Reminder("b", now + 3_600_000, "Later", "Ch")); s.toggleReminder(Store.Reminder("c", now - 600_000, "Old", "Ch"))
+        assertEquals(listOf("a"), s.takeDueReminders(now).map { it.key })
+        assertEquals(listOf("b"), s.reminders.value.map { it.key }, "fired and stale reminders are removed, future ones stay")
+        assertTrue(s.takeDueReminders(now).isEmpty())
+        s.toggleReminder(Store.Reminder("b", now + 3_600_000, "Later", "Ch")); assertTrue(s.reminders.value.isEmpty(), "toggle removes")
+    }
+}

@@ -194,4 +194,6 @@
     <string name="restore_step2">افتح العنوان في متصفح جوالك وأدخل الرمز ثم اختر ملف النسخة.</string>
     <string name="backup_done">تم تنزيل النسخة</string>
     <string name="restore_done">تمت الاستعادة</string>
+    <string name="reminder_hint">اضغط مطوّلًا على OK لتذكيرك عند بدء البرنامج</string>
+    <string name="reminder_now">يبدأ الآن: %1$s على %2$s</string>
 </resources>
