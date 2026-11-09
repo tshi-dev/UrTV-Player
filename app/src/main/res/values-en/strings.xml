@@ -194,4 +194,6 @@
     <string name="restore_step2">Open the address in your phone\'s browser, enter the code, then choose the backup file.</string>
     <string name="backup_done">Backup downloaded</string>
     <string name="restore_done">Restored</string>
+    <string name="reminder_hint">Hold OK to be reminded when it starts</string>
+    <string name="reminder_now">Starting now: %1$s on %2$s</string>
 </resources>

@@ -1,6 +1,10 @@
 package com.urtv.player.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,6 +69,16 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)
     }
 
+    // programme reminders: a quiet banner at the top while the app is open
+    var banner by remember { mutableStateOf<String?>(null) }
+    val soon = androidx.compose.ui.res.stringResource(com.urtv.player.R.string.reminder_now)
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(15_000)
+            store.takeDueReminders(System.currentTimeMillis()).firstOrNull()?.let { r -> banner = soon.format(r.title, r.channel); kotlinx.coroutines.delay(20_000); banner = null }
+        }
+    }
+    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
     when (screen) {
         Screen.Home -> HomeScreen(
             app, tab, { tab = it },
@@ -91,6 +105,11 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Movie -> def?.let { d -> MovieDetail(app, d, detailId, onPlay = { v, at -> playVod(listOf(v), 0, at, Screen.Movie) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Series -> def?.let { d -> SeriesDetail(app, d, detailId, onPlay = { l, i, at -> playVod(l, i, at, Screen.Series) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Vod -> if (vodItems.isEmpty()) screen = Screen.Home else VodPlayerScreen(app, vodItems, vodIndex, vodStart, onExit = { screen = vodBack })
+    }
+    banner?.let { b ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 28.dp)
+            .background(androidx.compose.ui.graphics.Color(0xF0141619), Rd(16)).padding(horizontal = 28.dp, vertical = 14.dp)) { Text(b, style = T.row) }
+    }
     }
 }
 
