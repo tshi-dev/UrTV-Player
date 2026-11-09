@@ -120,6 +120,8 @@ class ShotsTest {
     @Test fun settings() { seed(); shot("09-settings-ar") { HomeScreen(app, Tab.Settings, {}, { _, _ -> }, {}, {}, null) } }
     @Test fun empty() { shot("10-empty-ar") { HomeScreen(app, Tab.Live, {}, { _, _ -> }, {}, {}, null) } }
     @Test fun addPhone() { shot("08-add-from-phone-ar") { AddPlaylistScreen(app, Triple("http://192.0.2.10:49152/?c=482915", "482915", "192.0.2.10:49152")) {} } }
+    @Test fun backup() { shot("12-backup-passphrase-ar") { com.urtv.player.ui.BackupScreen(app, false) {} } }
+    @Test fun restore() { shot("13-restore-from-phone-ar") { com.urtv.player.ui.BackupScreen(app, true, Triple("http://192.0.2.10:49153/?c=730164", "730164", "192.0.2.10:49153")) {} } }
     @Test fun pin() { shot("11-pin-ar") { PinPad("أدخل الرمز السري", null, 0, {}) {} } }
     @Test fun player() { seed(); val ch = app.catalog.state.value.channels[2]
         shot("04-player-ar") { PlayerScreen(app, app.catalog.state.value.channels, ch) {} } }

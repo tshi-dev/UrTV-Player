@@ -40,11 +40,11 @@ import com.urtv.player.server.serverSettings
 import com.urtv.player.data.BufferMode
 
 private val REFRESH = listOf(0, 6, 12, 24, 48)
-private enum class Section(val label: Int) { Server(R.string.srv_settings_title), General(R.string.set_general), Playlists(R.string.set_playlists), Playback(R.string.set_playback), Appearance(R.string.set_theme), Home(R.string.set_home), Parental(R.string.set_parental), About(R.string.set_about) }
+private enum class Section(val label: Int) { Server(R.string.srv_settings_title), General(R.string.set_general), Playlists(R.string.set_playlists), Playback(R.string.set_playback), Appearance(R.string.set_theme), Home(R.string.set_home), Parental(R.string.set_parental), Backup(R.string.set_backup), About(R.string.set_about) }
 private val STARTS = listOf("home", "live", "guide", "movies", "series", "last", "server")
 
 @Composable
-fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit, onManageHome: () -> Unit, onAddServer: () -> Unit = {}) {
+fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit, onManageHome: () -> Unit, onBackup: (Boolean) -> Unit = {}, onAddServer: () -> Unit = {}) {
     val homeOnly by app.servers.homeOnly.collectAsState()
     val hasServers by app.servers.servers.collectAsState()
     var removeServer by remember { mutableStateOf<String?>(null) }
@@ -55,6 +55,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val refresh by store.refreshHours.collectAsState()
     val buffer by store.buffer.collectAsState()
     val preview by store.livePreview.collectAsState()
+    val tunnel by store.tunneling.collectAsState()
+    val statsOn by store.statsOverlay.collectAsState()
+    val prefetch by store.prefetchNeighbours.collectAsState()
     val resume by store.resumeLast.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     val textScale by store.textScale.collectAsState()
@@ -112,6 +115,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.set_buffer), stringResource(when (buffer) { BufferMode.Low -> R.string.buf_low; BufferMode.Normal -> R.string.buf_normal; BufferMode.High -> R.string.buf_high }), stringResource(R.string.set_buffer_hint)) {
                         store.setBuffer(BufferMode.entries[(buffer.ordinal + 1) % BufferMode.entries.size]); app.player.buffer = store.buffer.value } }
                     item { Setting(stringResource(R.string.set_preview), stringResource(if (preview) R.string.on else R.string.off), stringResource(R.string.set_preview_hint)) { store.setLivePreview(!preview) } }
+                    item { Setting(stringResource(R.string.set_prefetch), stringResource(if (prefetch) R.string.on else R.string.off), stringResource(R.string.set_prefetch_hint)) { store.setPrefetch(!prefetch) } }
+                    item { Setting(stringResource(R.string.set_tunnel), stringResource(if (tunnel) R.string.on else R.string.off), stringResource(R.string.set_tunnel_hint)) { store.setTunneling(!tunnel) } }
+                    item { Setting(stringResource(R.string.set_stats), stringResource(if (statsOn) R.string.on else R.string.off), stringResource(R.string.set_stats_hint)) { store.setStatsOverlay(!statsOn) } }
                 }
                 Section.Appearance -> {
                     item { Setting(stringResource(R.string.set_text_size), stringResource(listOf(R.string.size_normal, R.string.size_large, R.string.size_xl)[textScale])) { store.setTextScale((textScale + 1) % 3) } }
@@ -128,6 +134,11 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.set_pin), stringResource(if (hasPin) R.string.pin_set else R.string.pin_none), stringResource(R.string.set_pin_hint)) {
                         pin = if (hasPin) PinRequest.Verify { pin = PinRequest.SetNew { store.setPin(it) } } else PinRequest.SetNew { store.setPin(it) } } }
                     if (hasPin) item { Setting(stringResource(R.string.pin_remove), "") { pin = PinRequest.Verify { store.setPin(null); app.unlocked = emptySet() } } }
+                }
+                Section.Backup -> {
+                    item { Text(stringResource(R.string.backup_hint), style = T.small, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) }
+                    item { Setting(stringResource(R.string.backup_to_phone), "") { onBackup(false) } }
+                    item { Setting(stringResource(R.string.restore_from_phone), "") { onBackup(true) } }
                 }
                 Section.About -> item { Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted), modifier = Modifier.padding(horizontal = 12.dp).width(900.dp)) }
             }

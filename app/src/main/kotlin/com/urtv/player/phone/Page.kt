@@ -34,5 +34,12 @@ ${if (error) "<div class=\"e\">" + bi("أكمل الرابط أو بيانات �
 <label>${bi("دليل البرامج XMLTV (اختياري)", "XMLTV guide URL (optional)")}</label><input name="epg" type="url" placeholder="https://">
 <button>${bi("إرسال إلى التلفاز", "Send to TV")}</button></form>""")
 
-    fun done() = wrap("""<h1>${bi("تم الإرسال", "Done")}</h1><p class="s">${bi("أُرسلت القائمة إلى التلفاز، ويمكنك إغلاق هذه الصفحة.", "The playlist was sent to the TV. You can close this page.")}</p>""")
+    fun done() = wrap("""<h1>${bi("تم الإرسال", "Done")}</h1><p class="s">${bi("تم الأمر، ويمكنك إغلاق هذه الصفحة.", "All set. You can close this page.")}</p>""")
+
+    fun backup(code: String) = wrap("""<h1>${bi("نسخة احتياطية", "Backup")}</h1><p class="s">${bi("نزّل الملف المشفّر واحفظه. كلمة المرور التي اخترتها على التلفاز مطلوبة لفتحه.", "Download the encrypted file and keep it. You need the passphrase you chose on the TV to open it.")}</p>
+<form method="get" action="/backup"><input type="hidden" name="c" value="${esc(code)}"><button>${bi("تنزيل النسخة", "Download backup")}</button></form>""")
+
+    fun restore(code: String, error: Boolean = false) = wrap("""<h1>${bi("استعادة نسخة", "Restore a backup")}</h1><p class="s">${bi("اختر ملف النسخة الاحتياطية. ستُطلب منك كلمة المرور على التلفاز.", "Choose the backup file. The TV will then ask for its passphrase.")}</p>
+${if (error) "<div class=\"e\">" + bi("لم يصل ملف", "No file received") + "</div>" else ""}
+<form method="post" action="/restore?c=${esc(code)}" enctype="multipart/form-data"><input type="file" name="f" required><button>${bi("إرسال إلى التلفاز", "Send to TV")}</button></form>""")
 }

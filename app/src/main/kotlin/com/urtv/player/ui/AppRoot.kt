@@ -1,6 +1,11 @@
 package com.urtv.player.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,7 +20,7 @@ import com.urtv.player.core.Channel
 import com.urtv.player.data.WatchItem
 import kotlinx.coroutines.launch
 
-private enum class Screen { Home, Player, Add, Groups, HomeRows, Movie, Series, Vod, Server }
+private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, Series, Vod, Server }
 
 @Composable
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
@@ -28,6 +33,7 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     var queue by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var playing by remember { mutableStateOf<Channel?>(null) }
     var restoreKey by remember { mutableStateOf<String?>(null) }
+    var backupRestore by remember { mutableStateOf(false) }
     var detailId by remember { mutableStateOf("") }
     var vodItems by remember { mutableStateOf<List<VodPlay>>(emptyList()) }
     var vodIndex by remember { mutableStateOf(0) }
@@ -68,14 +74,25 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)
     }
 
-    if (homeOnly && screen != Screen.Server) return    // the effect above moves to the server screen on the next frame
-    when (screen) {
+    // programme reminders: a quiet banner at the top while the app is open
+    var banner by remember { mutableStateOf<String?>(null) }
+    val soon = androidx.compose.ui.res.stringResource(com.urtv.player.R.string.reminder_now)
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(15_000)
+            store.takeDueReminders(System.currentTimeMillis()).firstOrNull()?.let { r -> banner = soon.format(r.title, r.channel); kotlinx.coroutines.delay(20_000); banner = null }
+        }
+    }
+    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+    androidx.compose.animation.AnimatedContent(if (homeOnly) Screen.Server else screen, transitionSpec = {
+        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200, easing = androidx.compose.animation.core.LinearOutSlowInEasing)).togetherWith(androidx.compose.animation.ExitTransition.None)
+    }, label = "screen") { scr -> when (scr) {
         Screen.Server -> com.urtv.player.server.ServerRoot(app, onLanguage = onLanguageChanged, onIptv = { screen = Screen.Home })
         Screen.Home -> HomeScreen(
             app, tab, { tab = it },
             onPlay = { list, ch -> queue = list; playing = ch; screen = Screen.Player },
             onAdd = { screen = Screen.Add }, onServer = { screen = Screen.Server }, onLanguage = onLanguageChanged, restoreKey = restoreKey,
-            onManageGroups = { screen = Screen.Groups }, onManageHome = { screen = Screen.HomeRows },
+            onManageGroups = { screen = Screen.Groups }, onManageHome = { screen = Screen.HomeRows }, onBackup = { backupRestore = it; screen = Screen.Backup },
             onOpenMovie = { detailId = it; screen = Screen.Movie }, onOpenSeries = { detailId = it; screen = Screen.Series },
             onCatchup = { ch, p ->
                 val d = def
@@ -91,10 +108,17 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } ?: run { screen = Screen.Home }
         Screen.Add -> AddPlaylistScreen(app) { screen = Screen.Home }
         Screen.Groups -> GroupsManage(app) { tab = Tab.Settings; screen = Screen.Home }
+        Screen.Backup -> BackupScreen(app, backupRestore) { restored -> tab = Tab.Settings; screen = Screen.Home; if (restored) onLanguageChanged() }
         Screen.HomeRows -> HomeManage(app) { tab = Tab.Settings; screen = Screen.Home }
         Screen.Movie -> def?.let { d -> MovieDetail(app, d, detailId, onPlay = { v, at -> playVod(listOf(v), 0, at, Screen.Movie) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Series -> def?.let { d -> SeriesDetail(app, d, detailId, onPlay = { l, i, at -> playVod(l, i, at, Screen.Series) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Vod -> if (vodItems.isEmpty()) screen = Screen.Home else VodPlayerScreen(app, vodItems, vodIndex, vodStart, onExit = { screen = vodBack })
+    } }
+    if (!app.splashDone) LaunchSplash { app.splashDone = true }
+    banner?.let { b ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 28.dp)
+            .background(androidx.compose.ui.graphics.Color(0xF0141619), Rd(16)).padding(horizontal = 28.dp, vertical = 14.dp)) { Text(b, style = T.row) }
+    }
     }
 }
 

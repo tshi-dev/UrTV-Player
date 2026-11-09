@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
 /** A handful of vector glyphs drawn on a canvas, so no icon font or image asset is shipped. */
-enum class Glyph { Heart, Lock, Search, Play, Plus, Refresh, Check }
+enum class Glyph { Heart, Lock, Search, Play, Plus, Refresh, Check, Bell }
 
 @Composable
 fun Icon(g: Glyph, tint: Color = ink(), size: Int = 28, filled: Boolean = false) {
@@ -40,6 +40,10 @@ fun Icon(g: Glyph, tint: Color = ink(), size: Int = 28, filled: Boolean = false)
             Glyph.Play -> drawPath(Path().apply { moveTo(s * .25f, s * .12f); lineTo(s * .25f, s * .88f); lineTo(s * .85f, s * .5f); close() }, tint)
             Glyph.Plus -> { drawLine(tint, Offset(s * .5f, s * .15f), Offset(s * .5f, s * .85f), w, StrokeCap.Round); drawLine(tint, Offset(s * .15f, s * .5f), Offset(s * .85f, s * .5f), w, StrokeCap.Round) }
             Glyph.Refresh -> { drawArc(tint, 40f, 280f, false, Offset(s * .15f, s * .15f), Size(s * .7f, s * .7f), style = st); drawPath(Path().apply { moveTo(s * .68f, s * .05f); lineTo(s * .88f, s * .27f); lineTo(s * .58f, s * .3f); close() }, tint) }
+            Glyph.Bell -> {
+                drawPath(Path().apply { moveTo(s * .2f, s * .74f); cubicTo(s * .3f, s * .62f, s * .28f, s * .5f, s * .3f, s * .4f); cubicTo(s * .34f, s * .16f, s * .66f, s * .16f, s * .7f, s * .4f); cubicTo(s * .72f, s * .5f, s * .7f, s * .62f, s * .8f, s * .74f); close() }, tint)
+                drawCircle(tint, s * .09f, Offset(s * .5f, s * .85f))
+            }
             Glyph.Check -> drawPath(Path().apply { moveTo(s * .15f, s * .55f); lineTo(s * .4f, s * .78f); lineTo(s * .85f, s * .25f) }, tint, style = st)
         }
     }

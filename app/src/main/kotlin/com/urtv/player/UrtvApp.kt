@@ -24,6 +24,8 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     /** Locked groups the user has unlocked with the PIN during this run. */
     var unlocked by mutableStateOf(emptySet<String>())
     var resumeHandled = false
+    /** The launch animation plays once per process. */
+    var splashDone by mutableStateOf(false)
 
     /** Small, bounded image caches: friendly to 1-2 GB TV boxes. */
     override fun newImageLoader(context: android.content.Context): coil3.ImageLoader = coil3.ImageLoader.Builder(context)
@@ -36,7 +38,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
         store = Store(this)
         catalog = Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
         vod = Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
-        player = PlayerController(this)
+        player = PlayerController(this, store)
         servers = ServerManager(this)
     }
 }

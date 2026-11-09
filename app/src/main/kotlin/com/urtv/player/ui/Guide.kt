@@ -56,6 +56,8 @@ private const val SLOT_MS = 30 * 60_000L
 fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel) -> Unit, onCatchup: (Channel, Programme) -> Unit) {
     val epg by app.catalog.epg.collectAsState()
     val nowMs by rememberNow()
+    val reminders by app.store.reminders.collectAsState()
+    val reminded = remember(reminders) { reminders.map { it.key }.toSet() }
     val rows = remember(cat.channels, epg) { cat.channels.filter { epg.forChannel(it.epgId).isNotEmpty() } }
     var detail by remember { mutableStateOf<Programme?>(null) }
     val scroll = rememberScrollState()
@@ -75,6 +77,7 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
             Text(d?.title ?: " ", style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (d != null) {
                 Text("${fmtTime(d.startMs)} – ${fmtTime(d.stopMs)}", style = T.small)
+                if (d.startMs > nowMs) Text(stringResource(R.string.reminder_hint), style = T.tiny)
                 if (d.description.isNotBlank()) Text(d.description, style = T.tiny.copy(fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -97,7 +100,7 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
                         Text(ch.name, style = T.small.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Box(Modifier.weight(1f).horizontalScroll(scroll)) {
-                        GuideRow(ch, epg.forChannel(ch.epgId), start, nowOffset, nowMs, onFocus = { detail = it }) { p ->
+                        GuideRow(ch, epg.forChannel(ch.epgId), start, nowOffset, nowMs, reminded, onLong = { p -> app.store.toggleReminder(com.urtv.player.data.Store.Reminder("${ch.url}|${p.startMs}", p.startMs, p.title, ch.name)) }, onFocus = { detail = it }) { p ->
                             if (p.stopMs < nowMs && ch.archiveDays > 0 && ch.streamId != null) onCatchup(ch, p) else onPlay(rows, ch)
                         }
                     }
@@ -108,7 +111,7 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 }
 
 @Composable
-private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset: Dp, nowMs: Long, onFocus: (Programme) -> Unit, onClick: (Programme) -> Unit) {
+private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset: Dp, nowMs: Long, reminded: Set<String>, onLong: (Programme) -> Unit, onFocus: (Programme) -> Unit, onClick: (Programme) -> Unit) {
     val end = start + SPAN_MIN * 60_000L
     Box(Modifier.width(DP_PER_MIN * SPAN_MIN).fillMaxSize().drawBehind {
         val raw = nowOffset.toPx(); val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl) size.width - raw else raw
@@ -120,10 +123,13 @@ private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset
             val x = DP_PER_MIN * ((s - start) / 60_000f); val w = DP_PER_MIN * ((e - s) / 60_000f) - 4.dp
             if (w < 12.dp) continue
             val catchup = p.stopMs < nowMs && ch.archiveDays > 0
-            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize().drawBehind { drawLine(C.hairline, Offset(0f, 8f), Offset(0f, size.height - 8f), 1f) }, Rd(10), lift = 1.02f, onFocus = { if (it) onFocus(p) }) {
+            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize().drawBehind { drawLine(C.hairline, Offset(0f, 8f), Offset(0f, size.height - 8f), 1f) }, Rd(10), lift = 1.02f, onFocus = { if (it) onFocus(p) }, onLongClick = if (p.startMs > nowMs) { { onLong(p) } } else null) {
                 Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp)) {
                     Text(p.title, style = T.small.copy(color = C.text, fontSize = 19.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(fmtTime(p.startMs), style = T.tiny.copy(color = if (catchup) C.accent else C.faint, fontSize = 15.sp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(fmtTime(p.startMs), style = T.tiny.copy(color = if (catchup) C.accent else C.faint, fontSize = 15.sp))
+                        if ("${ch.url}|${p.startMs}" in reminded) { Spacer(Modifier.width(6.dp)); Icon(Glyph.Bell, C.accent, 16) }
+                    }
                 }
             }
         }

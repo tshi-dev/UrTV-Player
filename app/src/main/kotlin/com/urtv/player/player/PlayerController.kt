@@ -42,7 +42,7 @@ data class TrackState(val audio: List<TrackOption> = emptyList(), val text: List
  * Wraps ExoPlayer for live TV: HLS/DASH/TS, a stall watchdog with exponential back-off reconnect,
  * track selection, subtitles as plain text and aspect modes.
  */
-class PlayerController(private val ctx: Context) {
+class PlayerController(private val ctx: Context, private val store: com.urtv.player.data.Store) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     var player: ExoPlayer? = null; private set
     private var builtFor: BufferMode? = null
@@ -78,28 +78,67 @@ class PlayerController(private val ctx: Context) {
     private var retryJob: Job? = null
     private var stallSec = 0; private var frozenSec = 0; private var stableSec = 0; private var lastPos = -1L
 
-    private fun build(): ExoPlayer {
-        val http = DefaultHttpDataSource.Factory().setUserAgent(Http.UA).setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(10_000).setReadTimeoutMs(12_000)
+    private val lowRam = (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    private val prefs = ctx.getSharedPreferences("urtv", Context.MODE_PRIVATE)
+    private var meter: androidx.media3.exoplayer.upstream.DefaultBandwidthMeter? = null
+    private var builtLive: Boolean? = null
+    private val rebuffers = PlaybackTuning.RebufferTracker()
+    private var readySince = false
+    private var loadStartMs = 0L
+    private val _stats = MutableStateFlow(Stats())
+    val stats: StateFlow<Stats> = _stats
+    private var ttffAvg = 0L; private var ttffN = 0
+
+    data class Stats(val width: Int = 0, val height: Int = 0, val videoKbps: Int = 0, val estimateKbps: Int = 0, val bufferedMs: Long = 0,
+                     val dropped: Int = 0, val codec: String = "", val fps: Float = 0f, val ttffMs: Long = 0, val ttffAvgMs: Long = 0, val capped: Boolean = false)
+
+    /** Display size in pixels (physical mode), used to cap the video resolution. */
+    private fun displaySize(): Pair<Int, Int> = runCatching {
+        val dm = ctx.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+        val m = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY).mode; m.physicalWidth to m.physicalHeight
+    }.getOrDefault(0 to 0)
+
+    private fun build(live: Boolean): ExoPlayer {
+        val http = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA)
+        dataFactory = http
         val extractors = DefaultExtractorsFactory().setTsExtractorFlags(
             DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS)
-        val b = buffer
-        val load = DefaultLoadControl.Builder().setBufferDurationsMs(b.minMs, b.maxMs, b.startMs, b.rebufMs).build()
+        val buf = PlaybackTuning.buffers(buffer, live, lowRam)
+        val load = DefaultLoadControl.Builder().setBufferDurationsMs(buf.minMs, buf.maxMs, buf.startMs, buf.rebufMs)
+            .setPrioritizeTimeOverSizeThresholds(true).setBackBuffer(if (live) 0 else 30_000, false).apply { if (buf.targetBytes > 0) setTargetBufferBytes(buf.targetBytes) }.build()
+        val bm = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(ctx)
+            .setInitialBitrateEstimate(PlaybackTuning.seedBitrate(prefs.getLong("bw", 0))).build()
+        meter = bm
+        val (mw, mh) = PlaybackTuning.maxVideoSize(displaySize().first, displaySize().second)
+        val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx).apply {
+            setParameters(buildUponParameters().setMaxVideoSize(mw, mh).setViewportSizeToPhysicalDisplaySize(ctx, true).setTunnelingEnabled(store.tunneling.value).setAllowVideoMixedMimeTypeAdaptiveness(true))
+        }
         val p = ExoPlayer.Builder(ctx)
-            .setRenderersFactory(DefaultRenderersFactory(ctx).setEnableDecoderFallback(true))
+            .setRenderersFactory(DefaultRenderersFactory(ctx).setEnableDecoderFallback(true))   // hardware decoder first, software if it fails
             .setMediaSourceFactory(DefaultMediaSourceFactory(ctx, extractors).setDataSourceFactory(http))
-            .setLoadControl(load)
+            .setLoadControl(load).setBandwidthMeter(bm).setTrackSelector(selector)
             .setHandleAudioBecomingNoisy(true)
             .build()
+        p.videoChangeFrameRateStrategy = C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS      // 24/25/50/60 matching where the TV can switch without a black screen
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
         p.addListener(listener)
         surface?.let { p.setVideoSurfaceView(it) }
-        builtFor = b
+        builtFor = buffer; builtLive = live
         return p
     }
+    private var dataFactory: androidx.media3.datasource.DataSource.Factory? = null
 
     private val listener = object : Player.Listener {
+        override fun onRenderedFirstFrame() {
+            val t = System.currentTimeMillis() - loadStartMs
+            if (loadStartMs > 0 && t in 1..60_000) { ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
+        }
         override fun onPlaybackStateChanged(state: Int) {
+            // a stall after playback had started: after 3 in a minute, switch to a lower variant
+            if (state == Player.STATE_BUFFERING && readySince && !vod) {
+                if (rebuffers.record(System.currentTimeMillis())) downgrade()
+            }
+            if (state == Player.STATE_READY) readySince = true
             when (state) {
                 Player.STATE_BUFFERING -> if (_status.value != PlayStatus.Reconnecting && _status.value != PlayStatus.Failed) _status.value = PlayStatus.Loading
                 Player.STATE_READY -> if (_status.value != PlayStatus.Failed) { _status.value = PlayStatus.Playing }
@@ -117,6 +156,24 @@ class PlayerController(private val ctx: Context) {
             if (c != null && !forceHls && e.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) { forceHls = true; load(c); return }
             scheduleReconnect()
         }
+    }
+
+    private fun downgrade() {
+        val p = player ?: return
+        val cur = p.videoFormat?.bitrate?.toLong() ?: return
+        if (cur <= 0) return
+        rebuffers.reset()
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoBitrate(PlaybackTuning.downgradeCap(cur).toInt()).build()
+        _stats.value = _stats.value.copy(capped = true)
+    }
+
+    /** Refreshes [stats] from the player (called about once a second by the overlay and the watchdog). */
+    fun sampleStats() {
+        val p = player ?: return
+        val f = p.videoFormat
+        _stats.value = _stats.value.copy(width = f?.width ?: 0, height = f?.height ?: 0, videoKbps = ((f?.bitrate ?: 0) / 1000).coerceAtLeast(0),
+            estimateKbps = ((meter?.bitrateEstimate ?: 0L) / 1000).toInt(), bufferedMs = p.totalBufferedDuration, dropped = p.videoDecoderCounters?.droppedBufferCount ?: 0,
+            codec = (f?.sampleMimeType ?: "").removePrefix("video/") + (f?.codecs?.let { " $it" } ?: ""), fps = f?.frameRate?.takeIf { it > 0 } ?: 0f)
     }
 
     private fun readTracks(t: Tracks): TrackState {
@@ -152,6 +209,8 @@ class PlayerController(private val ctx: Context) {
     /** Seekable on-demand playback (movie, episode, catch-up) starting at [startMs]. */
     fun playVod(title: String, url: String, startMs: Long) { play(Channel(url, title, url), startMs, true) }
 
+    val isPreview get() = preview
+
     fun playPreview(ch: Channel) { preview = true; startPlay(ch, 0L, false) }
 
     fun play(ch: Channel, startMs: Long = 0L, isVod: Boolean = false) { preview = false; startPlay(ch, startMs, isVod) }
@@ -168,15 +227,24 @@ class PlayerController(private val ctx: Context) {
 
     private fun load(ch: Channel) {
         retryJob?.cancel()
-        if (player == null || builtFor != buffer) { player?.release(); player = build() }
+        if (player == null || builtFor != buffer || builtLive != !vod) { saveBandwidth(); player?.release(); player = build(!vod) }
         val p = player!!
+        loadStartMs = System.currentTimeMillis(); readySince = false
+        if (_attempt.value == 0) { rebuffers.reset(); p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoBitrate(Int.MAX_VALUE).build(); _stats.value = _stats.value.copy(capped = false) }
         p.volume = if (preview) 0f else 1f
         _status.value = if (_attempt.value > 0) PlayStatus.Reconnecting else PlayStatus.Loading
+        val isHls = forceHls || ch.url.contains(".m3u8", true)
         val item = MediaItem.Builder().setUri(Uri.parse(ch.url)).apply {
-            if (forceHls || ch.url.contains(".m3u8", true)) setMimeType(MimeTypes.APPLICATION_M3U8)
-            else if (ch.url.contains(".mpd", true)) setMimeType(MimeTypes.APPLICATION_MPD)
+            if (isHls) setMimeType(MimeTypes.APPLICATION_M3U8) else if (ch.url.contains(".mpd", true)) setMimeType(MimeTypes.APPLICATION_MPD)
+            // live: gently speed up (max 1.04x) to stay close to the live edge after a stall
+            if (!vod) setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setMaxPlaybackSpeed(1.04f).build())
         }.build()
-        if (vod && startAtMs > 0) p.setMediaItem(item, startAtMs) else p.setMediaItem(item)
+        val df = dataFactory
+        if (isHls && df != null) {
+            // chunkless preparation: start from the master playlist alone (fewer round trips before the first frame)
+            val src = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(df).setAllowChunklessPreparation(true).createMediaSource(item)
+            if (vod && startAtMs > 0) p.setMediaSource(src, startAtMs) else p.setMediaSource(src)
+        } else if (vod && startAtMs > 0) p.setMediaItem(item, startAtMs) else p.setMediaItem(item)
         p.prepare(); p.playWhenReady = true
         stallSec = 0; frozenSec = 0; stableSec = 0; lastPos = -1
         startWatchdog()
@@ -206,6 +274,7 @@ class PlayerController(private val ctx: Context) {
         watchdog = scope.launch {
             while (true) {
                 delay(1000)
+                if (store.statsOverlay.value) sampleStats()
                 val p = player ?: continue
                 if (current == null || _paused.value || _status.value == PlayStatus.Failed || retryJob?.isActive == true) continue
                 when (p.playbackState) {
@@ -228,8 +297,10 @@ class PlayerController(private val ctx: Context) {
     fun detach(sv: android.view.SurfaceView) { if (surface === sv) { player?.clearVideoSurfaceView(sv); surface = null } }
 
     /** Frees the decoder (activity stopped). The current channel is kept so [resume] can restart it. */
+    private fun saveBandwidth() { meter?.bitrateEstimate?.takeIf { it > 0 }?.let { prefs.edit().putLong("bw", it).apply() } }
+
     fun release() {
-        watchdog?.cancel(); retryJob?.cancel(); watchdog = null
+        saveBandwidth(); watchdog?.cancel(); retryJob?.cancel(); watchdog = null
         player?.release(); player = null; _status.value = PlayStatus.Idle
     }
 
