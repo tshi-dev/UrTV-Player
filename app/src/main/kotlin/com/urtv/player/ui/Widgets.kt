@@ -186,3 +186,35 @@ fun FocusField(
         }
     }
 }
+
+
+/** Quiet placeholder block with a slow pulse; uses theme tokens so it fits every theme. */
+@Composable
+fun SkeletonBlock(modifier: Modifier, radius: Int = 10) {
+    val t = rememberInfiniteTransition(label = "sk")
+    val a by t.animateFloat(0.55f, 1f, infiniteRepeatable(tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
+    Box(modifier.graphicsLayer { alpha = a }.clip(Rd(radius)).background(C.glass))
+}
+
+/** Rows shaped like the real channel rows (number, logo, two text lines): shown instead of a spinner or an empty state while loading. */
+@Composable
+fun SkeletonRows(count: Int = 10, rowHeight: Int = 76) {
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+        repeat(count) {
+            Row(Modifier.fillMaxWidth().height(rowHeight.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                SkeletonBlock(Modifier.size(width = 30.dp, height = 18.dp), 6); androidx.compose.foundation.layout.Spacer(Modifier.size(22.dp))
+                SkeletonBlock(Modifier.size(44.dp), 10); androidx.compose.foundation.layout.Spacer(Modifier.size(16.dp))
+                androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                    SkeletonBlock(Modifier.size(width = (240 + (it * 37) % 160).dp, height = 18.dp), 6)
+                    SkeletonBlock(Modifier.size(width = (160 + (it * 53) % 140).dp, height = 14.dp), 6)
+                }
+            }
+        }
+    }
+}
+
+/** Card-shaped placeholders for Home rows and poster grids. */
+@Composable
+fun SkeletonCards(count: Int = 5, width: Int = 300, height: Int = 88) {
+    Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) { repeat(count) { SkeletonBlock(Modifier.size(width.dp, height.dp), 14) } }
+}

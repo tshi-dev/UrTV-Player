@@ -12,8 +12,25 @@ permissions:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    env:
+      # optional secret: a token that can read tshi-dev/urtv-fonts (empty on forks and PRs, then Plex is used)
+      FONTS_TOKEN: ${{ secrets.FONTS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      # Thmanyah's licence allows its files only inside a built product: they live in the private tshi-dev/urtv-fonts
+      # and are put in place here, never committed to this repository. Without the secret the open IBM Plex Sans Arabic is used.
+      - uses: actions/checkout@v4
+        if: ${{ env.FONTS_TOKEN != '' }}
+        with:
+          repository: tshi-dev/urtv-fonts
+          token: ${{ secrets.FONTS_TOKEN }}
+          path: .fonts-private
+      - name: Private fonts
+        if: ${{ env.FONTS_TOKEN != '' }}
+        run: |
+          mkdir -p app/src/main/assets/fonts
+          cp .fonts-private/android/*.otf app/src/main/assets/fonts/
+          rm -rf .fonts-private
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -32,11 +49,8 @@ jobs:
           rsize=$(stat -c %s app/build/outputs/apk/release/app-release-unsigned.apk)
           echo "Release APK size: $rsize bytes (budget 4194304)"
           test "$rsize" -le 4194304
-      - name: Enforce size budget (debug APK at most 7 MB)
-        run: |
-          size=$(stat -c %s app/build/outputs/apk/debug/app-debug.apk)
-          echo "APK size: $size bytes (budget 7340032)"
-          test "$size" -le 7340032
+      - name: Debug APK size (reported, not enforced: the release APK is the shipped one)
+        run: echo "Debug APK size: $(stat -c %s app/build/outputs/apk/debug/app-debug.apk) bytes"
       - name: Report APK size, dex methods and permissions
         run: |
           ls -l app/build/outputs/apk/debug/*.apk

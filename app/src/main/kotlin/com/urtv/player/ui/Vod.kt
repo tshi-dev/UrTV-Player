@@ -88,7 +88,7 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {
                 when {
-                    list.isEmpty() && vod.loading -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
+                    list.isEmpty() && vod.loading -> androidx.compose.foundation.lazy.grid.LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), userScrollEnabled = false) { items(12) { SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) } }
                     list.isEmpty() && vod.failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.err_network), style = T.title); Spacer(Modifier.height(16.dp))
                         TvButton(stringResource(R.string.retry), { app.vod.open(app.store.playlists.value.firstOrNull { it.id == vod.playlistId }, true) }, primary = true) }

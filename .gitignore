@@ -6,3 +6,6 @@ build/
 local.properties
 .idea/
 .kotlin/
+
+# Thmanyah (private, injected at CI build time; never committed)
+app/src/main/assets/fonts/

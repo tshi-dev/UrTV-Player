@@ -27,7 +27,7 @@ private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, 
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val ready by app.store.ready.collectAsState()
     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(C.bg)) {
-        if (ready) AppContent(app, onLanguageChanged)
+        if (ready) AppContent(app, onLanguageChanged) else androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 130.dp)) { SkeletonRows(9) }
         if (!app.splashDone) LaunchSplash { app.splashDone = true }
     }
 }

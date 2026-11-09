@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val app = application as UrtvApp
+        com.urtv.player.ui.Fonts.init(this)
         setContent {
             val look by app.store.appearance.collectAsState(); val scale by app.store.textScale.collectAsState()
             UrtvTheme(look, scale) { AppRoot(app, onLanguageChanged = { recreate() }) }

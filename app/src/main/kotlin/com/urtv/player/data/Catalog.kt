@@ -21,6 +21,8 @@ data class CatalogState(
     val loading: Boolean = false,
     val error: LoadError? = null,
     val epgLoading: Boolean = false,
+    /** True once the first answer is in (cache read or network try finished). Until then the UI shows skeleton rows, never an empty-state flash. */
+    val settled: Boolean = false,
 )
 
 /** Loads the active playlist (cache first, then network) and its XMLTV guide. */
@@ -35,13 +37,13 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     fun open(id: String?, force: Boolean = false) {
         job?.cancel()
         val def = store.playlists.value.firstOrNull { it.id == id }
-        if (def == null) { _state.value = CatalogState(); _epg.value = EpgIndex.EMPTY; return }
+        if (def == null) { _state.value = CatalogState(settled = true); _epg.value = EpgIndex.EMPTY; return }
         val sameList = _state.value.playlistId == id
         _state.value = CatalogState(playlistId = id, channels = if (sameList) _state.value.channels else emptyList(), loading = true)
         job = scope.launch {
             val cacheFile = chFile(def.id)
             val cached = withContext(Dispatchers.IO) { readCache(cacheFile) }
-            if (cached.isNotEmpty()) _state.value = _state.value.copy(channels = cached, loading = false)
+            if (cached.isNotEmpty()) _state.value = _state.value.copy(channels = cached, loading = false, settled = true)
             val maxAgeMs = store.refreshHours.value * 3_600_000L
             val stale = !cacheFile.exists() || cached.isEmpty() || (maxAgeMs > 0 && System.currentTimeMillis() - cacheFile.lastModified() > maxAgeMs)
             var epgUrls = emptyList<String>()
@@ -50,13 +52,13 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 val r = withContext(Dispatchers.IO) { runCatching { fetch(def) } }
                 r.onSuccess { (list, urls) ->
                     epgUrls = urls
-                    if (list.isEmpty()) _state.value = _state.value.copy(loading = false, error = if (cached.isEmpty()) LoadError.Empty else null)
-                    else { withContext(Dispatchers.IO) { writeCache(cacheFile, list) }; _state.value = _state.value.copy(channels = list, loading = false, error = null) }
+                    if (list.isEmpty()) _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Empty else null)
+                    else { withContext(Dispatchers.IO) { writeCache(cacheFile, list) }; _state.value = _state.value.copy(channels = list, loading = false, settled = true, error = null) }
                 }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
-                    _state.value = _state.value.copy(loading = false, error = if (cached.isEmpty()) LoadError.Network else null)
+                    _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Network else null)
                 }
-            } else _state.value = _state.value.copy(loading = false)
+            } else _state.value = _state.value.copy(loading = false, settled = true)
             loadEpg(def, force || stale, epgUrls)
         }
     }
