@@ -95,33 +95,54 @@ class ServerManager(ctx: Context) {
         else -> JellyfinBackend(c, transport(c.pinnedCert), deviceId)
     }
 
-    /** What this TV can decode, from MediaCodecList. Used to choose direct play vs server transcoding. */
+    /**
+     * What this TV can really play: decoders from MediaCodecList, audio formats the HDMI/ARC path can pass through
+     * (AudioCapabilities), HDR from the display, and the highest decodable resolution. Used to ask the server for
+     * transcoding only when the TV truly cannot play the file.
+     */
     val caps: DeviceCaps by lazy { detectCaps() }
 
+    private val appCtx = ctx.applicationContext
+
+    /** [caps] with the bitrate limited by what the network has actually delivered (shared with the player's meter). */
+    fun capsNow(): DeviceCaps {
+        val est = runCatching { androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(appCtx).bitrateEstimate }.getOrDefault(0L)
+        // 75 % of the measured rate, never below 4 Mbit/s (the meter starts from a coarse guess) and never above the device limit.
+        val limit = if (est > 0) (est * 0.75).toLong().coerceIn(4_000_000L, caps.maxBitrate) else caps.maxBitrate
+        return caps.copy(maxBitrate = limit)
+    }
+
     private fun detectCaps(): DeviceCaps {
-        val video = HashSet<String>(); val audio = HashSet<String>(setOf("aac", "mp3", "opus", "flac", "vorbis"))
-        var maxH = 1080; var hdr = false
+        val video = HashSet<String>(); val audio = HashSet<String>(setOf("aac", "mp3", "opus", "flac", "vorbis", "pcm"))
+        var maxH = 1080; var main10 = false
         runCatching {
             for (info in MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos) {
                 if (info.isEncoder) continue
-                for (t in info.supportedTypes) when (t.lowercase()) {
-                    "video/avc" -> video += "h264"
-                    "video/hevc" -> { video += "hevc"; hdr = hdr || info.getCapabilitiesForType(t).colorFormats.isNotEmpty() && info.getCapabilitiesForType(t).profileLevels.any { it.profile == 0x1000 /* Main10 */ || it.profile == 2 } }
-                    "video/av01" -> video += "av1"
-                    "video/x-vnd.on2.vp9" -> video += "vp9"
-                    "audio/ac3" -> audio += "ac3"
-                    "audio/eac3" -> audio += "eac3"
-                    "audio/vnd.dts", "audio/vnd.dts.hd" -> audio += "dts"
-                    "audio/true-hd" -> audio += "truehd"
+                for (t in info.supportedTypes) {
+                    val name = when (t.lowercase()) { "video/avc" -> "h264"; "video/hevc" -> "hevc"; "video/av01" -> "av1"; "video/x-vnd.on2.vp9" -> "vp9"; else -> null } ?: continue
+                    video += name
+                    runCatching {
+                        val c = info.getCapabilitiesForType(t)
+                        if (c.videoCapabilities.isSizeSupported(3840, 2160)) maxH = 2160
+                        if (name == "hevc" && c.profileLevels.any { it.profile == 2 || it.profile == 0x1000 }) main10 = true   // Main10 / Main10 HDR10
+                    }
                 }
-                if (info.supportedTypes.any { it.equals("video/hevc", true) || it.equals("video/avc", true) }) runCatching {
-                    val t = info.supportedTypes.first { it.startsWith("video/") }
-                    val v = info.getCapabilitiesForType(t).videoCapabilities
-                    if (v.isSizeSupported(3840, 2160)) maxH = 2160
-                }
+                for (t in info.supportedTypes) when (t.lowercase()) { "audio/ac3" -> audio += "ac3"; "audio/eac3" -> audio += "eac3"; "audio/vnd.dts", "audio/vnd.dts.hd" -> audio += "dts"; "audio/true-hd" -> audio += "truehd" }
             }
         }
+        // Passthrough: the TV or receiver decodes these even when the SoC has no decoder for them.
+        runCatching {
+            val ac = androidx.media3.exoplayer.audio.AudioCapabilities.getCapabilities(appCtx)
+            if (ac.supportsEncoding(androidx.media3.common.C.ENCODING_AC3)) audio += "ac3"
+            if (ac.supportsEncoding(androidx.media3.common.C.ENCODING_E_AC3)) audio += "eac3"
+            if (ac.supportsEncoding(androidx.media3.common.C.ENCODING_DTS)) audio += "dts"
+            if (ac.supportsEncoding(androidx.media3.common.C.ENCODING_DOLBY_TRUEHD)) audio += "truehd"
+        }
+        val panelHdr = runCatching {
+            @Suppress("DEPRECATION")
+            ((appCtx.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay.hdrCapabilities?.supportedHdrTypes?.isNotEmpty()) == true
+        }.getOrDefault(false)
         if (video.isEmpty()) video += "h264"
-        return DeviceCaps(video, audio + "ac3", setOf("mp4", "mkv", "ts"), maxH, hdr, 80_000_000)
+        return DeviceCaps(video, audio, setOf("mp4", "mkv", "ts"), maxH, hdr = main10 && panelHdr, maxBitrate = 120_000_000)
     }
 }

@@ -115,7 +115,7 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
                 val sub = if (keepChoices && !subAuto) subSel else SubtitleChoice.pickSubtitle(full.subtitles, audio, prefs, mode)
                 audioSel = audio; subSel = sub
                 val burn = sub?.takeIf { s -> SubtitleChoice.needsBurnIn(s) }
-                val p = withContext(Dispatchers.IO) { backend.playback(full, mgr.caps, PlayOptions(0, audio?.index, burn?.index)) }
+                val p = withContext(Dispatchers.IO) { backend.playback(full, mgr.capsNow(), PlayOptions(0, audio?.index, burn?.index)) }
                 plan?.let { old -> launch(Dispatchers.IO) { backend.reportStop(old, sp.position()) } }
                 plan = p
                 sp.start(p, at, prefs)
