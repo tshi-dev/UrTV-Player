@@ -168,8 +168,8 @@ fun BadgeRow(item: MediaItem) {
 
 @Composable
 fun episodeLabel(season: Int?, ep: Int?): String = when {
-    season != null && ep != null -> stringResource(R.string.srv_ep_label, season, ep)
-    ep != null -> stringResource(R.string.srv_ep_only, ep)
+    season != null && ep != null -> stringResource(R.string.srv_ep_label, "$season", "$ep")
+    ep != null -> stringResource(R.string.srv_ep_only, "$ep")
     else -> ""
 }
 
@@ -224,7 +224,7 @@ fun Hero(item: MediaItem?, height: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-fun clockOf(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60) }
+fun clockOf(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(java.util.Locale.US, s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(java.util.Locale.US, s / 60, s % 60) }
 
 @Composable
 fun Centered(content: @Composable () -> Unit) = Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }

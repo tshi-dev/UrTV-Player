@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private fun clock(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60) }
+private fun clock(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(Locale.US, s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(Locale.US, s / 60, s % 60) }
 
 internal enum class Panel { None, Main, Audio, Subs, Style, Offset, Online, Results }
 
@@ -213,7 +213,7 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
                 Text(stringResource(if (activeMarker.kind == MarkerKind.Intro) R.string.srv_skip_intro else R.string.srv_skip_credits) + "  (OK)", style = T.bodyBold)
             }
         }
-        androidx.compose.animation.AnimatedVisibility(bar || paused, Modifier.align(Alignment.BottomCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+        androidx.compose.animation.AnimatedVisibility((bar || paused) && panel == Panel.None, Modifier.align(Alignment.BottomCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
             OsdBar(item, pos, dur, plan)
         }
         if (panel != Panel.None) Box(Modifier.align(Alignment.CenterEnd)) {

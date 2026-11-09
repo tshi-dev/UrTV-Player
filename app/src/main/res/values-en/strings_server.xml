@@ -46,12 +46,12 @@
     <string name="srv_trailer">Trailer</string>
     <string name="srv_cast">Cast</string>
     <string name="srv_similar">More like this</string>
-    <string name="srv_left_min">%1$d min left</string>
-    <string name="srv_season_n">Season %1$d</string>
-    <string name="srv_seasons_n">%1$d seasons</string>
+    <string name="srv_left_min">%1$s min left</string>
+    <string name="srv_season_n">Season %1$s</string>
+    <string name="srv_seasons_n">%1$s seasons</string>
     <string name="srv_specials">Specials</string>
-    <string name="srv_ep_label">S%1$d E%2$d</string>
-    <string name="srv_ep_only">E%1$d</string>
+    <string name="srv_ep_label">S%1$s E%2$s</string>
+    <string name="srv_ep_only">E%1$s</string>
     <string name="srv_h">h</string>
     <string name="srv_m">m</string>
     <string name="srv_sort_name">Name</string>
