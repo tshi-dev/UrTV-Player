@@ -3,6 +3,12 @@ updates:
   - package-ecosystem: gradle
     directory: "/"
     schedule: { interval: weekly }
+    ignore:
+      # Compose BOM, AGP and Kotlin move together with the Compose compiler plugin; upgrade them in one deliberate pass
+      # (CI must stay green), not through bot PRs that break the build.
+      - dependency-name: "androidx.compose:compose-bom"
+      - dependency-name: "com.android.application"
+      - dependency-name: "org.jetbrains.kotlin.*"
   - package-ecosystem: github-actions
     directory: "/"
     schedule: { interval: weekly }

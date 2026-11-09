@@ -88,12 +88,12 @@ object T {
     private val f @Composable get() = LocalTheme.current.font
     private fun s(size: Int, line: Int, w: FontWeight, f: FontFamily, c: Color) = TextStyle(fontSize = size.sp, lineHeight = line.sp, fontWeight = w, color = c, fontFamily = f, fontFeatureSettings = "tnum")
     val display @Composable get() = s(44, 60, FontWeight.SemiBold, f, ink())
-    val title @Composable get() = s(32, 44, FontWeight.SemiBold, f, ink())
-    val row @Composable get() = s(24, 34, FontWeight.Medium, f, ink())
-    val body @Composable get() = s(22, 32, FontWeight.Normal, f, ink())
-    val bodyBold @Composable get() = s(22, 32, FontWeight.Medium, f, ink())
-    val small @Composable get() = s(19, 28, FontWeight.Normal, f, mutedInk())
-    val tiny @Composable get() = s(16, 24, FontWeight.Normal, f, mutedInk().copy(alpha = 0.64f * LocalTheme.current.mutedAlpha / 0.7f))
+    val title @Composable get() = s(34, 46, FontWeight.SemiBold, f, ink())
+    val row @Composable get() = s(26, 36, FontWeight.Medium, f, ink())
+    val body @Composable get() = s(24, 34, FontWeight.Normal, f, ink())
+    val bodyBold @Composable get() = s(24, 34, FontWeight.Medium, f, ink())
+    val small @Composable get() = s(21, 30, FontWeight.Normal, f, mutedInk())
+    val tiny @Composable get() = s(18, 26, FontWeight.Normal, f, mutedInk().copy(alpha = 0.64f * LocalTheme.current.mutedAlpha / 0.7f))
 }
 
 @Composable
