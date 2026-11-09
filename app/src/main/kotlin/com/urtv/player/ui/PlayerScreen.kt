@@ -63,6 +63,8 @@ import com.urtv.player.player.PlayStatus
 import com.urtv.player.player.PlayerController
 import kotlinx.coroutines.delay
 
+internal val SLEEP_STEPS = listOf(0, 15, 30, 60, 90, 120)
+
 private enum class Overlay { None, Info, Guide, Options }
 
 @Composable
@@ -86,6 +88,8 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     var pinReq by remember { mutableStateOf<PinRequest?>(null) }
     var firstPlay by remember { mutableStateOf(true) }
     val root = remember { FocusRequester() }
+    var sleepMin by remember { mutableStateOf(0) }
+    LaunchedEffect(sleepMin) { if (sleepMin > 0) { delay(sleepMin * 60_000L); onExit(shown) } }
 
     fun showInfo() { overlay = Overlay.Info; infoTick++ }
     fun goTo(c: Channel) { if (c.url != shown.url) previous = shown; shown = c; blocked = false; showInfo() }
@@ -202,7 +206,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         }
         // options
         AnimatedVisibility(overlay == Overlay.Options, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
-            OptionsPanel(app, shown.name, chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, onGuide = { overlay = Overlay.Guide }, onReload = { ctrl.retryNow() }, onClose = { overlay = Overlay.None })
+            OptionsPanel(app, shown.name, chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, onGuide = { overlay = Overlay.Guide }, onReload = { ctrl.retryNow() }, onClose = { overlay = Overlay.None }, sleepMin = sleepMin, onSleep = { sleepMin = SLEEP_STEPS[(SLEEP_STEPS.indexOf(sleepMin) + 1) % SLEEP_STEPS.size] })
         }
     }
     PinHost(pinReq, store) { pinReq = null }
@@ -253,7 +257,7 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
 }
 
 @Composable
-internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit) {
+internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit, sleepMin: Int = 0, onSleep: () -> Unit = {}) {
     val ctrl = app.player
     val tracks by ctrl.tracks.collectAsState()
     val aspect by ctrl.aspect.collectAsState()
@@ -273,6 +277,7 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
         OptRow(stringResource(R.string.opt_aspect), stringResource(when (aspect) { AspectMode.Fit -> R.string.aspect_fit; AspectMode.Fill -> R.string.aspect_fill; AspectMode.Stretch -> R.string.aspect_stretch; AspectMode.R16x9 -> R.string.aspect_169; AspectMode.R4x3 -> R.string.aspect_43 })) { ctrl.cycleAspect() }
         if (fav != null) OptRow(stringResource(R.string.opt_fav), stringResource(if (fav) R.string.on else R.string.off)) { onFav() }
         if (onGuide != null) OptRow(stringResource(R.string.opt_list), "") { onGuide() }
+        OptRow(stringResource(R.string.opt_sleep), if (sleepMin == 0) stringResource(R.string.off) else stringResource(R.string.min_n, sleepMin)) { onSleep() }
         OptRow(stringResource(R.string.opt_reload), "") { onReload(); onClose() }
     }
 }

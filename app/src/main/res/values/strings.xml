@@ -116,4 +116,6 @@
     <string name="set_groups_hint">أخفِ مجموعات أو غيّر ترتيبها</string>
     <string name="shown">ظاهرة</string>
     <string name="hidden">مخفية</string>
+    <string name="opt_sleep">مؤقّت النوم</string>
+    <string name="min_n">%d دقيقة</string>
 </resources>

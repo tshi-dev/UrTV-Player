@@ -62,6 +62,8 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     var firstStart by remember { mutableLongStateOf(startMs) }
     var seekStreak by remember { mutableStateOf(0) }
     val root = remember { FocusRequester() }
+    var sleepMin by remember { mutableStateOf(0) }
+    LaunchedEffect(sleepMin) { if (sleepMin > 0) { delay(sleepMin * 60_000L); onExit() } }
     val status by ctrl.status.collectAsState()
     val paused by ctrl.paused.collectAsState()
     val ended by ctrl.ended.collectAsState()
@@ -131,7 +133,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             }
         }
         AnimatedVisibility(options, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
-            OptionsPanel(app, item.title, null, {}, null, onReload = { ctrl.retryNow() }, onClose = { options = false })
+            OptionsPanel(app, item.title, null, {}, null, onReload = { ctrl.retryNow() }, onClose = { options = false }, sleepMin = sleepMin, onSleep = { sleepMin = SLEEP_STEPS[(SLEEP_STEPS.indexOf(sleepMin) + 1) % SLEEP_STEPS.size] })
         }
     }
 }
