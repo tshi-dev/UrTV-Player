@@ -11,8 +11,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.shadow
 import com.urtv.player.data.FocusStyle
@@ -46,84 +46,101 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Text
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
 
 /**
- * The one focusable building block. Focus is shown by a white ring, a lift and a lighter fill, so it is
- * visible on any background and never relies on colour alone.
+ * The one focusable building block. No outline at rest (except the high-contrast theme). Focus follows the chosen style:
+ * Solid = light surface with dark text, Ring = white ring, Glow = accent border and glow; all lift slightly. Image cards
+ * ([ring]) always use a ring so the artwork stays visible. A subtle fill marks the selected item.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Tv(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = Rd(16),
+    shape: Shape = Rd(12),
     selected: Boolean = false,
     focusRequester: FocusRequester? = null,
     onFocus: (Boolean) -> Unit = {},
     onLongClick: (() -> Unit)? = null,
-    restColor: Color = C.surface,
+    restColor: Color = Color.Transparent,
+    ring: Boolean = false,
+    lift: Float = 1.03f,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val th = LocalTheme.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, tween(140), label = "lift")
-    val fill by animateColorAsState(if (focused) th.focusFill else if (selected) th.surfaceHi else restColor, tween(140), label = "fill")
-    // Solid: the fill itself is the indicator. Ring: white ring. Glow: accent border + accent shadow.
+    val scale by animateFloatAsState(if (focused) lift else 1f, tween(180), label = "lift")
+    val solid = th.solidFocus && !ring
+    val fill by animateColorAsState(if (focused && solid) th.focusFill else if (focused && !ring) th.focusSoft else if (selected) C.glass2 else restColor, tween(180), label = "fill")
     val border = when {
-        focused && th.focus == FocusStyle.Ring -> BorderStroke(3.dp, th.ring)
+        focused && (ring || th.focus == FocusStyle.Ring) -> BorderStroke(3.dp, th.ring)
         focused && th.focus == FocusStyle.Glow -> BorderStroke(2.dp, th.accent)
         focused && th.outlineAtRest -> BorderStroke(3.dp, th.ring)
-        selected -> BorderStroke(1.5.dp, th.accent)
         th.outlineAtRest -> BorderStroke(1.dp, th.text.copy(alpha = 0.5f))
         else -> null
     }
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .let { if (focused && th.focus == FocusStyle.Glow) it.shadow(18.dp, shape, ambientColor = th.accent, spotColor = th.accent) else it }
+            .let { if (focused && th.focus == FocusStyle.Glow && !ring) it.shadow(18.dp, shape, ambientColor = th.accent, spotColor = th.accent) else if (focused) it.shadow(14.dp, shape) else it }
             .clip(shape)
             .background(fill)
             .let { if (border != null) it.border(border, shape) else it }
             .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
             .onFocusChanged { focused = it.isFocused; onFocus(it.isFocused) }
             .combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = onLongClick),
-    ) { CompositionLocalProvider(LocalFocused provides focused) { content(focused) } }
+    ) { CompositionLocalProvider(LocalFocused provides (focused && solid)) { content(focused) } }
 }
 
-/** Text button used for actions: primary ones get the accent gradient. */
+/** Action button. Primary = solid light surface (theme text colour); secondary = quiet layer that lights up on focus. */
 @Composable
 fun TvButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false, focusRequester: FocusRequester? = null) {
-    Tv(onClick, modifier.height(60.dp), Rd(30), focusRequester = focusRequester, restColor = if (primary) C.accent else C.surfaceHi) { f ->
-        Text(text, style = T.bodyBold.copy(color = if (primary && !f) C.onAccent else ink()), modifier = Modifier.align(Alignment.Center).padding(horizontal = 32.dp))
+    val th = LocalTheme.current
+    Tv(onClick, modifier.height(60.dp), Rd(14), focusRequester = focusRequester, restColor = if (primary) th.text else C.surfaceHi) {
+        // primary at rest is already the light surface, so its label is the dark colour whether or not it is focused
+        val tone = if (primary) T.bodyBold.copy(color = th.bg) else T.bodyBold
+        Text(text, style = tone, maxLines = 1, modifier = Modifier.align(Alignment.Center).padding(horizontal = 32.dp))
     }
 }
 
 @Composable
 fun Spinner(size: Int = 64) {
-    val accent = C.accent
-    val track = C.text.copy(alpha = 0.15f)
     val t = rememberInfiniteTransition(label = "spin")
     val a by t.animateFloat(0f, 360f, infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart), label = "a")
     Canvas(Modifier.size(size.dp)) {
         val w = this.size.minDimension * 0.1f
-        drawArc(track, 0f, 360f, false, style = Stroke(w), topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w))
-        drawArc(accent, a, 100f, false, style = Stroke(w, cap = StrokeCap.Round), topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w))
+        drawArc(C.text.copy(alpha = 0.15f), 0f, 360f, false, style = Stroke(w), topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w))
+        drawArc(C.accent, a, 100f, false, style = Stroke(w, cap = StrokeCap.Round), topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w))
     }
 }
 
 @Composable
 fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(C.text.copy(alpha = 0.15f))) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(4.dp).background(C.accentBrush))
+    val focused = LocalFocused.current
+    Box(modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(if (focused) C.onFocus.copy(alpha = 0.15f) else C.text.copy(alpha = 0.16f))) {
+        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(3.dp).background(C.accent))
     }
 }
 
-/** Letter avatar fallback for channels without a logo. */
+/** Fallback tile for channels without a logo: the first letter on a tint derived from the name (stable per channel). */
 @Composable
 fun Monogram(name: String, size: Int = 52) {
-    Box(Modifier.size(size.dp).clip(Rd(14)).background(C.surfaceHi), contentAlignment = Alignment.Center) {
-        Text(name.trim().take(1).uppercase(), style = T.bodyBold.copy(color = mutedInk()))
+    val t = name.trim()
+    val h = (t.fold(0) { a, c -> (a * 31 + c.code) and 0xFFFF } % 360).toFloat()
+    val letter = Regex("""\d{1,2}$""").find(t)?.value ?: (t.firstOrNull() ?: '?').toString()
+    Box(Modifier.size(size.dp).clip(Rd((size / 4.5f).toInt()))
+        .background(Brush.linearGradient(listOf(Color.hsv(h, 0.38f, 0.40f), Color.hsv((h + 30) % 360, 0.42f, 0.26f)))), contentAlignment = Alignment.Center) {
+        androidx.tv.material3.Text(letter.uppercase(), style = T.bodyBold.copy(color = Color.White, fontSize = (size * 0.42f).sp))
+    }
+}
+
+/** Small label chip (genre, year, rating, S/E badge): separates facts without a bullet character. */
+@Composable
+fun Chip(text: String, modifier: Modifier = Modifier) {
+    Box(modifier.clip(Rd(8)).background(C.glass2).padding(horizontal = 10.dp, vertical = 2.dp)) {
+        Text(text, style = T.small.copy(color = C.text, fontSize = 17.sp), maxLines = 1)
     }
 }
 
@@ -142,23 +159,24 @@ fun FocusField(
     value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier,
     password: Boolean = false, ltr: Boolean = false, leading: @Composable (() -> Unit)? = null,
     imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Next,
-    focusRequester: FocusRequester? = null,
+    focusRequester: FocusRequester? = null, compact: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = Rd(18)
+    val shape = Rd(if (compact) 12 else 16)
     Row(
-        modifier.height(60.dp).clip(shape).background(if (focused) C.surfaceHi else C.surface)
-            .border(if (focused) 3.dp else 1.dp, if (focused) C.ring else C.text.copy(alpha = 0.18f), shape).padding(horizontal = 20.dp),
+        modifier.height(if (compact) 52.dp else 60.dp).clip(shape).background(if (focused) LocalTheme.current.focusFill else C.surface)
+            .let { if (focused && LocalTheme.current.focus != FocusStyle.Solid) it.border(3.dp, C.ring, shape) else it }
+            .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) { leading(); androidx.compose.foundation.layout.Spacer(Modifier.size(14.dp)) }
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text(label, style = T.body.copy(color = mutedInk()), maxLines = 1)
+            if (value.isEmpty()) Text(label, style = T.body.copy(color = if (focused && LocalTheme.current.solidFocus) C.onFocus.copy(alpha = 0.55f) else C.faint), maxLines = 1)
             androidx.compose.foundation.text.BasicTextField(
                 value, onChange, singleLine = true,
-                textStyle = T.body.copy(textAlign = if (ltr) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
+                textStyle = T.body.copy(color = if (focused && LocalTheme.current.solidFocus) C.onFocus else C.text, textAlign = if (ltr) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
                     textDirection = if (ltr) androidx.compose.ui.text.style.TextDirection.Ltr else androidx.compose.ui.text.style.TextDirection.Content),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent2),
                 visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = imeAction, autoCorrectEnabled = false,

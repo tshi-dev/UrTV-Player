@@ -37,7 +37,7 @@ data class ThemeSpec(
     val cornerScale: Float,
     val background: BgStyle,
     val outlineAtRest: Boolean,
-    val font: FontFamily = FontFamily.Default,
+    val font: FontFamily = Plex,
 ) {
     val solidFocus get() = focus == FocusStyle.Solid
     val focusFill get() = if (solidFocus) focusSolid else focusSoft

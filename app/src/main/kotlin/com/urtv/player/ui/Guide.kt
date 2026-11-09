@@ -35,16 +35,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Text
+import androidx.compose.ui.unit.sp
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
 import com.urtv.player.core.Channel
 import com.urtv.player.core.Programme
 import com.urtv.player.data.CatalogState
 
-private val DP_PER_MIN = 4.5.dp
-private val ROW_H = 72.dp
-private val NAME_W = 230.dp
+private val DP_PER_MIN = 8.dp
+private val ROW_H = 84.dp
+private val NAME_W = 300.dp
 private const val SPAN_MIN = 24 * 60
 private const val SLOT_MS = 30 * 60_000L
 
@@ -64,36 +64,37 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 
     if (rows.isEmpty()) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            if (cat.epgLoading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = mutedInk())) }
-            else { Text(stringResource(R.string.no_guide), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.no_guide_hint), style = T.body.copy(color = mutedInk())) }
+            if (cat.epgLoading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
+            else { Text(stringResource(R.string.no_guide), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.no_guide_hint), style = T.body.copy(color = C.muted)) }
         }
         return
     }
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().height(112.dp).padding(horizontal = 12.dp)) {
+        Column(Modifier.fillMaxWidth().height(120.dp).padding(horizontal = 8.dp)) {
             val d = detail
             Text(d?.title ?: " ", style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (d != null) {
                 Text("${fmtTime(d.startMs)} – ${fmtTime(d.stopMs)}", style = T.small)
-                if (d.description.isNotBlank()) Text(d.description, style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (d.description.isNotBlank()) Text(d.description, style = T.tiny.copy(fontSize = 17.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         // time header
-        Row(Modifier.fillMaxWidth().height(36.dp)) {
+        Row(Modifier.fillMaxWidth().height(40.dp)) {
             Spacer(Modifier.width(NAME_W))
             Box(Modifier.weight(1f).horizontalScroll(scroll, enabled = false)) {
                 Box(Modifier.width(DP_PER_MIN * SPAN_MIN)) {
-                    for (i in 0 until SPAN_MIN / 30) Text(fmtTime(start + i * SLOT_MS), style = T.tiny, modifier = Modifier.offset(x = DP_PER_MIN * (i * 30f) + 8.dp))
+                    for (i in 0 until SPAN_MIN / 30) Text(fmtTime(start + i * SLOT_MS), style = T.tiny, modifier = Modifier.offset(x = DP_PER_MIN * (i * 30f) + 12.dp))
                 }
             }
         }
         val listState = rememberLazyListState()
-        LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 6.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 8.dp)) {
             items(rows, key = { it.url }) { ch ->
-                Row(Modifier.fillMaxWidth().height(ROW_H).padding(vertical = 3.dp)) {
+                Row(Modifier.fillMaxWidth().height(ROW_H).drawBehind { drawLine(C.hairline, Offset(0f, 0f), Offset(size.width, 0f), 1f) }.padding(vertical = 4.dp)) {
                     Row(Modifier.width(NAME_W).fillMaxSize().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Logo(ch, 40); Spacer(Modifier.width(10.dp))
-                        Text(ch.name, style = T.small.copy(color = ink()), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text("${com.urtv.player.data.Browse.numberOf(cat.channels, ch)}", style = T.tiny, modifier = Modifier.width(48.dp))
+                        Logo(ch, 38); Spacer(Modifier.width(12.dp))
+                        Text(ch.name, style = T.small.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Box(Modifier.weight(1f).horizontalScroll(scroll)) {
                         GuideRow(ch, epg.forChannel(ch.epgId), start, nowOffset, nowMs, onFocus = { detail = it }) { p ->
@@ -109,17 +110,21 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 @Composable
 private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset: Dp, nowMs: Long, onFocus: (Programme) -> Unit, onClick: (Programme) -> Unit) {
     val end = start + SPAN_MIN * 60_000L
-    val nowLine = LocalTheme.current.accent.copy(alpha = 0.7f)
     Box(Modifier.width(DP_PER_MIN * SPAN_MIN).fillMaxSize().drawBehind {
-        val x = nowOffset.toPx(); drawLine(nowLine, Offset(x, 0f), Offset(x, size.height), 3f)
+        val raw = nowOffset.toPx(); val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl) size.width - raw else raw
+        drawLine(C.accent, Offset(x, 0f), Offset(x, size.height), 2f)
     }) {
         for (p in progs) {
             if (p.stopMs <= start || p.startMs >= end) continue
             val s = maxOf(p.startMs, start); val e = minOf(p.stopMs, end)
             val x = DP_PER_MIN * ((s - start) / 60_000f); val w = DP_PER_MIN * ((e - s) / 60_000f) - 4.dp
             if (w < 12.dp) continue
-            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize(), Rd(12), selected = nowMs in p.startMs until p.stopMs, onFocus = { if (it) onFocus(p) }) {
-                Text(p.title, style = T.small.copy(color = if (p.stopMs < nowMs && ch.archiveDays > 0) accentInk() else ink()), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp))
+            val catchup = p.stopMs < nowMs && ch.archiveDays > 0
+            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize().drawBehind { drawLine(C.hairline, Offset(0f, 8f), Offset(0f, size.height - 8f), 1f) }, Rd(10), lift = 1.02f, onFocus = { if (it) onFocus(p) }) {
+                Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp)) {
+                    Text(p.title, style = T.small.copy(color = C.text, fontSize = 19.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(fmtTime(p.startMs), style = T.tiny.copy(color = if (catchup) C.accent else C.faint, fontSize = 15.sp))
+                }
             }
         }
     }

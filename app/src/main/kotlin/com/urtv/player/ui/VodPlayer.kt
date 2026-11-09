@@ -40,12 +40,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
 import com.urtv.player.data.WatchItem
 import com.urtv.player.player.PlayStatus
 import kotlinx.coroutines.delay
+
+private fun watch(i: VodPlay, pos: Long, dur: Long) =
+    WatchItem(i.key, i.pid, i.kind, i.title, i.episodeTitle, i.image, i.url, pos, dur, System.currentTimeMillis(), i.seriesId, i.season, i.episode)
 
 private fun clock(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60) }
 
@@ -62,6 +64,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     var options by remember { mutableStateOf(false) }
     var firstStart by remember { mutableLongStateOf(startMs) }
     var seekStreak by remember { mutableStateOf(0) }
+    var dismissedNext by remember { mutableStateOf(-1) }
     val root = remember { FocusRequester() }
     var sleepMin by remember { mutableStateOf(0) }
     LaunchedEffect(sleepMin) { if (sleepMin > 0) { delay(sleepMin * 60_000L); onExit() } }
@@ -79,17 +82,17 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             pos = p.currentPosition; dur = p.duration.takeIf { it > 0 } ?: 0
             if (++n % 10 == 0) {
                 app.store.savePosition(item.key, pos, dur)
-                if (item.kind.isNotEmpty() && dur > 0) app.store.updateWatching(WatchItem(item.key, item.pid, item.kind, item.title, item.subtitle, item.image, item.url, pos, dur, System.currentTimeMillis()))
+                if (item.kind.isNotEmpty() && dur > 0) app.store.updateWatching(watch(item, pos, dur))
             }
         }
     }
     LaunchedEffect(ended) {
         if (ended) {
             app.store.savePosition(item.key, dur, dur)
-            if (item.kind.isNotEmpty()) app.store.updateWatching(WatchItem(item.key, item.pid, item.kind, item.title, item.subtitle, item.image, item.url, dur, dur, System.currentTimeMillis()))
+            if (item.kind.isNotEmpty()) app.store.updateWatching(watch(item, dur, dur))
             val nx = items.getOrNull(idx + 1)
-            if (nx != null && nx.kind.isNotEmpty()) app.store.offerNext(WatchItem(nx.key, nx.pid, nx.kind, nx.title, nx.subtitle, nx.image, nx.url, 0, 0, System.currentTimeMillis()))
-            if (nx != null) idx++ else onExit()
+            if (nx != null && nx.kind.isNotEmpty()) app.store.offerNext(watch(nx, 0, 0))
+            if (nx != null && dismissedNext != idx) idx++ else onExit()
         }
     }
     LaunchedEffect(tick, bar, paused) { if (bar && !paused && !options) { delay(4000); bar = false } }
@@ -98,7 +101,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     LifecycleEventEffect(Lifecycle.Event.ON_START) { ctrl.resume() }
     DisposableEffect(item.key) { onDispose { app.store.savePosition(item.key, pos, dur) } }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
-    BackHandler { if (options) options = false else if (bar && !paused) bar = false else onExit() }
+    BackHandler { if (options) options = false else if (dur > 0 && dur - pos in 1..12_000 && idx + 1 < items.size && dismissedNext != idx) dismissedNext = idx else if (bar && !paused) bar = false else onExit() }
 
     fun seek(deltaMs: Long) {
         val p = ctrl.player ?: return
@@ -113,7 +116,8 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             when (e.nativeKeyEvent.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { seekStreak++; seek(-(if (seekStreak > 12) 60_000L else if (seekStreak > 4) 30_000L else 10_000L)); true }
                 KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { seekStreak++; seek(if (seekStreak > 12) 60_000L else if (seekStreak > 4) 30_000L else 10_000L); true }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> { ctrl.togglePause(); bar = true; tick++; true }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { if (items.getOrNull(idx + 1) != null && dur > 0 && dur - pos in 1..12_000) { idx++ } else { ctrl.togglePause(); bar = true; tick++ }; true }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> { ctrl.togglePause(); bar = true; tick++; true }
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_INFO -> { bar = true; tick++; true }
                 KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { options = true; true }
                 KeyEvent.KEYCODE_MEDIA_NEXT -> { if (idx + 1 < items.size) idx++; true }
@@ -124,7 +128,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     ) {
         VideoSurface(ctrl)
         val sub by ctrl.cue.collectAsState()
-        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 150.dp, start = 120.dp, end = 120.dp).background(Color(0x99000000), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 4.dp))
+        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 260.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
         Box(Modifier.align(Alignment.Center)) {
             when {
                 status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); Text(stringResource(R.string.press_ok_retry), style = T.small) }
@@ -134,14 +138,31 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             }
         }
         AnimatedVisibility(bar || paused, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-            Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE05070B)))).padding(horizontal = 64.dp).padding(top = 60.dp, bottom = 36.dp)) {
-                Text(item.title, style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE05070B)))).padding(horizontal = 84.dp).padding(top = 90.dp, bottom = 56.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(item.title, style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (item.kind == "episode" && item.season > 0) Chip(stringResource(R.string.se_badge, item.season, item.episode))
+                }
+                if (item.episodeTitle.isNotBlank()) Text(item.episodeTitle, style = T.small)
                 Spacer(Modifier.height(12.dp))
                 ProgressBar(if (dur > 0) pos / dur.toFloat() else 0f)
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth()) {
                     Text(clock(pos), style = T.small); Spacer(Modifier.weight(1f)); Text(if (dur > 0) clock(dur) else "", style = T.small)
                 }
+            }
+        }
+        val nextItem = items.getOrNull(idx + 1)
+        val left = if (dur > 0) dur - pos else Long.MAX_VALUE
+        val showNext = nextItem != null && left in 1..12_000 && dismissedNext != idx && !options
+        AnimatedVisibility(showNext, Modifier.align(Alignment.BottomEnd).padding(end = 84.dp, bottom = 110.dp), enter = fadeIn(), exit = fadeOut()) {
+            Column(Modifier.width(560.dp).background(Color(0xE6141619), Rd(18)).padding(22.dp)) {
+                Text(stringResource(R.string.next_ep_in, (left / 1000).toInt().coerceAtLeast(1)), style = T.small)
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (nextItem != null && nextItem.season > 0) Chip(stringResource(R.string.se_badge, nextItem.season, nextItem.episode))
+                    Text(nextItem?.episodeTitle?.ifBlank { null } ?: nextItem?.title.orEmpty(), style = T.row, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(stringResource(R.string.next_ep_hint), style = T.tiny, modifier = Modifier.padding(top = 10.dp))
             }
         }
         AnimatedVisibility(options, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {

@@ -16,7 +16,7 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(base: Context) {
         val lang = base.getSharedPreferences("urtv", MODE_PRIVATE).getString("lang", "ar") ?: "ar"
-        val loc = Locale(lang)
+        val loc = Locale.forLanguageTag("$lang-u-nu-latn")   // Western digits in Arabic: clearer for channel numbers and times
         Locale.setDefault(loc)
         val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }
         super.attachBaseContext(base.createConfigurationContext(cfg))
