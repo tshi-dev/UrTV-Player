@@ -133,7 +133,7 @@ class ServerShotsTest {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
             Art(b.imageUrl(item, Img.Backdrop, 1920), emptyMap(), Modifier.fillMaxSize(), title = "", monogram = false)
             SubtitleOverlay(listOf(Cue(0, 1, cue)), SubtitleStyle(background = 0x66000000))
-            OsdBar(item, 20 * 60_000L, 44 * 60_000L, null)
+            if (panel == Panel.None) OsdBar(item, 20 * 60_000L, 44 * 60_000L, null)
             if (panel != Panel.None) androidx.compose.foundation.layout.Box(Modifier.align(androidx.compose.ui.Alignment.CenterEnd)) {
                 OptionsPanel(panel, item, null, item.audio.firstOrNull(), item.subtitles.firstOrNull(), LangPrefs(), SubtitleStyle(background = 0x66000000), 0, Res.Ok(emptyList()), "ar",
                     { }, { }, { }, { }, { }, { }, { }, { })

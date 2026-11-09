@@ -55,7 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private fun clockText(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60) }
+private fun clockText(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(java.util.Locale.US, s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(java.util.Locale.US, s / 60, s % 60) }
 
 /** Movie, show or collection page. The show title appears once, at the top; episodes carry only their own label. */
 @Composable
@@ -94,7 +94,7 @@ private fun MoviePage(backend: MediaBackend, item: MediaItem, onChanged: () -> U
                     if (item.genres.isNotEmpty()) Text(item.genres.take(4).joinToString("   "), style = metaStyle())
                     if (item.overview.isNotBlank()) Text(item.overview, style = T.body.copy(fontSize = 24.sp, lineHeight = 34.sp, color = C.text.copy(alpha = 0.88f)), maxLines = 5, overflow = TextOverflow.Ellipsis)
                     if (item.resumeMs > 0 && item.runtimeMs > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ProgressBar(item.progress, Modifier.width(300.dp)); Text(stringResource(R.string.srv_left_min, ((item.runtimeMs - item.resumeMs) / 60_000L).toInt().coerceAtLeast(1)), style = metaStyle())
+                        ProgressBar(item.progress, Modifier.width(300.dp)); Text(stringResource(R.string.srv_left_min, "${((item.runtimeMs - item.resumeMs) / 60_000L).toInt().coerceAtLeast(1)}"), style = metaStyle())
                     }
                     ActionRow(backend, item, onChanged, onPlay, first)
                 }
@@ -179,7 +179,7 @@ private fun ShowPage(backend: MediaBackend, show: MediaItem, version: Int, onCha
                     Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
                         show.year?.let { Text("$it", style = metaStyle()) }
                         show.officialRating?.takeIf { it.isNotBlank() }?.let { Badge(it) }
-                        if (seasons.isNotEmpty()) Text(stringResource(R.string.srv_seasons_n, seasons.size), style = metaStyle())
+                        if (seasons.isNotEmpty()) Text(stringResource(R.string.srv_seasons_n, "${seasons.size}"), style = metaStyle())
                         show.rating?.let { Text("★ " + "%.1f".format(java.util.Locale.US, it), style = metaStyle()) }
                     }
                     if (show.genres.isNotEmpty()) Text(show.genres.take(4).joinToString("   "), style = metaStyle())
@@ -194,7 +194,7 @@ private fun ShowPage(backend: MediaBackend, show: MediaItem, version: Int, onCha
                 LazyRow(contentPadding = PaddingValues(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(seasons, key = { it.id }) { s ->
                         Tv({ seasonId = s.id }, Modifier.height(48.dp), Rd(24), selected = s.id == chosen) {
-                            Text(if (s.seasonNumber != null && s.seasonNumber == 0) stringResource(R.string.srv_specials) else if (s.seasonNumber != null) stringResource(R.string.srv_season_n, s.seasonNumber!!) else s.name,
+                            Text(if (s.seasonNumber != null && s.seasonNumber == 0) stringResource(R.string.srv_specials) else if (s.seasonNumber != null) stringResource(R.string.srv_season_n, "${s.seasonNumber}") else s.name,
                                 style = T.body, modifier = Modifier.align(Alignment.Center).padding(horizontal = 20.dp), maxLines = 1)
                         }
                     }

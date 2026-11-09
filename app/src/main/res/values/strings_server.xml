@@ -46,12 +46,12 @@
     <string name="srv_trailer">المقطع الدعائي</string>
     <string name="srv_cast">طاقم التمثيل</string>
     <string name="srv_similar">مشابه</string>
-    <string name="srv_left_min">بقي %1$d دقيقة</string>
-    <string name="srv_season_n">الموسم %1$d</string>
-    <string name="srv_seasons_n">%1$d مواسم</string>
+    <string name="srv_left_min">بقي %1$s دقيقة</string>
+    <string name="srv_season_n">الموسم %1$s</string>
+    <string name="srv_seasons_n">%1$s مواسم</string>
     <string name="srv_specials">خاص</string>
-    <string name="srv_ep_label">م%1$d ح%2$d</string>
-    <string name="srv_ep_only">ح%1$d</string>
+    <string name="srv_ep_label">م%1$s ح%2$s</string>
+    <string name="srv_ep_only">ح%1$s</string>
     <string name="srv_h">س</string>
     <string name="srv_m">د</string>
     <string name="srv_sort_name">الاسم</string>
