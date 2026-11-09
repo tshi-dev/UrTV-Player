@@ -202,14 +202,14 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         }
         // options
         AnimatedVisibility(overlay == Overlay.Options, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
-            OptionsPanel(app, shown, chKey(pid, shown) in favs, onGuide = { overlay = Overlay.Guide }, onClose = { overlay = Overlay.None })
+            OptionsPanel(app, shown.name, chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, onGuide = { overlay = Overlay.Guide }, onReload = { ctrl.retryNow() }, onClose = { overlay = Overlay.None })
         }
     }
     PinHost(pinReq, store) { pinReq = null }
 }
 
 @Composable
-private fun VideoSurface(ctrl: PlayerController) {
+internal fun VideoSurface(ctrl: PlayerController) {
     val ar by ctrl.videoAspect.collectAsState()
     val mode by ctrl.aspect.collectAsState()
     BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
@@ -253,7 +253,7 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
 }
 
 @Composable
-private fun OptionsPanel(app: UrtvApp, ch: Channel, fav: Boolean, onGuide: () -> Unit, onClose: () -> Unit) {
+internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit) {
     val ctrl = app.player
     val tracks by ctrl.tracks.collectAsState()
     val aspect by ctrl.aspect.collectAsState()
@@ -261,9 +261,8 @@ private fun OptionsPanel(app: UrtvApp, ch: Channel, fav: Boolean, onGuide: () ->
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     val audio = tracks.audio.firstOrNull { it.selected }
     val text = tracks.text.firstOrNull { it.selected }
-    val pid = app.catalog.state.value.playlistId.orEmpty()
     Column(Modifier.fillMaxHeight().width(480.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE005070B), Color(0xF005070B)))).padding(start = 64.dp, end = 32.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
-        Text(ch.name, style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         OptRow(stringResource(R.string.opt_audio), audio?.label ?: stringResource(R.string.none), fr) {
             if (tracks.audio.size > 1) ctrl.selectAudio(tracks.audio[(tracks.audio.indexOf(audio) + 1) % tracks.audio.size])
         }
@@ -272,9 +271,9 @@ private fun OptionsPanel(app: UrtvApp, ch: Channel, fav: Boolean, onGuide: () ->
             if (l.isNotEmpty()) { val i = if (text == null) -1 else l.indexOf(text); ctrl.selectText(if (i + 1 >= l.size) null else l[i + 1]) }
         }
         OptRow(stringResource(R.string.opt_aspect), stringResource(when (aspect) { AspectMode.Fit -> R.string.aspect_fit; AspectMode.Fill -> R.string.aspect_fill; AspectMode.Stretch -> R.string.aspect_stretch; AspectMode.R16x9 -> R.string.aspect_169; AspectMode.R4x3 -> R.string.aspect_43 })) { ctrl.cycleAspect() }
-        OptRow(stringResource(R.string.opt_fav), stringResource(if (fav) R.string.on else R.string.off)) { app.store.toggleFav(chKey(pid, ch)) }
-        OptRow(stringResource(R.string.opt_list), "") { onGuide() }
-        OptRow(stringResource(R.string.opt_reload), "") { ctrl.retryNow(); onClose() }
+        if (fav != null) OptRow(stringResource(R.string.opt_fav), stringResource(if (fav) R.string.on else R.string.off)) { onFav() }
+        if (onGuide != null) OptRow(stringResource(R.string.opt_list), "") { onGuide() }
+        OptRow(stringResource(R.string.opt_reload), "") { onReload(); onClose() }
     }
 }
 

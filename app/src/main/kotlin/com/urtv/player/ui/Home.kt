@@ -58,7 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Tab { Live, Favs, Recents, Guide, Settings }
+enum class Tab { Live, Movies, Series, Favs, Recents, Guide, Settings }
 
 fun chKey(pid: String, c: Channel) = "$pid|${c.url}"
 fun groupKey(pid: String, g: String) = "$pid|$g"
@@ -72,6 +72,7 @@ fun HomeScreen(
     app: UrtvApp, tab: Tab, onTab: (Tab) -> Unit,
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
     restoreKey: String?,
+    onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {}, onCatchup: (Channel, Programme) -> Unit = { _, _ -> },
 ) {
     val store = app.store
     val cat by app.catalog.state.collectAsState()
@@ -84,8 +85,8 @@ fun HomeScreen(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("UrTV", style = T.display.copy(fontSize = 36.sp), modifier = Modifier.padding(end = 32.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (t in Tab.entries) {
-                    val label = stringResource(when (t) { Tab.Live -> R.string.tab_live; Tab.Favs -> R.string.tab_favs; Tab.Recents -> R.string.tab_recents; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
+                for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true }) {
+                    val label = stringResource(when (t) { Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Favs -> R.string.tab_favs; Tab.Recents -> R.string.tab_recents; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
                     Tv({ onTab(t) }, Modifier.height(52.dp), RoundedCornerShape(26.dp), selected = t == tab, onFocus = { if (it) onTab(t) },
                         focusRequester = if (t == tab) tabFocus else null) {
                         Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp))
@@ -101,6 +102,8 @@ fun HomeScreen(
                 EmptyPlaylists(onAdd)
             } else when (tab) {
                 Tab.Live -> LiveTab(app, cat, onPlay, restoreKey)
+                Tab.Movies -> PosterBrowse(app, true, onOpenMovie)
+                Tab.Series -> PosterBrowse(app, false, onOpenSeries)
                 Tab.Favs -> {
                     val favs by store.favs.collectAsState()
                     val pid = cat.playlistId.orEmpty()
@@ -114,7 +117,7 @@ fun HomeScreen(
                     val list = recents.mapNotNull { byKey[it] }
                     ChannelGrid(app, cat, list, stringResource(R.string.empty_recents), onPlay, restoreKey)
                 }
-                Tab.Guide -> GuideScreen(app, cat, onPlay)
+                Tab.Guide -> GuideScreen(app, cat, onPlay, onCatchup)
                 Tab.Settings -> SettingsScreen(app, onAdd, onLanguage)
             }
         }

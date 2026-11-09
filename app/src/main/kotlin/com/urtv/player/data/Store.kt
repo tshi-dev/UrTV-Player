@@ -68,6 +68,14 @@ class Store(ctx: Context) {
     }
     fun lastKey(): String? = sp.getString("last", null)
 
+    // ---- playback positions for movies/episodes/catch-up ("resume where you stopped")
+    fun position(key: String): Long = sp.getLong("pos_$key", 0L)
+    fun savePosition(key: String, ms: Long, durationMs: Long) {
+        val e = sp.edit()
+        if (ms < 5_000 || (durationMs > 0 && ms > durationMs * 0.95)) e.remove("pos_$key") else e.putLong("pos_$key", ms)
+        e.apply()
+    }
+
     // ---- settings
     fun setLang(v: String) { _lang.value = v; sp.edit().putString("lang", v).apply() }
     fun setRefreshHours(v: Int) { _refreshH.value = v; sp.edit().putInt("refreshH", v).apply() }

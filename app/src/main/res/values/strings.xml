@@ -93,4 +93,13 @@
     <string name="pin_mismatch">الرمزان غير متطابقين</string>
     <string name="set_about">عن التطبيق</string>
     <string name="about_text">UrTV مشغّل فقط: لا يأتي بقنوات ولا قوائم ولا روابط، ولا يطلب إلا الإنترنت. لا تحليلات ولا إعلانات ولا تحديث ذاتي. الإصدار 0.1.0</string>
+    <string name="tab_movies">أفلام</string>
+    <string name="tab_series">مسلسلات</string>
+    <string name="all_categories">كل التصنيفات</string>
+    <string name="play">تشغيل</string>
+    <string name="from_start">من البداية</string>
+    <string name="resume_from">تابع من %s</string>
+    <string name="back">رجوع</string>
+    <string name="season_n">الموسم %d</string>
+    <string name="catchup">إعادة (فاتتك)</string>
 </resources>

@@ -53,7 +53,7 @@ private const val SLOT_MS = 30 * 60_000L
  * scrolls the whole timeline smoothly while channel names stay pinned.
  */
 @Composable
-fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel) -> Unit) {
+fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel) -> Unit, onCatchup: (Channel, Programme) -> Unit) {
     val epg by app.catalog.epg.collectAsState()
     val nowMs by rememberNow()
     val rows = remember(cat.channels, epg) { cat.channels.filter { epg.forChannel(it.epgId).isNotEmpty() } }
@@ -96,7 +96,9 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
                         Text(ch.name, style = T.small.copy(color = C.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Box(Modifier.weight(1f).horizontalScroll(scroll)) {
-                        GuideRow(ch, epg.forChannel(ch.epgId), start, nowOffset, nowMs, onFocus = { detail = it }) { onPlay(rows, ch) }
+                        GuideRow(ch, epg.forChannel(ch.epgId), start, nowOffset, nowMs, onFocus = { detail = it }) { p ->
+                            if (p.stopMs < nowMs && ch.archiveDays > 0 && ch.streamId != null) onCatchup(ch, p) else onPlay(rows, ch)
+                        }
                     }
                 }
             }
@@ -105,7 +107,7 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 }
 
 @Composable
-private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset: Dp, nowMs: Long, onFocus: (Programme) -> Unit, onClick: () -> Unit) {
+private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset: Dp, nowMs: Long, onFocus: (Programme) -> Unit, onClick: (Programme) -> Unit) {
     val end = start + SPAN_MIN * 60_000L
     Box(Modifier.width(DP_PER_MIN * SPAN_MIN).fillMaxSize().drawBehind {
         val x = nowOffset.toPx(); drawLine(C.accent2.copy(alpha = 0.7f), Offset(x, 0f), Offset(x, size.height), 3f)
@@ -115,8 +117,8 @@ private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset
             val s = maxOf(p.startMs, start); val e = minOf(p.stopMs, end)
             val x = DP_PER_MIN * ((s - start) / 60_000f); val w = DP_PER_MIN * ((e - s) / 60_000f) - 4.dp
             if (w < 12.dp) continue
-            Tv(onClick, Modifier.offset(x = x).width(w).fillMaxSize(), RoundedCornerShape(12.dp), selected = nowMs in p.startMs until p.stopMs, onFocus = { if (it) onFocus(p) }) {
-                Text(p.title, style = T.small.copy(color = C.text), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp))
+            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize(), RoundedCornerShape(12.dp), selected = nowMs in p.startMs until p.stopMs, onFocus = { if (it) onFocus(p) }) {
+                Text(p.title, style = T.small.copy(color = if (p.stopMs < nowMs && ch.archiveDays > 0) C.accent2 else C.text), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp))
             }
         }
     }

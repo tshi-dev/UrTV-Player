@@ -113,7 +113,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     private fun writeCache(f: File, l: List<Channel>) {
         fun s(x: String?) = (x ?: "").replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
         val tmp = File(f.path + ".tmp")
-        tmp.bufferedWriter().use { w -> for (c in l) w.append(listOf(s(c.id), s(c.name), s(c.url), s(c.group), s(c.logo), s(c.epgId), c.number?.toString() ?: "").joinToString("\t")).append('\n') }
+        tmp.bufferedWriter().use { w -> for (c in l) w.append(listOf(s(c.id), s(c.name), s(c.url), s(c.group), s(c.logo), s(c.epgId), c.number?.toString() ?: "", s(c.streamId), c.archiveDays.toString()).joinToString("\t")).append('\n') }
         f.delete(); tmp.renameTo(f)
     }
 
@@ -124,7 +124,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
             f.bufferedReader().useLines { lines ->
                 for (ln in lines) {
                     val p = ln.split('\t'); if (p.size < 7) continue
-                    out += Channel(p[0], p[1], p[2], p[3], p[4].ifEmpty { null }, p[5].ifEmpty { null }, p[6].toIntOrNull())
+                    out += Channel(p[0], p[1], p[2], p[3], p[4].ifEmpty { null }, p[5].ifEmpty { null }, p[6].toIntOrNull(), p.getOrNull(7)?.ifEmpty { null }, p.getOrNull(8)?.toIntOrNull() ?: 0)
                 }
             }
         }
