@@ -25,7 +25,7 @@ Xtream/M3U credentials and tokens (they are in URLs too), the parental PIN, the 
 | 12 | XSS on the phone page | No script anywhere; `default-src 'none'` CSP; every echoed value is HTML-escaped [`phonePageEscapesCodeAndShipsNoScript`] |
 | 13 | PIN brute force or offline cracking | PBKDF2-HMAC-SHA256 (60 000 iterations) with a random 16-byte salt; after 5 wrong tries the pad locks 30 s, doubling to 15 min; PIN never stored |
 | 14 | TLS interception with user-installed CAs | `network_security_config` trusts the system store only. Cleartext http stays allowed because most IPTV servers need it (**residual**, inherent to the use case) |
-| 15 | Extra attack surface | Permissions: INTERNET, ACCESS_NETWORK_STATE and the normal app-defined `sa.urtv.permission.READ_LANG` (UrTV's language only, no prompt); one exported component (launcher activity); the exported `ProfileInstallReceiver` is removed; no WebView, no content providers of our own, no deep links, no broadcast receivers |
+| 15 | Extra attack surface | Permissions: INTERNET, ACCESS_NETWORK_STATE and the normal app-defined `sa.urtv.permission.READ_LANG` (UrTV's language only, no prompt); two exported components (launcher activity, and `FindMatchActivity`, see F1); the exported `ProfileInstallReceiver` is removed; no WebView, no content providers of our own, no deep links, no broadcast receivers |
 | 16 | Supply chain | All dependency versions are pinned (no ranges); Dependabot watches Gradle and Actions weekly; Actions run with `contents: read`; no signing key or secret in the repo, release signing only from CI secrets; no self-updater |
 | 17 | R8 | Enabled for debug and release; keep rules only for serialization |
 
@@ -53,3 +53,17 @@ Code: `core/.../server/` (API clients, tested with canned and hostile JSON) and 
 | S9 | Plex login | Official plex.tv PIN flow; the account token is never typed on the TV |
 
 Not tested against live servers: all behaviour is verified against canned responses based on the documented APIs.
+
+## Addendum: FIND_MATCH (exported activity for the UrTV home app)
+
+Code: `app/.../FindMatchActivity.kt`, `app/.../ui/FindMatch.kt`, `core/.../MatchFinder.kt`. Action `sa.urtv.player.action.FIND_MATCH`.
+
+| # | Threat | Fix |
+|---|---|---|
+| F1 | Any app launching the exported activity or feeding it input | Accepted only from a caller signed with the same key as this app: the calling package (available only to `startActivityForResult`, so a plain `startActivity` has none) is checked with `PackageManager.checkSignatures`. Wrong action, no verifiable caller or another signer: the activity closes at once with `RESULT_CANCELED` and reads nothing from the intent [`FindMatchActivityTest`] |
+| F2 | Hostile extras (huge strings, wrong types, many channel names, odd kickoff) | Read with defensive getters; every string is stripped of control characters and capped at 80 chars, at most 12 channel names, kickoff outside ±7 days replaced by now [`MatchFinderTest`, `FindMatchActivityTest`] |
+| F3 | Caller steering playback to an attacker URL | Extras are only compared with the user's own channel names and guide text; no URL from the caller is read, opened or played. Only channels already in the user's playlist can start |
+| F4 | Information leak back to the caller | The result is only `RESULT_OK` (something played) or `RESULT_CANCELED`; no channel, playlist or credential is returned |
+| F5 | Remembered pick | Stored per competition as the usual hashed channel key (`playlistId|hash`), never a URL |
+
+Residual: a debug build of the player and a release build of UrTV (or the reverse) do not match signatures, so the call is ignored there by design.

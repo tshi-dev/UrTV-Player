@@ -207,4 +207,13 @@
     <string name="unofficial_build">نسخة غير رسمية</string>
     <string name="unofficial_blocked">هذه النسخة لم تُوقَّع من المطوّر. أُوقفت إضافة القوائم من الجوال واستعادة النسخ الاحتياطية. ثبّت النسخة الرسمية من UrTV.</string>
     <string name="debug_label">تجريبي</string>
+    <string name="fm_title">قنوات المباراة</string>
+    <string name="fm_none">ما لقينا قناة لهذه المباراة في قوائمك</string>
+    <string name="fm_search">ابحث في القنوات</string>
+    <string name="fm_back">رجوع</string>
+    <string name="fm_finding">نبحث عن قناة المباراة…</string>
+    <string name="fm_why_guide">في الدليل</string>
+    <string name="fm_why_named">قناة ناقلة</string>
+    <string name="fm_why_group">من القنوات الرياضية</string>
+    <string name="fm_last_pick">اختيارك السابق</string>
 </resources>

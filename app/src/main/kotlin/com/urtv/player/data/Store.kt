@@ -79,6 +79,10 @@ class Store(ctx: Context) {
     }
     fun lastKey(): String? = sp.getString("last", null)
 
+    // ---- «find match»: the channel the user picked last time for a competition (key = normalised competition name)
+    fun matchPick(comp: String): String? = if (comp.isEmpty()) null else sp.getString("mpick_${comp.take(60)}", null)
+    fun setMatchPick(comp: String, channelKey: String) { if (comp.isNotEmpty()) sp.edit().putString("mpick_${comp.take(60)}", channelKey).apply() }
+
     // ---- playback positions for movies/episodes/catch-up ("resume where you stopped")
     fun position(key: String): Long = sp.getLong("pos_$key", 0L)
     fun savePosition(key: String, ms: Long, durationMs: Long) {

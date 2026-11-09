@@ -14,14 +14,7 @@ import com.urtv.player.ui.UrtvTheme
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-    override fun attachBaseContext(base: Context) {
-        val sp = base.getSharedPreferences("urtv", MODE_PRIVATE)
-        val lang = sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: "auto", sp.getString("urtvLang", null), com.urtv.player.data.Language.systemLanguage())
-        val loc = Locale.forLanguageTag("$lang-u-nu-latn")   // Western digits in Arabic: clearer for channel numbers and times
-        Locale.setDefault(loc)
-        val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }
-        super.attachBaseContext(base.createConfigurationContext(cfg))
-    }
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base))
 
     override fun onResume() {
         super.onResume()
@@ -41,4 +34,14 @@ class MainActivity : ComponentActivity() {
             UrtvTheme(look, scale) { AppRoot(app, onLanguageChanged = { recreate() }) }
         }
     }
+}
+
+/** The app language (Auto/ar/en, Western digits) applied to a base context; shared by every activity. */
+fun localized(base: Context): Context {
+    val sp = base.getSharedPreferences("urtv", Context.MODE_PRIVATE)
+    val lang = sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: "auto", sp.getString("urtvLang", null), com.urtv.player.data.Language.systemLanguage())
+    val loc = Locale.forLanguageTag("$lang-u-nu-latn")   // Western digits in Arabic: clearer for channel numbers and times
+    Locale.setDefault(loc)
+    val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }
+    return base.createConfigurationContext(cfg)
 }

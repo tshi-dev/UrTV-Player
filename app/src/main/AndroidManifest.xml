@@ -34,7 +34,18 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- Only the launcher activity is exported: drop the exported dev receiver that androidx.profileinstaller adds. -->
+        <!-- Second exported component: «find the channel for this match», callable only by an app signed with the same key
+             (checked in code against the calling package, so the caller must use startActivityForResult). -->
+        <activity
+            android:name=".FindMatchActivity"
+            android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density">
+            <intent-filter>
+                <action android:name="sa.urtv.player.action.FIND_MATCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <!-- Only the launcher and FIND_MATCH activities are exported: drop the exported dev receiver that androidx.profileinstaller adds. -->
         <receiver android:name="androidx.profileinstaller.ProfileInstallReceiver" tools:node="remove" />
     </application>
 </manifest>

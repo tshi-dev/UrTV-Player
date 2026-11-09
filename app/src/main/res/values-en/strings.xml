@@ -207,4 +207,13 @@
     <string name="unofficial_build">Unofficial build</string>
     <string name="unofficial_blocked">This build is not signed by the developer. Adding playlists from the phone and restoring backups are turned off. Install the official build from UrTV.</string>
     <string name="debug_label">Debug</string>
+    <string name="fm_title">Channels for this match</string>
+    <string name="fm_none">We couldn\'t find a channel for this match in your playlists</string>
+    <string name="fm_search">Search channels</string>
+    <string name="fm_back">Back</string>
+    <string name="fm_finding">Looking for the match channel…</string>
+    <string name="fm_why_guide">In the guide</string>
+    <string name="fm_why_named">Broadcaster channel</string>
+    <string name="fm_why_group">Sports channels</string>
+    <string name="fm_last_pick">Your last pick</string>
 </resources>
