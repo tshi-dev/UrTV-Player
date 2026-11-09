@@ -15,6 +15,19 @@ the app only plays what you give it.
 Build: `gradle :core:test` (parsers, no Android SDK needed) · `gradle :app:assembleDebug` (needs the Android SDK).
 Release signing happens only in CI from secrets; no keys are in this repository.
 
+### Remote control (player)
+
+| Key | Action |
+|---|---|
+| Up / Down (or CH+/CH-) | previous / next channel |
+| 0-9 | channel number (0 alone = previous channel) |
+| OK | mini guide (channel list with now/next) |
+| Left / Menu | audio, subtitles, aspect, favourite, reload |
+| Right / Info | now/next banner |
+| Back | close overlay, then leave the player |
+
+In lists, hold OK on a channel to add it to favourites, or on a group to lock it with the PIN.
+
 ## العربية
 
 مشغّل IPTV مستقل لأجهزة Android TV. **لا يحتوي على أي قنوات ولا قوائم تشغيل ولا روابط.** تضيف مصادرك بنفسك، والتطبيق يشغّل ما تعطيه فقط.
@@ -25,3 +38,16 @@ Release signing happens only in CI from secrets; no keys are in this repository.
 - رمز PIN للرقابة الأبوية على مجموعات تختارها
 - عربي (RTL) وإنجليزي، بالريموت فقط
 - أقل الصلاحيات: `INTERNET` و`ACCESS_NETWORK_STATE` فقط. بلا تخزين ولا تراكب ولا تثبيت ولا تحليلات ولا إعلانات. بلا تحديث ذاتي.
+
+### أزرار الريموت (المشغّل)
+
+| الزر | الوظيفة |
+|---|---|
+| أعلى / أسفل (أو CH+/CH-) | القناة السابقة / التالية |
+| 0-9 | رقم القناة (0 وحده = القناة السابقة) |
+| OK | الدليل المصغّر (قائمة القنوات مع الآن/التالي) |
+| يسار / Menu | الصوت، الترجمة، الأبعاد، المفضّلة، إعادة التحميل |
+| يمين / Info | شريط الآن/التالي |
+| رجوع | يغلق اللوحة ثم يخرج من المشغّل |
+
+في القوائم: اضغط مطوّلًا على OK عند قناة لإضافتها للمفضّلة، أو عند مجموعة لقفلها بالرمز.
