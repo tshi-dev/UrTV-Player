@@ -60,7 +60,11 @@ import java.util.Locale
 
 enum class Tab { Live, Movies, Series, Favs, Recents, Guide, Settings }
 
-fun chKey(pid: String, c: Channel) = "$pid|${c.url}"
+private val keyMemo = java.util.concurrent.ConcurrentHashMap<String, String>()
+/** Favourite/recent key: playlist id + a hash of the stream URL, so credentials in URLs never land in preferences. */
+fun chKey(pid: String, c: Channel): String = keyMemo.getOrPut(c.url) {
+    java.security.MessageDigest.getInstance("SHA-256").digest(c.url.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
+}.let { "$pid|$it" }
 fun groupKey(pid: String, g: String) = "$pid|$g"
 fun fmtTime(ms: Long): String = SimpleDateFormat("HH:mm", Locale.US).format(Date(ms))
 

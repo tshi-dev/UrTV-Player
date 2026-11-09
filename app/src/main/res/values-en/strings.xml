@@ -118,4 +118,5 @@
     <string name="hidden">Hidden</string>
     <string name="opt_sleep">Sleep timer</string>
     <string name="min_n">%d min</string>
+    <string name="pin_locked">Too many tries. Wait %d s</string>
 </resources>
