@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir -p app/src/main/assets/fonts
           cp .fonts-private/android/*.otf app/src/main/assets/fonts/
+          echo "Thmanyah pulled: $(ls app/src/main/assets/fonts | tr '\n' ' ')"
           rm -rf .fonts-private
       - uses: actions/setup-java@v4
         with:
@@ -87,6 +88,7 @@ jobs:
         run: |
           mkdir -p app/src/main/assets/fonts
           cp .fonts-private/android/*.otf app/src/main/assets/fonts/
+          echo "Thmanyah pulled: $(ls app/src/main/assets/fonts | tr '\n' ' ')"
           rm -rf .fonts-private
       - uses: actions/setup-java@v4
         with:
@@ -123,7 +125,8 @@ jobs:
           name="urtv-player-${GITHUB_REF_NAME#v}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$name"
           sha256sum "$name" > "$name.sha256"
-          gh release create "$GITHUB_REF_NAME" "$name" "$name.sha256" --title "UrTV Player ${GITHUB_REF_NAME#v}" \
+          pre=""; case "${GITHUB_REF_NAME#v}" in 0.*) pre="--prerelease";; esac   # versions below 1.0 are pre-releases
+          gh release create "$GITHUB_REF_NAME" "$name" "$name.sha256" $pre --title "UrTV Player ${GITHUB_REF_NAME#v}" \
             --notes "Signed official build. Signing certificate SHA-256: $PLAYER_CERT_SHA256. Install it only from UrTV or verify the sha256 file."
       - name: Remove the key
         if: always()
