@@ -46,10 +46,12 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val resume by store.resumeLast.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     val textScale by store.textScale.collectAsState()
-    val oled by store.oled.collectAsState()
+    val look by store.appearance.collectAsState()
     val offsets by store.epgOffsetMin.collectAsState()
     var pin by remember { mutableStateOf<PinRequest?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
+    var appearance by remember { mutableStateOf(false) }
+    if (appearance) { AppearanceScreen(store) { appearance = false }; return }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { SectionLabel(stringResource(R.string.set_playlists)) }
@@ -60,7 +62,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                         Text(p.name, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(stringResource(if (p.isXtream) R.string.kind_xtream else R.string.kind_m3u), style = T.tiny)
                     }
-                    if (p.id == active) Icon(Glyph.Check, C.accent2, 28)
+                    if (p.id == active) Icon(Glyph.Check, accentInk(), 28)
                 }
             }
         }
@@ -77,8 +79,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
         item { Setting(stringResource(R.string.set_buffer), stringResource(when (buffer) { BufferMode.Low -> R.string.buf_low; BufferMode.Normal -> R.string.buf_normal; BufferMode.High -> R.string.buf_high }), stringResource(R.string.set_buffer_hint)) {
             store.setBuffer(BufferMode.entries[(buffer.ordinal + 1) % BufferMode.entries.size]); app.player.buffer = store.buffer.value } }
         item { Setting(stringResource(R.string.set_resume), stringResource(if (resume) R.string.on else R.string.off)) { store.setResume(!resume) } }
-        item { Setting(stringResource(R.string.set_text_size), stringResource(listOf(R.string.size_normal, R.string.size_large, R.string.size_xl)[textScale])) { store.setTextScale((textScale + 1) % 3) } }
-        item { Setting(stringResource(R.string.set_theme), stringResource(if (oled) R.string.theme_oled else R.string.theme_dark)) { store.setOled(!oled) } }
+        item { Setting(stringResource(R.string.set_theme), stringResource(themeName(look.theme)) + " · " + stringResource(accentName(look.accent))) { appearance = true } }
         if (active != null) {
             item { Spacer(Modifier.height(8.dp)); SectionLabel(stringResource(R.string.set_active_playlist)) }
             item {
@@ -111,7 +112,7 @@ private fun Setting(label: String, value: String, hint: String? = null, onClick:
                 Text(label, style = T.body)
                 if (hint != null) Text(hint, style = T.tiny)
             }
-            Text(value, style = T.bodyBold.copy(color = C.accent2))
+            Text(value, style = T.bodyBold.copy(color = accentInk()))
         }
     }
 }
@@ -122,7 +123,7 @@ fun ConfirmDialog(text: String, onYes: () -> Unit, onNo: () -> Unit) {
     val fr = remember { androidx.compose.ui.focus.FocusRequester() }
     androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     Box(Modifier.fillMaxSize().background2(C.scrim), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(520.dp).background2(C.surface, RoundedCornerShape(28.dp)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(520.dp).background2(C.surface, Rd(28)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text, style = T.title)
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -159,12 +160,12 @@ fun GroupsManage(app: UrtvApp, onBack: () -> Unit) {
                 Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tv({ store.toggleHiddenGroup("$pid|$g") }, Modifier.weight(1f).fillMaxHeight()) {
                         Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(label, style = T.body.copy(color = if (hid) C.muted else C.text), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                            Text(stringResource(if (hid) R.string.hidden else R.string.shown), style = T.small.copy(color = if (hid) C.danger else C.accent2))
+                            Text(label, style = T.body.copy(color = if (hid) mutedInk() else ink()), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            Text(stringResource(if (hid) R.string.hidden else R.string.shown), style = T.small.copy(color = if (hid) dangerInk() else accentInk()))
                         }
                     }
-                    Tv({ move(i, -1) }, Modifier.size(64.dp), RoundedCornerShape(16.dp)) { Text("▲", style = T.body, modifier = Modifier.align(Alignment.Center)) }
-                    Tv({ move(i, 1) }, Modifier.size(64.dp), RoundedCornerShape(16.dp)) { Text("▼", style = T.body, modifier = Modifier.align(Alignment.Center)) }
+                    Tv({ move(i, -1) }, Modifier.size(64.dp), Rd(16)) { Text("▲", style = T.body, modifier = Modifier.align(Alignment.Center)) }
+                    Tv({ move(i, 1) }, Modifier.size(64.dp), Rd(16)) { Text("▼", style = T.body, modifier = Modifier.align(Alignment.Center)) }
                 }
             }
         }
