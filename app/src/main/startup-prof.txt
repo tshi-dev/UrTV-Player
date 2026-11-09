@@ -1,0 +1,4 @@
+SHPLcom/urtv/player/**;->**(**)**
+SHPLandroidx/compose/runtime/**;->**(**)**
+SHPLandroidx/compose/ui/**;->**(**)**
+SHPLandroidx/activity/**;->**(**)**

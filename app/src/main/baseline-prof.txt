@@ -1,0 +1,18 @@
+# Hand-written baseline profile for the start path (Home, Live list, player entry). Regenerate on a device with a
+# Macrobenchmark BaselineProfileRule when one is available; wildcards keep this valid as code moves.
+HSPLcom/urtv/player/**;->**(**)**
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/foundation/**;->**(**)**
+HSPLandroidx/compose/animation/**;->**(**)**
+HSPLandroidx/tv/material3/**;->**(**)**
+HSPLandroidx/activity/**;->**(**)**
+HSPLandroidx/lifecycle/**;->**(**)**
+HSPLkotlinx/coroutines/**;->**(**)**
+HSPLkotlinx/serialization/json/**;->**(**)**
+HSPLcoil3/**;->**(**)**
+HSPLokhttp3/**;->**(**)**
+Lcom/urtv/player/**;
+Landroidx/compose/runtime/**;
+Landroidx/compose/ui/**;
+Landroidx/compose/foundation/**;

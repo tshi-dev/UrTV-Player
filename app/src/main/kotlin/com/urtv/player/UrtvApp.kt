@@ -17,10 +17,11 @@ import kotlinx.coroutines.SupervisorJob
 /** Process-wide singletons (no DI framework: keeps the APK small). */
 class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     lateinit var store: Store; private set
-    lateinit var catalog: Catalog; private set
-    lateinit var vod: Vod; private set
-    lateinit var player: PlayerController; private set
-    lateinit var servers: ServerManager; private set
+    // Everything below is created on first use, so process start does the bare minimum.
+    val catalog: Catalog by lazy { Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+    val vod: Vod by lazy { Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+    val player: PlayerController by lazy { PlayerController(this, store) }
+    val servers: ServerManager by lazy { ServerManager(this) }
     /** Locked groups the user has unlocked with the PIN during this run. */
     var unlocked by mutableStateOf(emptySet<String>())
     var resumeHandled = false
@@ -35,10 +36,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        store = Store(this)
-        catalog = Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
-        vod = Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
-        player = PlayerController(this, store)
-        servers = ServerManager(this)
+        store = Store(this)                                    // preferences only: cheap
+        Thread({ store.loadHeavy() }, "load-store").start()     // Keystore + encrypted files off the main thread
     }
 }
