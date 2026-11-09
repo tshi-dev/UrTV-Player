@@ -15,7 +15,10 @@ class Store(ctx: Context) {
     private val file = File(ctx.filesDir, "playlists.json")
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val _playlists = MutableStateFlow(readPlaylists())
+    /** False until the encrypted files (playlists, watch list) are read off the main thread; keeps process start light. */
+    private val _ready = MutableStateFlow(false)
+    val ready: StateFlow<Boolean> = _ready
+    private val _playlists = MutableStateFlow<List<PlaylistDef>>(emptyList())
     val playlists: StateFlow<List<PlaylistDef>> = _playlists
     private val _favs = MutableStateFlow(sp.getStringSet("favs", emptySet())!!.toSet())
     val favs: StateFlow<Set<String>> = _favs
@@ -35,6 +38,15 @@ class Store(ctx: Context) {
     val resumeLast: StateFlow<Boolean> = _resume
     private val _hasPin = MutableStateFlow(sp.getString("pinHash", null) != null)
     val hasPin: StateFlow<Boolean> = _hasPin
+
+    /** Reads the encrypted files (Keystore + disk). Call from a background thread; safe to call once at start. */
+    @Synchronized fun loadHeavy() {
+        val pl = readPlaylists()
+        val w = runCatching { Secrets.readText(wFile)?.let { json.decodeFromString(ListSerializer(WatchItem.serializer()), it) } ?: emptyList() }.getOrDefault(emptyList())
+        _playlists.compareAndSet(emptyList(), pl)          // never overwrite something the user already added meanwhile
+        _watching.compareAndSet(emptyList(), w)
+        _ready.value = true
+    }
 
     // ---- playlists
     private fun readPlaylists(): List<PlaylistDef> = runCatching {
@@ -108,7 +120,7 @@ class Store(ctx: Context) {
 
     // ---- continue watching (movies and episodes), newest first, capped
     private val wFile = File(ctx.filesDir, "watching.json")
-    private val _watching = MutableStateFlow(runCatching { Secrets.readText(wFile)?.let { json.decodeFromString(ListSerializer(WatchItem.serializer()), it) } ?: emptyList() }.getOrDefault(emptyList()))
+    private val _watching = MutableStateFlow<List<WatchItem>>(emptyList())
     val watching: StateFlow<List<WatchItem>> = _watching
     private fun writeWatching(l: List<WatchItem>) {
         _watching.value = l

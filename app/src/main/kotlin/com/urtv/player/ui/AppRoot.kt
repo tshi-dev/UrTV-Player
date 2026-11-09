@@ -22,8 +22,18 @@ import kotlinx.coroutines.launch
 
 private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, Series, Vod, Server }
 
+/** Entry point. The launch animation sits on top and never gates anything: the content appears as soon as the stores are read. */
 @Composable
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
+    val ready by app.store.ready.collectAsState()
+    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(C.bg)) {
+        if (ready) AppContent(app, onLanguageChanged)
+        if (!app.splashDone) LaunchSplash { app.splashDone = true }
+    }
+}
+
+@Composable
+private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val store = app.store
     val scope = rememberCoroutineScope()
     val homeOnly by app.servers.homeOnly.collectAsState()
@@ -114,7 +124,6 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Series -> def?.let { d -> SeriesDetail(app, d, detailId, onPlay = { l, i, at -> playVod(l, i, at, Screen.Series) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Vod -> if (vodItems.isEmpty()) screen = Screen.Home else VodPlayerScreen(app, vodItems, vodIndex, vodStart, onExit = { screen = vodBack })
     } }
-    if (!app.splashDone) LaunchSplash { app.splashDone = true }
     banner?.let { b ->
         androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 28.dp)
             .background(androidx.compose.ui.graphics.Color(0xF0141619), Rd(16)).padding(horizontal = 28.dp, vertical = 14.dp)) { Text(b, style = T.row) }

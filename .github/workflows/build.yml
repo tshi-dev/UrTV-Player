@@ -26,9 +26,21 @@ jobs:
         run: gradle :core:test :app:testDebugUnitTest --no-daemon
       - name: Debug APK (default local debug key, no secrets)
         run: gradle :app:assembleDebug --no-daemon
-      - name: Report APK size and permissions
+      - name: Release build (unsigned: signing happens only from CI secrets) and size budget
+        run: |
+          gradle :app:assembleRelease --no-daemon
+          rsize=$(stat -c %s app/build/outputs/apk/release/app-release-unsigned.apk)
+          echo "Release APK size: $rsize bytes (budget 4194304)"
+          test "$rsize" -le 4194304
+      - name: Enforce size budget (debug APK at most 7 MB)
+        run: |
+          size=$(stat -c %s app/build/outputs/apk/debug/app-debug.apk)
+          echo "APK size: $size bytes (budget 7340032)"
+          test "$size" -le 7340032
+      - name: Report APK size, dex methods and permissions
         run: |
           ls -l app/build/outputs/apk/debug/*.apk
+          "$ANDROID_HOME"/cmdline-tools/latest/bin/apkanalyzer dex references app/build/outputs/apk/debug/app-debug.apk || true
           "$ANDROID_HOME"/build-tools/*/aapt2 dump permissions app/build/outputs/apk/debug/app-debug.apk || true
       - uses: actions/upload-artifact@v4
         with:
