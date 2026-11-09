@@ -129,3 +129,18 @@ class ReminderTest {
         s.toggleReminder(Store.Reminder("b", now + 3_600_000, "Later", "Ch")); assertTrue(s.reminders.value.isEmpty(), "toggle removes")
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = UrtvApp::class)
+class LanguageStoreTest {
+    @Test fun autoFollowsUrtvChangesAndManualOverrides() {
+        val s = ApplicationProvider.getApplicationContext<UrtvApp>().store
+        s.setLang("auto"); s.onUrtvLanguage("ar"); assertEquals("ar", s.resolvedLang())
+        assertTrue(s.onUrtvLanguage("en"), "UrTV switched to English: recreate"); assertEquals("en", s.resolvedLang())
+        assertFalse(s.onUrtvLanguage("en"), "no change, no recreate")
+        assertTrue(s.onUrtvLanguage("ar")); assertEquals("ar", s.resolvedLang())
+        assertEquals("en", s.setLang("en")); assertFalse(s.onUrtvLanguage("ar"), "manual choice wins over UrTV"); assertEquals("en", s.resolvedLang())
+        s.setLang("auto"); assertEquals("ar", s.resolvedLang(), "back to auto picks up UrTV's last language")
+        assertEquals("auto", s.lang.value)
+    }
+}

@@ -71,3 +71,21 @@ class WatchItemTest {
         assertEquals(0f, w.copy(durMs = 0).fraction)
     }
 }
+
+class LanguageTest {
+    private val r = com.urtv.player.data.Language::resolve
+    @Test fun manualChoiceAlwaysWins() {
+        assertEquals("en", r("en", "ar", "ar")); assertEquals("ar", r("ar", "en", "en"))
+    }
+    @Test fun autoFollowsUrtvThenSystemThenArabic() {
+        assertEquals("en", r("auto", "en", "ar")); assertEquals("ar", r("auto", "ar", "en"))
+        assertEquals("en", r("auto", null, "en"), "UrTV not installed: system language")
+        assertEquals("ar", r("auto", null, "ar")); assertEquals("ar", r("auto", null, "fr"), "Arabic first for anything else")
+        assertEquals("en", r("auto", "xx", "en"), "an unknown value from the provider is ignored")
+    }
+    @Test fun cycleAndNormalise() {
+        val l = com.urtv.player.data.Language
+        assertEquals(listOf("ar", "en", "auto"), listOf(l.next("auto"), l.next("ar"), l.next("en")))
+        assertEquals("ar", l.normalize(" AR-SA ")); assertEquals("en", l.normalize("en")); assertEquals(null, l.normalize("fr")); assertEquals(null, l.normalize(null))
+    }
+}

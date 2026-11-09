@@ -202,4 +202,6 @@
     <string name="set_tunnel_hint">Smoother on some devices. Turn off if you see picture or audio problems</string>
     <string name="set_stats">Playback stats</string>
     <string name="set_stats_hint">Shows resolution, bitrate and buffer while playing</string>
+    <string name="lang_auto">Auto (follow UrTV)</string>
+    <string name="set_language_hint">Follows the language of UrTV if installed, otherwise the TV language</string>
 </resources>

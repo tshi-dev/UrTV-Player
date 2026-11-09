@@ -202,4 +202,6 @@
     <string name="set_tunnel_hint">يحسّن السلاسة على بعض الأجهزة. أوقفه إن ظهرت مشاكل في الصورة أو الصوت</string>
     <string name="set_stats">إحصاءات التشغيل</string>
     <string name="set_stats_hint">يعرض الدقة ومعدل البيانات والمخزن المؤقت أثناء التشغيل</string>
+    <string name="lang_auto">تلقائي (حسب UrTV)</string>
+    <string name="set_language_hint">يتبع لغة UrTV إن كان مثبّتًا، وإلا لغة التلفاز</string>
 </resources>

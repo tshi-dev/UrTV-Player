@@ -15,11 +15,19 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(base: Context) {
-        val lang = base.getSharedPreferences("urtv", MODE_PRIVATE).getString("lang", "ar") ?: "ar"
+        val sp = base.getSharedPreferences("urtv", MODE_PRIVATE)
+        val lang = sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: "auto", sp.getString("urtvLang", null), com.urtv.player.data.Language.systemLanguage())
         val loc = Locale.forLanguageTag("$lang-u-nu-latn")   // Western digits in Arabic: clearer for channel numbers and times
         Locale.setDefault(loc)
         val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }
         super.attachBaseContext(base.createConfigurationContext(cfg))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Auto language follows UrTV: re-check whenever we come back to the foreground (off the main thread).
+        val app = application as UrtvApp
+        Thread({ val u = com.urtv.player.data.Language.readUrtv(applicationContext); if (app.store.onUrtvLanguage(u)) runOnUiThread { recreate() } }, "lang-check").start()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
