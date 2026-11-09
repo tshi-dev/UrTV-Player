@@ -43,14 +43,15 @@ jobs:
         run: gradle :core:test :app:testDebugUnitTest --no-daemon
       - name: Debug APK (default local debug key, no secrets)
         run: gradle :app:assembleDebug --no-daemon
-      - name: Release build (unsigned: signing happens only from CI secrets) and size budget
+      - name: "Release build (unsigned - signing happens only from CI secrets) and size budget"
         run: |
           gradle :app:assembleRelease --no-daemon
           rsize=$(stat -c %s app/build/outputs/apk/release/app-release-unsigned.apk)
           echo "Release APK size: $rsize bytes (budget 4194304)"
           test "$rsize" -le 4194304
       - name: "Debug APK size (reported, not enforced - the release APK is the shipped one)"
-        run: echo "Debug APK size: $(stat -c %s app/build/outputs/apk/debug/app-debug.apk) bytes"
+        run: |
+          echo "Debug APK size: $(stat -c %s app/build/outputs/apk/debug/app-debug.apk) bytes"
       - name: Report APK size, dex methods and permissions
         run: |
           ls -l app/build/outputs/apk/debug/*.apk
