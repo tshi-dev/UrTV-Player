@@ -66,7 +66,7 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 
     if (rows.isEmpty()) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            if (cat.epgLoading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
+            if (cat.epgLoading || !cat.settled) SkeletonRows(8, 84)
             else { Text(stringResource(R.string.no_guide), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.no_guide_hint), style = T.body.copy(color = C.muted)) }
         }
         return

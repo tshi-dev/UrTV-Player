@@ -208,6 +208,12 @@ private fun HomeRows(
             else -> true
         }
     }
+    if (shown.isEmpty() && (!cat.settled || cat.loading)) {
+        Column(Modifier.fillMaxSize().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+            repeat(3) { Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { SkeletonBlock(Modifier.size(220.dp, 26.dp), 6); SkeletonCards(5) } }
+        }
+        return
+    }
     if (shown.isEmpty()) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text(stringResource(R.string.home_empty), style = T.title)
@@ -368,8 +374,9 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                             TvButton(stringResource(R.string.unlock), { pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gKey } }, primary = true, focusRequester = ufr)
                         }
                     }
+                    list.isEmpty() && (!cat.settled || (cat.loading && cat.channels.isEmpty())) -> SkeletonRows(10)
                     list.isEmpty() -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (cat.loading && cat.channels.isEmpty()) { Spinner(); Spacer(Modifier.height(14.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
+                        if (false) { }
                         else if (cat.error != null && cat.channels.isEmpty()) {
                             Text(stringResource(when (cat.error) { LoadError.Network -> R.string.err_network; LoadError.Format -> R.string.err_format; else -> R.string.err_empty }), style = T.title)
                             Spacer(Modifier.height(20.dp)); TvButton(stringResource(R.string.retry), { app.catalog.refreshActive() }, primary = true)
@@ -428,7 +435,7 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
     }
     DisposableEffect(Unit) { onDispose { if (ctrl.isPreview) ctrl.stop() } }   // never kill a full-screen channel that just started
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && shownUrl == ch?.url) Color.Black else C.surfaceHi)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && ch != null && shownUrl == ch.url) Color.Black else C.surfaceHi)) {
             if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
             if (ch != null) Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color(0x80000000)).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }

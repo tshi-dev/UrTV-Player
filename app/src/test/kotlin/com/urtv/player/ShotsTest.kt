@@ -5,6 +5,10 @@ import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onRoot
@@ -122,6 +126,9 @@ class ShotsTest {
     @Test fun addPhone() { shot("08-add-from-phone-ar") { AddPlaylistScreen(app, Triple("http://192.0.2.10:49152/?c=482915", "482915", "192.0.2.10:49152")) {} } }
     @Test fun backup() { shot("12-backup-passphrase-ar") { com.urtv.player.ui.BackupScreen(app, false) {} } }
     @Test fun restore() { shot("13-restore-from-phone-ar") { com.urtv.player.ui.BackupScreen(app, true, Triple("http://192.0.2.10:49153/?c=730164", "730164", "192.0.2.10:49153")) {} } }
+    @Test fun loadingSkeleton() {
+        shot("14-loading-skeleton-ar") { androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().background(com.urtv.player.ui.C.bgBrush).padding(horizontal = 72.dp, vertical = 130.dp)) { com.urtv.player.ui.SkeletonRows(9) } }
+    }
     @Test fun pin() { shot("11-pin-ar") { PinPad("أدخل الرمز السري", null, 0, {}) {} } }
     @Test fun player() { seed(); val ch = app.catalog.state.value.channels[2]
         shot("04-player-ar") { PlayerScreen(app, app.catalog.state.value.channels, ch) {} } }
