@@ -8,6 +8,7 @@ object Browse {
     const val OTHER = "\u0000other"
     const val FAV = "\u0000fav"
     const val RECENT = "\u0000recent"
+    const val LIST = "\u0000list:"
 
     fun groupOf(c: Channel) = c.group.ifBlank { OTHER }
 

@@ -67,7 +67,7 @@ import kotlinx.coroutines.delay
 
 internal val SLEEP_STEPS = listOf(0, 15, 30, 60, 90, 120)
 
-private enum class Overlay { None, Info, Guide, Options }
+private enum class Overlay { None, Info, Guide, Options, Lists }
 
 @Composable
 fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Channel) -> Unit) {
@@ -124,7 +124,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { ctrl.release() }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { if (!blocked) ctrl.resume() }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
-    BackHandler { if (overlay == Overlay.Guide || overlay == Overlay.Options) overlay = Overlay.None else if (overlay == Overlay.Info) overlay = Overlay.None else onExit(shown) }
+    BackHandler { if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists) overlay = Overlay.None else if (overlay == Overlay.Info) overlay = Overlay.None else onExit(shown) }
 
     val status by ctrl.status.collectAsState()
     val attempt by ctrl.attempt.collectAsState()
@@ -133,7 +133,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         Modifier.fillMaxSize().background(Color.Black).focusRequester(root).focusable().onPreviewKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             val code = e.nativeKeyEvent.keyCode
-            if (overlay == Overlay.Guide || overlay == Overlay.Options) {
+            if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists) {
                 if (code == KeyEvent.KEYCODE_MENU) { overlay = Overlay.None; true } else false
             } else when (code) {
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { step(-1); true }
@@ -207,9 +207,13 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
             val list = if (queue.any { it.url == shown.url }) queue else all
             MiniGuide(list, shown, epg, nowMs, all) { goTo(it); overlay = Overlay.None }
         }
+        // my lists picker
+        AnimatedVisibility(overlay == Overlay.Lists, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
+            ListsPicker(app, pid, chKey(pid, shown)) { overlay = Overlay.Options }
+        }
         // options
         AnimatedVisibility(overlay == Overlay.Options, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
-            OptionsPanel(app, shown.name, chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, onGuide = { overlay = Overlay.Guide }, onReload = { ctrl.retryNow() }, onClose = { overlay = Overlay.None }, sleepMin = sleepMin, onSleep = { sleepMin = SLEEP_STEPS[(SLEEP_STEPS.indexOf(sleepMin) + 1) % SLEEP_STEPS.size] })
+            OptionsPanel(app, shown.name, chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, onGuide = { overlay = Overlay.Guide }, onLists = { overlay = Overlay.Lists }, onReload = { ctrl.retryNow() }, onClose = { overlay = Overlay.None }, sleepMin = sleepMin, onSleep = { sleepMin = SLEEP_STEPS[(SLEEP_STEPS.indexOf(sleepMin) + 1) % SLEEP_STEPS.size] })
         }
     }
     PinHost(pinReq, store) { pinReq = null }
@@ -261,7 +265,7 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
 }
 
 @Composable
-internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit, sleepMin: Int = 0, onSleep: () -> Unit = {}) {
+internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit, sleepMin: Int = 0, onSleep: () -> Unit = {}, onLists: (() -> Unit)? = null) {
     val ctrl = app.player
     val tracks by ctrl.tracks.collectAsState()
     val aspect by ctrl.aspect.collectAsState()
@@ -281,6 +285,7 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
         OptRow(stringResource(R.string.opt_aspect), stringResource(when (aspect) { AspectMode.Fit -> R.string.aspect_fit; AspectMode.Fill -> R.string.aspect_fill; AspectMode.Stretch -> R.string.aspect_stretch; AspectMode.R16x9 -> R.string.aspect_169; AspectMode.R4x3 -> R.string.aspect_43 })) { ctrl.cycleAspect() }
         if (fav != null) OptRow(stringResource(R.string.opt_fav), stringResource(if (fav) R.string.on else R.string.off)) { onFav() }
         if (onGuide != null) OptRow(stringResource(R.string.opt_list), "") { onGuide() }
+        if (onLists != null) OptRow(stringResource(R.string.opt_my_lists), "") { onLists() }
         OptRow(stringResource(R.string.opt_sleep), if (sleepMin == 0) stringResource(R.string.off) else stringResource(R.string.min_n, sleepMin)) { onSleep() }
         OptRow(stringResource(R.string.opt_reload), "") { onReload(); onClose() }
     }
@@ -292,6 +297,29 @@ private fun OptRow(label: String, value: String, fr: FocusRequester? = null, onC
         Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = T.body, modifier = Modifier.weight(1f))
             Text(value, style = T.bodyBold.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Add or remove the current channel in the user's own lists; "New list" creates one named "List N". */
+@Composable
+private fun ListsPicker(app: UrtvApp, pid: String, key: String, onBack: () -> Unit) {
+    val store = app.store
+    val lists by store.customLists.collectAsState()
+    val names = lists.keys.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    androidx.activity.compose.BackHandler(onBack = onBack)
+    val base = stringResource(R.string.list_default_name)
+    Column(Modifier.fillMaxHeight().width(620.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE0080909), Color(0xF2080909)))).padding(start = 110.dp, end = 60.dp, top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
+        Text(stringResource(R.string.opt_my_lists), style = T.title)
+        names.forEachIndexed { i, n ->
+            val on = key in (lists["$pid|$n"] ?: emptySet())
+            OptRow(n, if (on) "✓" else "", if (i == 0) fr else null) { store.toggleInList(pid, n, key) }
+        }
+        OptRow(stringResource(R.string.new_list), "+", if (names.isEmpty()) fr else null) {
+            var i = names.size + 1; while ("$base $i" in names) i++
+            val n = store.createList(pid, "$base $i"); store.toggleInList(pid, n, key)
         }
     }
 }

@@ -290,6 +290,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val hidden by store.hiddenGroups.collectAsState()
     val favs by store.favs.collectAsState()
     val recents by store.recents.collectAsState()
+    val lists by store.customLists.collectAsState()
     val epg by app.catalog.epg.collectAsState()
     val allGroups = remember(cat.channels) { Browse.groups(cat.channels) }
     val groups = remember(allGroups, order, hidden) { Browse.arrange(allGroups, order[pid].orEmpty(), hidden.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }.toSet()) }
@@ -298,7 +299,8 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val locked by store.lockedGroups.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     var pinReq by remember { mutableStateOf<PinRequest?>(null) }
-    LaunchedEffect(groups) { if (group !in groups && group != Browse.ALL && group != Browse.FAV && group != Browse.RECENT) group = Browse.ALL }
+    var deleteList by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(groups) { if (group !in groups && group != Browse.ALL && group != Browse.FAV && group != Browse.RECENT && !group.startsWith(Browse.LIST)) group = Browse.ALL }
     val gKey = groupKey(pid, group)
     val isLocked = group != Browse.ALL && gKey in locked && gKey !in app.unlocked
     val visibleChannels = remember(cat.channels, groups) { val g = groups.toSet(); cat.channels.filter { Browse.groupOf(it) in g } }
@@ -309,6 +311,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
             group == Browse.ALL -> visibleChannels
             group == Browse.FAV -> cat.channels.filter { chKey(pid, it) in favs }
             group == Browse.RECENT -> recents.mapNotNull { byKey[it] }
+            group.startsWith(Browse.LIST) -> (lists["$pid|${group.removePrefix(Browse.LIST)}"] ?: emptySet()).let { ks -> cat.channels.filter { chKey(pid, it) in ks } }
             else -> Browse.filter(cat.channels, group, "")
         }
     }
@@ -329,14 +332,16 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         // ---- groups rail: plain text rows with counts
         LazyColumn(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
-            val entries = listOf(Browse.ALL, Browse.FAV, Browse.RECENT) + groups
+            val myLists = lists.keys.filter { it.startsWith("$pid|") }.map { Browse.LIST + it.substringAfter('|') }
+            val entries = listOf(Browse.ALL, Browse.FAV, Browse.RECENT) + myLists + groups
             items(entries, key = { it }) { g ->
                 val gk = groupKey(pid, g)
-                val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.FAV -> stringResource(R.string.tab_favs); Browse.RECENT -> stringResource(R.string.tab_recents); Browse.OTHER -> stringResource(R.string.group_other); else -> g }
-                val n = when (g) { Browse.ALL -> cat.channels.size; Browse.FAV -> favs.count { it.startsWith("$pid|") }; Browse.RECENT -> recents.count { it.startsWith("$pid|") }; else -> counts[g] ?: 0 }
+                val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.FAV -> stringResource(R.string.tab_favs); Browse.RECENT -> stringResource(R.string.tab_recents); Browse.OTHER -> stringResource(R.string.group_other); else -> if (g.startsWith(Browse.LIST)) g.removePrefix(Browse.LIST) else g }
+                val n = when (g) { Browse.ALL -> cat.channels.size; Browse.FAV -> favs.count { it.startsWith("$pid|") }; Browse.RECENT -> recents.count { it.startsWith("$pid|") }; else -> if (g.startsWith(Browse.LIST)) (lists["$pid|${g.removePrefix(Browse.LIST)}"]?.size ?: 0) else counts[g] ?: 0 }
                 val special = g == Browse.ALL || g == Browse.FAV || g == Browse.RECENT
+                val isList = g.startsWith(Browse.LIST)
                 Tv({ group = g }, Modifier.fillMaxWidth().height(52.dp), selected = g == group, onFocus = { if (it) group = g },
-                    onLongClick = if (special) null else { { pinReq = if (hasPin) PinRequest.Verify { store.toggleLockedGroup(gk) } else PinRequest.SetNew { store.setPin(it); store.toggleLockedGroup(gk) } } }) {
+                    onLongClick = if (special) null else if (isList) { { deleteList = g.removePrefix(Browse.LIST) } } else { { pinReq = if (hasPin) PinRequest.Verify { store.toggleLockedGroup(gk) } else PinRequest.SetNew { store.setPin(it); store.toggleLockedGroup(gk) } } }) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(label, style = if (g == group) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         if (gk in locked) { Icon(Glyph.Lock, C.faint, 18); Spacer(Modifier.width(8.dp)) }
@@ -381,6 +386,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         PreviewPane(app, focused ?: list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
     }
     PinHost(pinReq, store) { pinReq = null }
+    deleteList?.let { n -> ConfirmDialog(stringResource(R.string.delete_list_confirm, n), onYes = { store.deleteList(pid, n); group = Browse.ALL; deleteList = null }, onNo = { deleteList = null }) }
 }
 
 /** One dense row: number, logo, name over programme (with time left at the end) and a thin progress bar. */
