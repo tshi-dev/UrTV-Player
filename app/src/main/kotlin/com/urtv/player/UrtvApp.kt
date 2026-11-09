@@ -9,6 +9,7 @@ import com.urtv.player.data.Catalog
 import com.urtv.player.data.Store
 import com.urtv.player.data.Vod
 import com.urtv.player.player.PlayerController
+import com.urtv.player.server.ServerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     val catalog: Catalog by lazy { Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     val vod: Vod by lazy { Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     val player: PlayerController by lazy { PlayerController(this, store) }
+    val servers: ServerManager by lazy { ServerManager(this) }
     /** Locked groups the user has unlocked with the PIN during this run. */
     var unlocked by mutableStateOf(emptySet<String>())
     var resumeHandled = false

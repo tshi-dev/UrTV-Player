@@ -38,7 +38,7 @@ class SubtitleChoiceTest {
         assertNull(SubtitleChoice.pickSubtitle(listOf(su(40, "jpn")), au(1, "eng"), prefs))
     }
     @Test fun imageFormatsAreClassified() {
-        assertTrue(SubtitleChoice.isImage(su(1, "ara", codec = "PGSSUB"))); assertFalse(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "pgssub")))
+        assertTrue(SubtitleChoice.isImage(su(1, "ara", codec = "PGSSUB"))); assertTrue(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "pgssub")))
         assertTrue(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "dvdsub"))); assertTrue(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "vobsub")))
         assertFalse(SubtitleChoice.isImage(su(1, "ara", codec = "ass")))
     }
@@ -91,5 +91,16 @@ class SubtitleStyleTest {
     @Test fun valuesAreClamped() {
         val s = SubtitleStyle(size = 5f, bottom = -1f, font = "comic").coerced()
         assertEquals(0.12f, s.size); assertEquals(0.02f, s.bottom); assertEquals("sans", s.font)
+    }
+}
+
+class BadgesTest {
+    @Test fun labelsFromStreams() {
+        val m = MediaItem("1", ItemType.Movie, "x", streams = listOf(
+            StreamInfo(0, type = StreamType.Video, codec = "hevc", width = 3840, height = 2160, videoRange = "DOVIWithHDR10"),
+            StreamInfo(1, type = StreamType.Audio, codec = "eac3", channels = 6, isDefault = true, title = "English Dolby Atmos")))
+        assertEquals(listOf("4K", "Dolby Vision", "HEVC", "Dolby Atmos", "5.1"), Badges.of(m))
+        assertEquals(listOf("1080p"), Badges.of(MediaItem("2", ItemType.Movie, "x", streams = listOf(StreamInfo(0, type = StreamType.Video, codec = "h264", height = 1080, videoRange = "SDR")))))
+        assertTrue(Badges.of(MediaItem("3", ItemType.Movie, "x")).isEmpty())
     }
 }
