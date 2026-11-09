@@ -55,7 +55,11 @@ import com.urtv.player.data.PlaylistDef
 data class Poster(val id: String, val title: String, val image: String?, val category: String, val meta: String?)
 
 /** What the VOD player plays: [key] is where the resume position is stored. */
-data class VodPlay(val title: String, val url: String, val key: String)
+data class VodPlay(
+    val title: String, val url: String, val key: String,
+    /** Set for movies/episodes so progress feeds "Continue watching" (empty for catch-up). */
+    val pid: String = "", val kind: String = "", val subtitle: String = "", val image: String? = null,
+)
 
 private const val ALL = "\u0000all"
 fun vodKey(pid: String, id: String) = "vod|$pid|$id"
@@ -163,8 +167,8 @@ fun MovieDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (VodPlay, Lo
     val meta = listOfNotNull(info.genre.ifBlank { null }, m.rating?.takeIf { it != "0" }?.let { "★ $it" }, info.durationSec.takeIf { it > 0 }?.let { "${it / 60} ${"min"}" }).joinToString("  ·  ")
     DetailFrame(m.poster, m.name, meta, info.plot, listOf(info.director.takeIf { it.isNotBlank() }, info.cast.takeIf { it.isNotBlank() }).filterNotNull().joinToString("  ·  "), buttons = {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (pos > 0) TvButton(stringResource(R.string.resume_from, hms(pos)), { onPlay(VodPlay(m.name, m.url, key), pos) }, primary = true, focusRequester = fr)
-            TvButton(stringResource(if (pos > 0) R.string.from_start else R.string.play), { onPlay(VodPlay(m.name, m.url, key), 0) }, primary = pos == 0L, focusRequester = if (pos > 0) null else fr)
+            if (pos > 0) TvButton(stringResource(R.string.resume_from, hms(pos)), { onPlay(VodPlay(m.name, m.url, key, def.id, "movie", "", m.poster), pos) }, primary = true, focusRequester = fr)
+            TvButton(stringResource(if (pos > 0) R.string.from_start else R.string.play), { onPlay(VodPlay(m.name, m.url, key, def.id, "movie", "", m.poster), 0) }, primary = pos == 0L, focusRequester = if (pos > 0) null else fr)
             TvButton(stringResource(R.string.back), onBack)
         }
     })
@@ -197,7 +201,7 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(list.size) { i ->
                         val e = list[i]; val k = vodKey(def.id, e.id); val pos = app.store.position(k)
-                        Tv({ onPlay(list.map { VodPlay("${s.name} · S${it.season}E${it.number}", it.url, vodKey(def.id, it.id)) }, i, pos) }, Modifier.fillMaxWidth().height(80.dp),
+                        Tv({ onPlay(list.map { VodPlay(s.name, it.url, vodKey(def.id, it.id), def.id, "episode", "S${it.season}·E${it.number} · ${it.title}", it.image ?: s.poster) }, i, pos) }, Modifier.fillMaxWidth().height(80.dp),
                             focusRequester = if (i == firstOpen) fr else null) {
                             Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("${e.number}", style = T.title.copy(color = C.accent2), modifier = Modifier.width(56.dp))
