@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,7 +70,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                 Text(stringResource(s.label), style = if (s == section) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 18.dp))
             }
         }
-        LazyColumn(Modifier.weight(1f).fillMaxHeight(), contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        LazyColumn(Modifier.weight(1f).fillMaxHeight().wrapContentWidth(Alignment.Start).widthIn(max = 900.dp), contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             when (section) {
                 Section.General -> {
                     item { Setting(stringResource(R.string.set_language), if (lang == "ar") "العربية" else "English") { store.setLang(if (lang == "ar") "en" else "ar"); onLanguage() } }

@@ -388,18 +388,18 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
 @Composable
 fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester?, onFocus: (Boolean) -> Unit) {
     var f by remember { mutableStateOf(false) }
-    Tv(onClick, Modifier.fillMaxWidth().height(70.dp), Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
+    Tv(onClick, Modifier.fillMaxWidth().height(76.dp), Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("$number", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
             Logo(ch, 44); Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(ch.name, style = T.row.copy(fontSize = 23.sp, lineHeight = 30.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f) Modifier.basicMarquee() else Modifier)
+                Text(ch.name, style = T.row.copy(fontSize = 25.sp, lineHeight = 32.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f) Modifier.basicMarquee() else Modifier)
                 if (now != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(now.title, style = T.small.copy(fontSize = 18.sp, lineHeight = 24.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(12.dp)); Text(leftText(now, nowMs), style = T.tiny.copy(fontSize = 15.sp))
+                        Text(now.title, style = T.small.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp)); Text(leftText(now, nowMs), style = T.tiny.copy(fontSize = 17.sp))
                     }
-                    Spacer(Modifier.height(3.dp)); ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1))
+                    Spacer(Modifier.height(3.dp)); ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1), Modifier.width(220.dp))
                 }
             }
             if (fav) { Spacer(Modifier.width(12.dp)); Icon(Glyph.Heart, if (f) C.onFocus else C.accent, 20, filled = true) }
@@ -418,12 +418,12 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
     }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(Color.Black)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && shownUrl == ch?.url) Color.Black else C.surfaceHi)) {
             if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
             if (ch != null) Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color(0x80000000)).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }
             }
-            if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 64) }
+            if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 132) }
         }
         if (ch != null) {
             val (now, _) = epg.nowNext(ch.epgId, nowMs)
