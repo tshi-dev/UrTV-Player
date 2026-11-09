@@ -25,7 +25,7 @@ Xtream/M3U credentials and tokens (they are in URLs too), the parental PIN, the 
 | 12 | XSS on the phone page | No script anywhere; `default-src 'none'` CSP; every echoed value is HTML-escaped [`phonePageEscapesCodeAndShipsNoScript`] |
 | 13 | PIN brute force or offline cracking | PBKDF2-HMAC-SHA256 (60 000 iterations) with a random 16-byte salt; after 5 wrong tries the pad locks 30 s, doubling to 15 min; PIN never stored |
 | 14 | TLS interception with user-installed CAs | `network_security_config` trusts the system store only. Cleartext http stays allowed because most IPTV servers need it (**residual**, inherent to the use case) |
-| 15 | Extra attack surface | Permissions: INTERNET and ACCESS_NETWORK_STATE only; one exported component (launcher activity); the exported `ProfileInstallReceiver` is removed; no WebView, no content providers of our own, no deep links, no broadcast receivers |
+| 15 | Extra attack surface | Permissions: INTERNET, ACCESS_NETWORK_STATE and the normal app-defined `sa.urtv.permission.READ_LANG` (UrTV's language only, no prompt); one exported component (launcher activity); the exported `ProfileInstallReceiver` is removed; no WebView, no content providers of our own, no deep links, no broadcast receivers |
 | 16 | Supply chain | All dependency versions are pinned (no ranges); Dependabot watches Gradle and Actions weekly; Actions run with `contents: read`; no signing key or secret in the repo, release signing only from CI secrets; no self-updater |
 | 17 | R8 | Enabled for debug and release; keep rules only for serialization |
 
