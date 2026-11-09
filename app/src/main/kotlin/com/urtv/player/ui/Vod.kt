@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -92,7 +93,7 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
                         Text(stringResource(R.string.err_network), style = T.title); Spacer(Modifier.height(16.dp))
                         TvButton(stringResource(R.string.retry), { app.vod.open(app.store.playlists.value.firstOrNull { it.id == vod.playlistId }, true) }, primary = true) }
                     list.isEmpty() -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center))
-                    else -> LazyVerticalGrid(GridCells.Adaptive(170.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp),
+                    else -> LazyVerticalGrid(GridCells.Adaptive(140.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         itemsIndexed(list, key = { _, p -> p.id }) { _, p -> PosterCard(p) { onOpen(p.id) } }
                     }
@@ -105,6 +106,7 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
 @Composable
 private fun PosterCard(p: Poster, onClick: () -> Unit) {
     Tv(onClick, Modifier.fillMaxWidth().aspectRatio(0.68f), RoundedCornerShape(16.dp)) {
+        Placeholder(p.title)
         if (!p.image.isNullOrBlank()) SubcomposeAsyncImage(p.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, loading = {}, error = {})
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0xEE05070B))))
         Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
@@ -114,11 +116,21 @@ private fun PosterCard(p: Poster, onClick: () -> Unit) {
     }
 }
 
+/** Calm tinted tile shown until (or instead of) a poster; the tint is derived from the title so it is stable. */
+@Composable
+private fun Placeholder(title: String) {
+    val h = (title.hashCode().toUInt() % 360u).toFloat()
+    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color.hsv(h, 0.35f, 0.32f), Color.hsv((h + 40) % 360, 0.45f, 0.18f)))), contentAlignment = Alignment.Center) {
+        Text(title.trim().take(1), style = T.display.copy(color = Color.White.copy(alpha = 0.35f)))
+    }
+}
+
 @Composable
 private fun DetailFrame(poster: String?, title: String, meta: String, plot: String, extra: String, buttons: @Composable () -> Unit, below: @Composable () -> Unit = {}) {
     Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 64.dp, vertical = 40.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-            Box(Modifier.width(240.dp).aspectRatio(0.68f).background(C.surface, RoundedCornerShape(20.dp)).let { it }) {
+            Box(Modifier.width(240.dp).aspectRatio(0.68f).clip(RoundedCornerShape(20.dp))) {
+                Placeholder(title)
                 if (!poster.isNullOrBlank()) SubcomposeAsyncImage(poster, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, loading = {}, error = {})
             }
             Column(Modifier.weight(1f)) {

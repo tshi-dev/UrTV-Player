@@ -68,6 +68,21 @@ class ShotsTest {
         check(!app.catalog.epg.value.isEmpty) { "epg not loaded: ${app.catalog.state.value}" }
     }
 
+    private fun seedXtream() {
+        app.store.addPlaylist(PlaylistDef("xt", "Example Xtream", "xtream", server = "http://example.com", user = "u", pass = "p"))
+        val dir = File(app.filesDir, "cache").apply { mkdirs() }
+        val cats = listOf("أكشن", "دراما", "كوميديا", "وثائقي")
+        File(dir, "movies_xt.tsv").writeText((1..30).joinToString("\n") { i ->
+            listOf("m$i", "فيلم تجريبي $i", "http://example.com/movie/u/p/$i.mp4", cats[i % cats.size], "", "%.1f".format(java.util.Locale.US, 5 + (i % 5) * 0.9), i.toString()).joinToString("\t")
+        } + "\n")
+        File(dir, "series_xt.tsv").writeText((1..12).joinToString("\n") { i ->
+            listOf("s$i", "مسلسل تجريبي $i", cats[i % cats.size], "", "7.5", "2022", i.toString(), "وصف قصير للمسلسل.").joinToString("\t")
+        } + "\n")
+        app.catalog.open("xt"); app.vod.open(app.store.playlists.value.first { it.id == "xt" })
+        repeat(100) { if (app.vod.state.value.movies.isNotEmpty()) return@repeat; shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(50) }
+        check(app.vod.state.value.movies.isNotEmpty())
+    }
+
     private fun shot(name: String, content: @Composable () -> Unit) {
         val sc = ActivityScenario.launch(ComponentActivity::class.java)
         sc.onActivity { it.setContent { UrtvTheme { content() } } }
@@ -96,4 +111,9 @@ class ShotsTest {
     @Test fun pin() { shot("06-pin-ar") { PinPad("أدخل الرمز السري", null, 0, {}) {} } }
     @Test fun player() { seed(); val ch = app.catalog.state.value.channels[2]
         shot("07-player-ar") { PlayerScreen(app, app.catalog.state.value.channels, ch) {} } }
+
+    @Test fun movies() { seedXtream(); shot("08-movies-ar") { HomeScreen(app, Tab.Movies, {}, { _, _ -> }, {}, {}, null) } }
+    @Test fun series() { seedXtream(); shot("09-series-ar") { HomeScreen(app, Tab.Series, {}, { _, _ -> }, {}, {}, null) } }
+    @Test @Config(qualifiers = "en-w960dp-h540dp-xhdpi") fun homeEn() { seed(); shot("10-channels-en") { HomeScreen(app, Tab.Live, {}, { _, _ -> }, {}, {}, null) } }
+    @Test @Config(qualifiers = "en-w960dp-h540dp-xhdpi") fun settingsEn() { seed(); shot("11-settings-en") { HomeScreen(app, Tab.Settings, {}, { _, _ -> }, {}, {}, null) } }
 }

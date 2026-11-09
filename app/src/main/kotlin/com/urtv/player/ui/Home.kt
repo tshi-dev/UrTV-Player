@@ -89,12 +89,11 @@ fun HomeScreen(
                     val label = stringResource(when (t) { Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Favs -> R.string.tab_favs; Tab.Recents -> R.string.tab_recents; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
                     Tv({ onTab(t) }, Modifier.height(52.dp), RoundedCornerShape(26.dp), selected = t == tab, onFocus = { if (it) onTab(t) },
                         focusRequester = if (t == tab) tabFocus else null) {
-                        Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp))
+                        Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp), maxLines = 1, softWrap = false)
                     }
                 }
             }
             Spacer(Modifier.weight(1f))
-            if (active != null) Text(active.name, style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 200.dp).padding(horizontal = 16.dp))
         }
         Spacer(Modifier.height(16.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {

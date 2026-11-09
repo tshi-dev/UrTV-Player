@@ -75,7 +75,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
             val parsed = XtreamParser.parseStreams(Http.text(acc.streamsUrl()), acc, cats)
             return parsed.channels to parsed.epgUrls
         }
-        val parsed = M3uParser.parse(Http.text(def.url))
+        val parsed = Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r -> M3uParser.parse(r.lineSequence()) }
         return parsed.channels to parsed.epgUrls
     }
 
