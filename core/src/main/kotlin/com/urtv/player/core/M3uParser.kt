@@ -55,11 +55,11 @@ object M3uParser {
         ATTR.findAll(s).associate { it.groupValues[1].lowercase() to (it.groups[2]?.value ?: it.groups[3]?.value ?: it.groups[4]?.value ?: "") }
 
     private fun parseInf(line: String): Pending {
-        // The title is after the last comma that is outside quotes.
+        // The title starts at the first comma outside quotes (attributes come before it; the title may itself contain commas).
         var inQ = false; var q = 0.toChar(); var cut = -1
         for (i in line.indices) {
             val c = line[i]
-            if (inQ) { if (c == q) inQ = false } else if (c == '"' || c == '\'') { if (line.indexOf(c, i + 1) > 0) { inQ = true; q = c } } else if (c == ',') cut = i
+            if (inQ) { if (c == q) inQ = false } else if (c == '"' || c == '\'') { if (line.indexOf(c, i + 1) > 0) { inQ = true; q = c } } else if (c == ',') { cut = i; break }
         }
         val title = if (cut >= 0) line.substring(cut + 1).trim() else ""
         val head = if (cut >= 0) line.substring(0, cut) else line
