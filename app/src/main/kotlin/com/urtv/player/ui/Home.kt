@@ -81,7 +81,7 @@ fun HomeScreen(
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
     restoreKey: String?,
     onManageGroups: () -> Unit = {}, onManageHome: () -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {},
-    onCatchup: (Channel, Programme) -> Unit = { _, _ -> }, onResume: (WatchItem) -> Unit = {},
+    onCatchup: (Channel, Programme) -> Unit = { _, _ -> }, onResume: (WatchItem) -> Unit = {}, onServer: () -> Unit = {},
 ) {
     val store = app.store
     val cat by app.catalog.state.collectAsState()
@@ -107,6 +107,10 @@ fun HomeScreen(
                     Tv({ onTab(t) }, Modifier.height(48.dp), RoundedCornerShape(50), selected = t == tab, onFocus = { if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
                         Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp))
                     }
+                }
+                // Home media server (Jellyfin, Emby, Plex): opens its own screen.
+                Tv({ onServer() }, Modifier.height(48.dp), RoundedCornerShape(50), lift = 1f) {
+                    Text(stringResource(R.string.srv_tab_server), style = T.body.copy(color = C.muted), maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp))
                 }
             }
             Spacer(Modifier.weight(1f))

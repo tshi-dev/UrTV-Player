@@ -15,13 +15,15 @@ import com.urtv.player.core.Channel
 import com.urtv.player.data.WatchItem
 import kotlinx.coroutines.launch
 
-private enum class Screen { Home, Player, Add, Groups, HomeRows, Movie, Series, Vod }
+private enum class Screen { Home, Player, Add, Groups, HomeRows, Movie, Series, Vod, Server }
 
 @Composable
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val store = app.store
     val scope = rememberCoroutineScope()
-    var screen by rememberSaveable { mutableStateOf(Screen.Home) }
+    val homeOnly by app.servers.homeOnly.collectAsState()
+    // Start screen: «home server only» forces the server; otherwise the start-screen setting may pick it.
+    var screen by rememberSaveable { mutableStateOf(if (app.servers.homeOnly.value || (store.startScreen.value == "server" && app.servers.servers.value.isNotEmpty())) Screen.Server else Screen.Home) }
     var tab by rememberSaveable { mutableStateOf(startTab(store.startScreen.value)) }
     var queue by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var playing by remember { mutableStateOf<Channel?>(null) }
@@ -34,13 +36,15 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val cat by app.catalog.state.collectAsState()
     val playlists by store.playlists.collectAsState()
     val def = playlists.firstOrNull { it.id == cat.playlistId }
-    LaunchedEffect(cat.playlistId, def?.isXtream) { app.vod.open(def) }
+    // Home server only: nothing of IPTV is loaded or reachable.
+    LaunchedEffect(homeOnly) { if (homeOnly && screen != Screen.Server) screen = Screen.Server }
+    LaunchedEffect(cat.playlistId, def?.isXtream) { if (!homeOnly) app.vod.open(def) }
     if ((tab == Tab.Movies || tab == Tab.Series) && def?.isXtream != true && playlists.isNotEmpty() && cat.playlistId != null) tab = Tab.Home
 
     // Open the active playlist once per process; optionally resume the last channel ("last" start screen or the resume setting).
-    LaunchedEffect(Unit) { if (cat.playlistId == null) app.catalog.open(store.activeId.value ?: store.playlists.value.firstOrNull()?.id) }
+    LaunchedEffect(Unit) { if (cat.playlistId == null && !app.servers.homeOnly.value) app.catalog.open(store.activeId.value ?: store.playlists.value.firstOrNull()?.id) }
     LaunchedEffect(cat.channels, cat.playlistId) {
-        if (!app.resumeHandled && cat.channels.isNotEmpty()) {
+        if (!app.resumeHandled && cat.channels.isNotEmpty() && !homeOnly && screen == Screen.Home) {
             app.resumeHandled = true
             val key = store.lastKey(); val pid = cat.playlistId.orEmpty()
             val ch = key?.let { k -> cat.channels.firstOrNull { chKey(pid, it) == k } }
@@ -64,11 +68,13 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)
     }
 
+    if (homeOnly && screen != Screen.Server) return    // the effect above moves to the server screen on the next frame
     when (screen) {
+        Screen.Server -> com.urtv.player.server.ServerRoot(app, onLanguage = onLanguageChanged, onIptv = { screen = Screen.Home })
         Screen.Home -> HomeScreen(
             app, tab, { tab = it },
             onPlay = { list, ch -> queue = list; playing = ch; screen = Screen.Player },
-            onAdd = { screen = Screen.Add }, onLanguage = onLanguageChanged, restoreKey = restoreKey,
+            onAdd = { screen = Screen.Add }, onServer = { screen = Screen.Server }, onLanguage = onLanguageChanged, restoreKey = restoreKey,
             onManageGroups = { screen = Screen.Groups }, onManageHome = { screen = Screen.HomeRows },
             onOpenMovie = { detailId = it; screen = Screen.Movie }, onOpenSeries = { detailId = it; screen = Screen.Series },
             onCatchup = { ch, p ->

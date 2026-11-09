@@ -116,7 +116,7 @@ fun AddServerScreen(app: UrtvApp, onDone: () -> Unit) {
                 Text(s.fingerprint.chunked(48).joinToString("\n"), style = T.small.copy(fontSize = 18.sp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TvButton(stringResource(R.string.srv_cert_trust), { probe(listOf(s.base), s.fingerprint) })
-                    TvButton(stringResource(R.string.cancel), { step = Step.Choose })
+                    TvButton(stringResource(R.string.srv_cancel), { step = Step.Choose })
                 }
             }
             is Step.Login -> {

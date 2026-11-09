@@ -30,13 +30,6 @@ class ServerManager(ctx: Context) {
     /** «وضع خادم المنزل فقط»: IPTV is hidden everywhere and the app is only a media-server client. */
     val homeOnly: StateFlow<Boolean> = _homeOnly
 
-    private val _startOnServer = MutableStateFlow(sp.getBoolean("startOnServer", false))
-    /** Open on the home server instead of IPTV (ignored, always true, in home-server-only mode). */
-    val startOnServer: StateFlow<Boolean> = _startOnServer
-    fun setStartOnServer(v: Boolean) { _startOnServer.value = v; sp.edit().putBoolean("startOnServer", v).apply() }
-    /** The screen to open on launch. */
-    fun startsOnServer(): Boolean = _homeOnly.value || (_startOnServer.value && _servers.value.isNotEmpty())
-
     private val _style = MutableStateFlow(readStyle())
     val subtitleStyle: StateFlow<SubtitleStyle> = _style
     private val _mode = MutableStateFlow(SubtitleMode.entries.firstOrNull { it.name == sp.getString("subMode", null) } ?: SubtitleMode.Auto)

@@ -99,7 +99,7 @@ fun ServerRoot(app: UrtvApp, onLanguage: () -> Unit, onIptv: () -> Unit) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     current is Dest.Add -> AddServerScreen(app) { pushed = emptyList(); top = Dest.Home }
-                    top == Dest.Settings && pushed.isEmpty() -> SettingsScreen(app, onAdd = { onIptv() }, onLanguage = onLanguage, onManageGroups = {}, onAddServer = { pushed = pushed + Dest.Add })
+                    top == Dest.Settings && pushed.isEmpty() -> SettingsScreen(app, onAdd = { onIptv() }, onLanguage = onLanguage, onManageGroups = {}, onManageHome = {}, onAddServer = { pushed = pushed + Dest.Add })
                     cfg == null || backend == null -> NoServer(onAdd = { pushed = pushed + Dest.Add })
                     current is Dest.Detail -> DetailScreen(backend, current.id, ::play, ::open)
                     current is Dest.Lib -> LibraryScreen(backend, current.lib, ::open)
