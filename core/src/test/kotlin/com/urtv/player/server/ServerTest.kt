@@ -49,10 +49,14 @@ class DiscoveryTest {
         val d = Discovery.parseReply(reply.toByteArray(), "192.168.1.10")!!
         assertEquals("http://192.168.1.10:8096", d.baseUrl); assertEquals("Home", d.name)
     }
-    @Test fun dropsPublicSenderOrAdvertisedAddress() {
+    @Test fun dropsPublicSenderAndBadAddresses() {
         assertNull(Discovery.parseReply(reply.toByteArray(), "8.8.8.8"))
-        assertNull(Discovery.parseReply("""{"Address":"http://8.8.8.8:8096","Id":"x","Name":"Evil"}""".toByteArray(), "192.168.1.10"))
         assertNull(Discovery.parseReply("""{"Address":"file:///etc","Id":"x"}""".toByteArray(), "192.168.1.10"))
+    }
+    @Test fun publicAdvertisedNameFallsBackToTheLanSender() {
+        val d = Discovery.parseReply("""{"Address":"https://media.example.com","Id":"x","Name":"Home"}""".toByteArray(), "192.168.1.10")!!
+        assertEquals("http://192.168.1.10:8096", d.baseUrl)
+        assertEquals("http://192.168.1.10:8096", Discovery.parseReply("""{"Address":"http://8.8.8.8:8096","Id":"x","Name":"Evil"}""".toByteArray(), "192.168.1.10")!!.baseUrl)
     }
     @Test fun garbageAndHugeRepliesAreIgnored() {
         assertNull(Discovery.parseReply("not json".toByteArray(), "192.168.1.10"))

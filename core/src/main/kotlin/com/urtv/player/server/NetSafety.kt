@@ -106,9 +106,11 @@ object Discovery {
         val o = parseObj(String(data, Charsets.UTF_8)) ?: return null
         val addr = o.s("Address") ?: return null
         val p = NetSafety.parse(addr) ?: return null
-        // Behind Docker or NAT the server may advertise an internal address; only trust a private advertised host.
-        val base = if (NetSafety.isPrivateHost(p.host)) NetSafety.normalizeBase(addr) else null
-        base ?: return null
+        // The reply came from a private host. If it advertises a public name (an admin set a public address), the LAN
+        // address is still reachable: use the sender with the default port, and let the sign-in probe confirm it.
+        val base = (if (NetSafety.isPrivateHost(p.host)) NetSafety.normalizeBase(addr) else null)
+            ?: NetSafety.normalizeBase("http://${if (senderHost.contains(':')) "[$senderHost]" else senderHost}:8096")
+            ?: return null
         val id = o.s("Id")?.takeIf { it.length in 1..64 } ?: return null
         return DiscoveredServer(id, (o.s("Name") ?: p.host).take(80), base)
     }

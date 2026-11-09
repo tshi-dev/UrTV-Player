@@ -209,6 +209,7 @@ private fun QuickStep(app: UrtvApp, s: Step.Quick, onDone: () -> Unit, onFail: (
                 }
             }
             onFail(ServerException(ServerException.Reason.Auth, "expired"))
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e      // leaving the screen is not a failure
         } catch (e: Exception) { onFail(e) }
     }
     Text(stringResource(R.string.srv_qc_hint), style = T.body)
@@ -231,6 +232,7 @@ private fun PlexPinStep(app: UrtvApp, onToken: (String, List<PlexTv.PlexServer>)
                 if (token != null) { val servers = withContext(Dispatchers.IO) { tv.servers(token) }; onToken(token, servers); return@LaunchedEffect }
             }
             onFail(ServerException(ServerException.Reason.Auth, "expired"))
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e      // leaving the screen is not a failure
         } catch (e: Exception) { onFail(e) }
     }
     Text(stringResource(R.string.srv_plex_hint), style = T.body)
