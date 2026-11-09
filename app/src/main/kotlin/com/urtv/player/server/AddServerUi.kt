@@ -86,9 +86,9 @@ fun AddServerScreen(app: UrtvApp, onDone: () -> Unit) {
                     if (it.reason == ServerException.Reason.Network) sawNet = true
                 }
             }
-            val c = lastCert
+            val fp = lastCert?.fingerprint
             busy = false
-            if (c?.fingerprint != null && pinned == null) step = Step.Cert(certBase, c.fingerprint)
+            if (fp != null && pinned == null) step = Step.Cert(certBase, fp)
             else error = if (sawNet) "net" else "notserver"
         }
     }
