@@ -18,21 +18,29 @@ data class PhoneInput(val name: String, val url: String, val server: String, val
  * One-shot LAN page for adding a playlist from a phone. Local network only, protected by a random
  * 6-digit session code, closes after one successful submit, 5 wrong codes, or 10 minutes.
  */
-class PhoneServer(private val onInput: (PhoneInput) -> Unit, private val onClosed: () -> Unit) {
+class PhoneServer(
+    private val bind: InetAddress,
+    private val onInput: (PhoneInput) -> Unit,
+    private val onClosed: () -> Unit,
+    private val lifetimeMs: Long = 10 * 60_000L,
+) {
     val code: String = "%06d".format(SecureRandom().nextInt(1_000_000))
     @Volatile var port: Int = 0; private set
     @Volatile private var server: ServerSocket? = null
     @Volatile private var done = false
     private var wrong = 0
 
+    /** Host header values this server answers to (defends against DNS rebinding from a browser on the phone). */
+    private var hosts: Set<String> = emptySet()
+
     fun start(): Boolean {
-        for (p in 8765..8785) {
-            try { server = ServerSocket(p, 4); port = p; break } catch (_: Exception) { }
-        }
+        // Random free port, bound to the LAN address only (not 0.0.0.0), and only while this screen is open.
+        try { server = ServerSocket(0, 2, bind); port = server!!.localPort } catch (_: Exception) { return false }
+        hosts = setOf("${bind.hostAddress}:$port")
         val s = server ?: return false
         Thread({
             s.soTimeout = 1000
-            val deadline = System.currentTimeMillis() + 10 * 60_000L
+            val deadline = System.currentTimeMillis() + lifetimeMs
             while (!done && System.currentTimeMillis() < deadline) {
                 try { handle(s.accept()) } catch (_: SocketTimeoutException) { } catch (_: Exception) { if (done) break }
             }
@@ -59,10 +67,14 @@ class PhoneServer(private val onInput: (PhoneInput) -> Unit, private val onClose
         val parts = lines[0].split(' ')
         if (parts.size < 2) return
         val method = parts[0]; val target = parts[1]
+        fun header(n: String) = lines.firstOrNull { it.startsWith("$n:", true) }?.substringAfter(':')?.trim()
+        if (header("host") !in hosts) { respond(out, 403, "text/plain", "forbidden"); return }
+        header("origin")?.let { if (it != "http://${header("host")}") { respond(out, 403, "text/plain", "forbidden"); return } }
+        if (method != "GET" && method != "POST") { respond(out, 405, "text/plain", "method not allowed"); return }
         val path = target.substringBefore('?')
         val query = parseForm(target.substringAfter('?', ""))
-        val len = lines.firstOrNull { it.startsWith("content-length:", true) }?.substringAfter(':')?.trim()?.toIntOrNull() ?: 0
-        if (len > 8192) { respond(out, 413, "text/plain", "too large"); return }
+        val len = header("content-length")?.toIntOrNull() ?: 0
+        if (len < 0 || len > 8192) { respond(out, 413, "text/plain", "too large"); return }
         val body = if (method == "POST" && len > 0) String(readN(inp, len), Charsets.UTF_8) else ""
         when {
             method == "GET" && path == "/" -> {
@@ -86,7 +98,7 @@ class PhoneServer(private val onInput: (PhoneInput) -> Unit, private val onClose
 
     private fun checkCode(c: String): Boolean {
         val ok = MessageDigest.isEqual(c.toByteArray(), code.toByteArray())
-        if (!ok && ++wrong >= 5) done = true
+        if (!ok) { Thread.sleep(300); if (++wrong >= 5) done = true }   // slow down guessing, then shut the door
         return ok
     }
 
@@ -113,7 +125,7 @@ class PhoneServer(private val onInput: (PhoneInput) -> Unit, private val onClose
 
     private fun respond(o: java.io.OutputStream, status: Int, type: String, body: String) {
         val b = body.toByteArray(Charsets.UTF_8)
-        val reason = when (status) { 200 -> "OK"; 400 -> "Bad Request"; 403 -> "Forbidden"; 404 -> "Not Found"; else -> "Error" }
+        val reason = when (status) { 200 -> "OK"; 400 -> "Bad Request"; 403 -> "Forbidden"; 404 -> "Not Found"; 405 -> "Method Not Allowed"; 413 -> "Payload Too Large"; else -> "Error" }
         val h = "HTTP/1.1 $status $reason\r\nContent-Type: $type; charset=utf-8\r\nContent-Length: ${b.size}\r\nCache-Control: no-store\r\n" +
             "Referrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n" +
             "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'\r\nConnection: close\r\n\r\n"
@@ -125,9 +137,9 @@ class PhoneServer(private val onInput: (PhoneInput) -> Unit, private val onClose
             (a.address.size == 16 && (a.address[0].toInt() and 0xfe) == 0xfc)
 
         /** This device's LAN IPv4 address (site-local only), or null when not on a private network. */
-        fun lanAddress(): String? = runCatching {
+        fun lanAddress(): InetAddress? = runCatching {
             NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }
-                .flatMap { it.inetAddresses.toList() }.filterIsInstance<Inet4Address>().firstOrNull { it.isSiteLocalAddress }?.hostAddress
+                .flatMap { it.inetAddresses.toList() }.filterIsInstance<Inet4Address>().firstOrNull { it.isSiteLocalAddress }
         }.getOrNull()
     }
 }

@@ -55,7 +55,8 @@ fun PinHost(req: PinRequest?, store: Store, onDismiss: () -> Unit) {
         step == 0 -> stringResource(R.string.pin_new)
         else -> stringResource(R.string.pin_confirm)
     }
-    PinPad(title, if (error) stringResource(if (req is PinRequest.Verify) R.string.pin_wrong else R.string.pin_mismatch) else null, attempt, onCancel = onDismiss) { pin ->
+    val lockSec = if (req is PinRequest.Verify && error) store.pinLockedSeconds() else 0
+    PinPad(title, if (lockSec > 0) stringResource(R.string.pin_locked, lockSec) else if (error) stringResource(if (req is PinRequest.Verify) R.string.pin_wrong else R.string.pin_mismatch) else null, attempt, onCancel = onDismiss) { pin ->
         error = false
         when (req) {
             is PinRequest.Verify -> if (store.checkPin(pin)) { onDismiss(); req.onOk() } else { error = true; attempt++ }

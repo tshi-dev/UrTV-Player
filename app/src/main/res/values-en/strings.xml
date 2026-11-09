@@ -147,4 +147,5 @@
     <string name="bg_gradient">Subtle gradient</string>
     <string name="bg_poster">Blurred poster</string>
     <string name="ap_poster_hint">Shows behind movies and series while a poster is focused</string>
+    <string name="pin_locked">Too many tries. Wait %d s</string>
 </resources>

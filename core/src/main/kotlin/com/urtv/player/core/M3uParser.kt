@@ -3,11 +3,14 @@ package com.urtv.player.core
 /** Tolerant M3U/M3U8 playlist parser. Never throws on malformed input; bad entries are counted in [ParsedPlaylist.skipped]. */
 object M3uParser {
     private val ATTR = Regex("""([A-Za-z0-9_\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,"']+))""")
-    private val SCHEMES = listOf("http://", "https://", "rtmp://", "rtsp://", "udp://", "rtp://", "file://")
+    private val SCHEMES = listOf("http://", "https://", "rtmp://", "rtsp://", "udp://", "rtp://") // never file:// content:// intent://
 
     fun parse(text: String): ParsedPlaylist = parse(text.removePrefix("\uFEFF").lineSequence())
 
     /** Streaming variant: reads one line at a time, so very large playlists never sit in memory as one String. */
+    const val MAX_CHANNELS = 200_000
+    const val MAX_LINE = 8192
+
     fun parse(lines: Sequence<String>): ParsedPlaylist {
         val channels = ArrayList<Channel>()
         val epg = LinkedHashSet<String>()
@@ -16,6 +19,8 @@ object M3uParser {
         var group = ""
 
         for (raw in lines) {
+            if (raw.length > MAX_LINE) { skipped++; pending = null; continue } // hostile / garbage line
+            if (channels.size >= MAX_CHANNELS) { skipped++; continue }
             val line = raw.trim().removePrefix("\uFEFF")
             if (line.isEmpty()) continue
             when {
@@ -39,7 +44,7 @@ object M3uParser {
                         val g = p?.group?.ifBlank { null } ?: group
                         channels += Channel(
                             id = p?.epgId?.ifBlank { null } ?: line,
-                            name = name, url = line, group = g,
+                            name = name.take(300), url = line, group = g.take(120),
                             logo = p?.logo?.ifBlank { null }, epgId = p?.epgId?.ifBlank { null },
                             number = p?.number,
                         )

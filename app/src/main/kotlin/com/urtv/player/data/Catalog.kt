@@ -82,8 +82,8 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     private suspend fun loadEpg(def: PlaylistDef, fetchNew: Boolean, urlsFromPlaylist: List<String>) {
         val file = epgFile(def.id)
         val urlFile = File(dir, "epgurls_${def.id}.txt")
-        if (urlsFromPlaylist.isNotEmpty()) runCatching { urlFile.writeText(urlsFromPlaylist.joinToString("\n")) }
-        val remembered = if (urlsFromPlaylist.isEmpty() && urlFile.exists()) runCatching { urlFile.readLines() }.getOrDefault(emptyList()) else urlsFromPlaylist
+        if (urlsFromPlaylist.isNotEmpty()) runCatching { Secrets.writeText(urlFile, urlsFromPlaylist.joinToString("\n")) }
+        val remembered = if (urlsFromPlaylist.isEmpty() && urlFile.exists()) runCatching { Secrets.readText(urlFile)?.lines().orEmpty() }.getOrDefault(emptyList()) else urlsFromPlaylist
         val urls = (listOf(def.epgUrl).filter { it.isNotBlank() } + remembered).filter { it.isNotBlank() }.distinct()
         val keep = HashSet<String>()
         for (c in _state.value.channels) c.epgId?.let { keep += it; keep += it.lowercase() }
@@ -95,7 +95,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 if (urls.isNotEmpty() && (fetchNew && urls.isNotEmpty() || !file.exists() || System.currentTimeMillis() - file.lastModified() > maxAge)) {
                     val tmp = File(file.path + ".tmp")
                     val ok = urls.any { u ->
-                        runCatching { Http.open(u, 30000).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }; true }.getOrDefault(false)
+                        runCatching { Http.open(u, 30000, Http.MAX_GUIDE).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }; true }.getOrDefault(false)
                     }
                     if (ok) { file.delete(); tmp.renameTo(file) } else tmp.delete()
                 }
@@ -114,21 +114,20 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     // Plain TSV cache: id, name, url, group, logo, epgId, number
     private fun writeCache(f: File, l: List<Channel>) {
         fun s(x: String?) = (x ?: "").replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
-        val tmp = File(f.path + ".tmp")
-        tmp.bufferedWriter().use { w -> for (c in l) w.append(listOf(s(c.id), s(c.name), s(c.url), s(c.group), s(c.logo), s(c.epgId), c.number?.toString() ?: "", s(c.streamId), c.archiveDays.toString()).joinToString("\t")).append('\n') }
-        f.delete(); tmp.renameTo(f)
+        // Stream URLs of Xtream playlists embed the credentials, so the cache is encrypted at rest.
+        Secrets.write(f) { o -> o.bufferedWriter().use { w -> for (c in l) w.append(listOf(s(c.id), s(c.name), s(c.url), s(c.group), s(c.logo), s(c.epgId), c.number?.toString() ?: "", s(c.streamId), c.archiveDays.toString()).joinToString("\t")).append('\n') } }
     }
 
     private fun readCache(f: File): List<Channel> {
         if (!f.exists()) return emptyList()
         val out = ArrayList<Channel>()
         runCatching {
-            f.bufferedReader().useLines { lines ->
+            Secrets.read(f) { i -> i.bufferedReader().useLines { lines ->
                 for (ln in lines) {
                     val p = ln.split('\t'); if (p.size < 7) continue
                     out += Channel(p[0], p[1], p[2], p[3], p[4].ifEmpty { null }, p[5].ifEmpty { null }, p[6].toIntOrNull(), p.getOrNull(7)?.ifEmpty { null }, p.getOrNull(8)?.toIntOrNull() ?: 0)
                 }
-            }
+            } }
         }
         return out
     }

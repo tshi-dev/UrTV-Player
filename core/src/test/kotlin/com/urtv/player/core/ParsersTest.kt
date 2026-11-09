@@ -104,3 +104,30 @@ class XtreamVodTest {
         assertEquals(3, c.archiveDays); assertEquals("5", c.streamId)
     }
 }
+
+class HostileInputTest {
+    @Test fun m3uRejectsLocalSchemesAndHugeLines() {
+        val r = M3uParser.parse("#EXTM3U\n#EXTINF:-1,A\nfile:///etc/passwd\n#EXTINF:-1,B\ncontent://x/y\n#EXTINF:-1,C\nintent://x#Intent;end\n#EXTINF:-1,D\nhttp://example.com/ok\n" + "x".repeat(20_000) + "\n")
+        assertEquals(listOf("D"), r.channels.map { it.name })
+    }
+
+    @Test fun xmltvDoesNotExpandExternalEntities() {
+        val xml = """<?xml version="1.0"?><!DOCTYPE tv [<!ENTITY x SYSTEM "file:///etc/passwd">]>
+            <tv><programme start="20240101000000 +0000" stop="20240101010000 +0000" channel="c"><title>&x;</title></programme></tv>"""
+        val p = XmltvParser.parse(xml)
+        assertTrue(p.none { it.title.contains("root:") }, "entity must not be resolved")
+    }
+
+    @Test fun xmltvLimitsFieldLengthsAndSurvivesTruncation() {
+        val long = "t".repeat(5000)
+        val p = XmltvParser.parse("""<tv><programme start="20240101000000" stop="20240101010000" channel="c"><title>$long</title></programme><programme start="2024""").single()
+        assertEquals(300, p.title.length)
+    }
+
+    @Test fun xtreamJsonOfWrongShapeIsHarmless() {
+        val acc = XtreamAccount("h.example", "u", "p")
+        assertTrue(XtreamParser.parseStreams("{\"a\":1}", acc).channels.isEmpty())
+        assertTrue(XtreamParser.parseMovies("[[],1,null,\"x\"]", acc).isEmpty())
+        assertEquals(emptyMap(), XtreamParser.parseCategories("not json"))
+    }
+}
