@@ -116,4 +116,6 @@
     <string name="set_groups_hint">Hide groups or change their order</string>
     <string name="shown">Shown</string>
     <string name="hidden">Hidden</string>
+    <string name="opt_sleep">Sleep timer</string>
+    <string name="min_n">%d min</string>
 </resources>

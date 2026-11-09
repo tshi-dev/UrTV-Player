@@ -7,6 +7,7 @@ the app only plays what you give it.
 
 - Playlists: M3U/M3U8 URL, Xtream Codes, XMLTV guide; several playlists, groups, search, favourites, recents
 - Add a playlist from your phone: scan the QR code on the TV (local network only, one-time session token)
+- Movies and series (Xtream): poster grid, details, seasons, resume where you stopped; catch-up from the guide where the provider offers it
 - Fast zapping (Up/Down, number entry), now/next, TV guide grid, audio/subtitle tracks, aspect modes, auto-reconnect
 - Parental PIN for chosen groups
 - Arabic (RTL) and English, D-pad only
@@ -34,6 +35,7 @@ In lists, hold OK on a channel to add it to favourites, or on a group to lock it
 
 - قوائم التشغيل: رابط M3U/M3U8 أو Xtream Codes أو دليل XMLTV؛ عدة قوائم، مجموعات، بحث، مفضّلة، آخر ما شاهدت
 - أضف القائمة من هاتفك: امسح رمز QR على التلفاز (الشبكة المحلية فقط، رمز جلسة لمرة واحدة)
+- أفلام ومسلسلات (Xtream): ملصقات، تفاصيل، مواسم، وتابع من حيث توقفت؛ وإعادة البرامج الفائتة من الدليل إن وفّرها المزوّد
 - تنقّل سريع بين القنوات، دليل البرامج، المسارات الصوتية والترجمة، أوضاع العرض، إعادة اتصال تلقائية
 - رمز PIN للرقابة الأبوية على مجموعات تختارها
 - عربي (RTL) وإنجليزي، بالريموت فقط
