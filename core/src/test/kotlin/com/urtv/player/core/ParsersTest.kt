@@ -74,3 +74,33 @@ class XmltvTest {
     @Test fun garbage() { assertTrue(XmltvParser.parse("not xml").isEmpty()) }
     @Test fun time() { assertEquals(0L, XmltvParser.parseTime("19700101000000 +0000")); assertNull(XmltvParser.parseTime("x")) }
 }
+
+class XtreamVodTest {
+    private val acc = XtreamAccount("host.example:8080", "user", "p w")
+
+    @Test fun moviesTolerateStringsAndMissingFields() {
+        val m = XtreamParser.parseMovies("""[{"stream_id":"7","name":"فيلم تجريبي","container_extension":"mkv","category_id":"3","rating":"7.5"},{"name":"no id"},{"stream_id":9}]""", acc, mapOf("3" to "أفلام"))
+        assertEquals(2, m.size)
+        assertEquals("http://host.example:8080/movie/user/p%20w/7.mkv", m[0].url); assertEquals("أفلام", m[0].category)
+        assertTrue(m[1].url.endsWith("/9.mp4"))
+    }
+
+    @Test fun seriesAndEpisodes() {
+        assertEquals("S", XtreamParser.parseSeriesList("""[{"series_id":1,"name":"S","cover":"http://i/c.jpg","releaseDate":"2020-05-01"}]""").single().name)
+        val eps = XtreamParser.parseEpisodes("""{"episodes":{"2":[{"id":"22","episode_num":1,"title":"B","season":2,"container_extension":"mp4"}],"1":[{"id":"12","episode_num":2,"title":"A2","season":1},{"id":"11","episode_num":"1","title":"A1","season":1,"info":{"plot":"p","duration_secs":"600"}}]}}""", acc)
+        assertEquals(listOf("A1", "A2", "B"), eps.map { it.title })
+        assertEquals(600, eps[0].durationSec); assertTrue(eps[2].url.contains("/series/user/"))
+    }
+
+    @Test fun garbageIsEmpty() {
+        assertTrue(XtreamParser.parseMovies("<html>", acc).isEmpty()); assertTrue(XtreamParser.parseEpisodes("[]", acc).isEmpty())
+        assertEquals("", XtreamParser.parseVodInfo("nope").plot)
+    }
+
+    @Test fun catchupUrlUsesUtcAndArchiveFlag() {
+        val u = acc.catchupUrl("5", 1_700_000_000_000, 90)
+        assertTrue(u.contains("stream=5&start=2023-11-14:22-13&duration=90"), u)
+        val c = XtreamParser.parseStreams("""[{"stream_id":"5","name":"x","tv_archive":1,"tv_archive_duration":"3"}]""", acc).channels.single()
+        assertEquals(3, c.archiveDays); assertEquals("5", c.streamId)
+    }
+}
