@@ -64,6 +64,12 @@ class PlayerController(private val ctx: Context) {
     private val _paused = MutableStateFlow(false)
     val paused: StateFlow<Boolean> = _paused
 
+    private val _ended = MutableStateFlow(false)
+    val ended: StateFlow<Boolean> = _ended
+    /** Where to start (movies/catch-up). Updated while playing so a reconnect resumes in place. */
+    private var startAtMs = 0L
+    private var vod = false
+
     private var current: Channel? = null
     private var forceHls = false
     private var watchdog: Job? = null
@@ -95,6 +101,7 @@ class PlayerController(private val ctx: Context) {
             when (state) {
                 Player.STATE_BUFFERING -> if (_status.value != PlayStatus.Reconnecting && _status.value != PlayStatus.Failed) _status.value = PlayStatus.Loading
                 Player.STATE_READY -> if (_status.value != PlayStatus.Failed) { _status.value = PlayStatus.Playing }
+                Player.STATE_ENDED -> if (vod) _ended.value = true
                 else -> Unit
             }
         }
@@ -140,7 +147,11 @@ class PlayerController(private val ctx: Context) {
 
     fun cycleAspect() { _aspect.value = AspectMode.entries[(_aspect.value.ordinal + 1) % AspectMode.entries.size] }
 
-    fun play(ch: Channel) {
+    /** Seekable on-demand playback (movie, episode, catch-up) starting at [startMs]. */
+    fun playVod(title: String, url: String, startMs: Long) { play(Channel(url, title, url), startMs, true) }
+
+    fun play(ch: Channel, startMs: Long = 0L, isVod: Boolean = false) {
+        vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f
         load(ch)
@@ -158,7 +169,8 @@ class PlayerController(private val ctx: Context) {
             if (forceHls || ch.url.contains(".m3u8", true)) setMimeType(MimeTypes.APPLICATION_M3U8)
             else if (ch.url.contains(".mpd", true)) setMimeType(MimeTypes.APPLICATION_MPD)
         }.build()
-        p.setMediaItem(item); p.prepare(); p.playWhenReady = true
+        if (vod && startAtMs > 0) p.setMediaItem(item, startAtMs) else p.setMediaItem(item)
+        p.prepare(); p.playWhenReady = true
         stallSec = 0; frozenSec = 0; stableSec = 0; lastPos = -1
         startWatchdog()
     }
@@ -173,6 +185,7 @@ class PlayerController(private val ctx: Context) {
 
     private fun scheduleReconnect() {
         val c = current ?: return
+        if (vod) player?.currentPosition?.takeIf { it > 0 }?.let { startAtMs = it }
         val n = _attempt.value + 1
         _attempt.value = n
         if (n > MAX_ATTEMPTS) { _status.value = PlayStatus.Failed; player?.stop(); return }
