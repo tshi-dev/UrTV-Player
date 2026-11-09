@@ -97,7 +97,7 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 36.dp)) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(38.dp).clip(Rd(11)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 20) }
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_mark), null, Modifier.size(40.dp))
                 Spacer(Modifier.width(12.dp)); Text("UrTV", style = T.title.copy(fontSize = 28.sp))
             }
             Spacer(Modifier.weight(1f))
@@ -133,7 +133,7 @@ fun EmptyPlaylists(onAdd: () -> Unit) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(88.dp).clip(Rd(26)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 44) }
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_mark), null, Modifier.size(104.dp))
         Spacer(Modifier.height(28.dp))
         Text(stringResource(R.string.no_playlists_title), style = T.display)
         Spacer(Modifier.height(12.dp))

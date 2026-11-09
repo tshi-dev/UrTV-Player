@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/brand/icon-512.png" width="128" alt="UrTV Player"></p>
+
 # UrTV Player
 
 **English** · [العربية](#العربية)
