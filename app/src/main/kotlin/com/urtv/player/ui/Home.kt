@@ -80,7 +80,7 @@ fun HomeScreen(
     app: UrtvApp, tab: Tab, onTab: (Tab) -> Unit,
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
     restoreKey: String?,
-    onManageGroups: () -> Unit = {}, onManageHome: () -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {},
+    onManageGroups: () -> Unit = {}, onManageHome: () -> Unit = {}, onBackup: (Boolean) -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {},
     onCatchup: (Channel, Programme) -> Unit = { _, _ -> }, onResume: (WatchItem) -> Unit = {}, onServer: () -> Unit = {},
 ) {
     val store = app.store
@@ -125,7 +125,7 @@ fun HomeScreen(
                 Tab.Movies -> PosterBrowse(app, true, onOpenMovie)
                 Tab.Series -> PosterBrowse(app, false, onOpenSeries)
                 Tab.Guide -> GuideScreen(app, cat, onPlay, onCatchup)
-                Tab.Settings -> SettingsScreen(app, onAdd, onLanguage, onManageGroups, onManageHome)
+                Tab.Settings -> SettingsScreen(app, onAdd, onLanguage, onManageGroups, onManageHome, onBackup)
             }
         }
     }
@@ -426,7 +426,7 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
         delay(1200)                                  // only start the stream once the user rests on a channel
         shownUrl = ch.url; ctrl.playPreview(ch)
     }
-    DisposableEffect(Unit) { onDispose { ctrl.stop() } }
+    DisposableEffect(Unit) { onDispose { if (ctrl.isPreview) ctrl.stop() } }   // never kill a full-screen channel that just started
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && shownUrl == ch?.url) Color.Black else C.surfaceHi)) {
             if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })

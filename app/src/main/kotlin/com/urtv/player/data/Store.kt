@@ -4,7 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import java.io.File
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -129,6 +129,7 @@ class Store(ctx: Context) {
     private val _lists = MutableStateFlow(
         sp.getString("lists", "")!!.lines().filter { it.contains('\t') }.associate { l -> l.substringBefore('\t') to l.substringAfter('\t').split(',').filter { it.isNotEmpty() }.toSet() })
     val customLists: StateFlow<Map<String, Set<String>>> = _lists
+    private fun saveListsMap(m: Map<String, Set<String>>) = saveLists(m)
     private fun saveLists(m: Map<String, Set<String>>) { _lists.value = m; sp.edit().putString("lists", m.entries.joinToString("\n") { it.key.replace('\t', ' ').replace('\n', ' ') + "\t" + it.value.joinToString(",") }).apply() }
     fun createList(pid: String, name: String): String {
         val clean = name.trim().replace('\t', ' ').replace('\n', ' ').take(40).ifBlank { "List" }
@@ -140,6 +141,29 @@ class Store(ctx: Context) {
     }
     fun deleteList(pid: String, name: String) = saveLists(_lists.value - "$pid|$name")
     fun listNames(pid: String): List<String> = _lists.value.keys.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }
+
+    // ---- in-app programme reminders (no background service, so they fire while the app is open)
+    data class Reminder(val key: String, val startMs: Long, val title: String, val channel: String)
+    private val _reminders = MutableStateFlow(sp.getString("reminders", "")!!.lines().mapNotNull { l ->
+        val p = l.split('\t'); if (p.size == 4) p[1].toLongOrNull()?.let { Reminder(p[0], it, p[2], p[3]) } else null })
+    val reminders: StateFlow<List<Reminder>> = _reminders
+    private fun saveReminders(l: List<Reminder>) { _reminders.value = l; sp.edit().putString("reminders", l.joinToString("\n") { listOf(it.key, it.startMs, it.title, it.channel).joinToString("\t") { x -> x.toString().replace('\t', ' ').replace('\n', ' ') } }).apply() }
+    fun toggleReminder(r: Reminder) { val cur = _reminders.value; saveReminders(if (cur.any { it.key == r.key }) cur.filter { it.key != r.key } else (cur + r).sortedBy { it.startMs }.take(100)) }
+    /** Reminders that are due (start within the last minute or the next minute); they are removed so each fires once. */
+    fun takeDueReminders(now: Long): List<Reminder> {
+        val due = _reminders.value.filter { it.startMs - now <= 60_000 && it.startMs - now >= -60_000 }
+        val stale = _reminders.value.filter { it.startMs < now - 60_000 }
+        if (due.isNotEmpty() || stale.isNotEmpty()) saveReminders(_reminders.value - (due + stale).toSet())
+        return due
+    }
+
+    // ---- playback dev/advanced switches
+    private val _tunnel = MutableStateFlow(sp.getBoolean("tunnel", false)); val tunneling: StateFlow<Boolean> = _tunnel
+    fun setTunneling(v: Boolean) { _tunnel.value = v; sp.edit().putBoolean("tunnel", v).apply() }
+    private val _stats = MutableStateFlow(sp.getBoolean("stats", false)); val statsOverlay: StateFlow<Boolean> = _stats
+    fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }
+    private val _prefetch = MutableStateFlow(sp.getBoolean("prefetch", false)); val prefetchNeighbours: StateFlow<Boolean> = _prefetch
+    fun setPrefetch(v: Boolean) { _prefetch.value = v; sp.edit().putBoolean("prefetch", v).apply() }
 
     // ---- start screen, home rows, live preview, watched marks
     private val _start = MutableStateFlow(sp.getString("start", "home")!!)
@@ -153,6 +177,62 @@ class Store(ctx: Context) {
     fun setLivePreview(v: Boolean) { _preview.value = v; sp.edit().putBoolean("preview", v).apply() }
     fun isWatched(key: String) = sp.getBoolean("w_$key", false)
     fun markWatched(key: String, v: Boolean = true) { sp.edit().apply { if (v) putBoolean("w_$key", true) else remove("w_$key") }.apply() }
+
+    // ---- backup (no PIN, no watch history, no caches). Credentials are inside, so the result is only ever written encrypted.
+    fun exportJson(): String {
+        fun strs(c: Collection<String>) = JsonArray(c.map { JsonPrimitive(it) })
+        val o = buildJsonObject {
+            put("v", 1)
+            put("playlists", json.encodeToJsonElement(ListSerializer(PlaylistDef.serializer()), _playlists.value))
+            put("active", _active.value ?: ""); put("favs", strs(_favs.value)); put("recents", strs(_recents.value)); put("locked", strs(_locked.value)); put("hidden", strs(_hidden.value))
+            put("order", buildJsonObject { _order.value.forEach { (k, v) -> put(k, strs(v)) } })
+            put("lists", buildJsonObject { _lists.value.forEach { (k, v) -> put(k, strs(v)) } })
+            put("epgOff", buildJsonObject { _offsets.value.forEach { (k, v) -> put(k, v) } })
+            put("homeRows", strs(_homeRows.value)); put("start", _start.value); put("lang", _lang.value); put("refreshH", _refreshH.value)
+            put("buffer", _buffer.value.name); put("preview", _preview.value); put("resume", _resume.value); put("textScale", _textScale.value)
+            val a = _appearance.value
+            put("appearance", buildJsonObject { put("theme", a.theme.name); put("accent", a.accent.name); put("focus", a.focus.name); put("corner", a.corner.name); put("bg", a.background.name) })
+        }
+        return o.toString()
+    }
+
+    /** Applies a backup produced by [exportJson]. Unknown or malformed parts are ignored; sizes are bounded. Returns false if it is not a backup. */
+    fun importJson(text: String): Boolean {
+        val o = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return false
+        if (o["v"]?.jsonPrimitive?.intOrNull != 1) return false
+        fun strs(k: String, max: Int = 20_000) = (o[k] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }?.take(max)
+        fun map(k: String) = (o[k] as? JsonObject)?.entries?.take(500)
+        val e = sp.edit()
+        (o["playlists"] as? JsonArray)?.let { arr ->
+            val l = runCatching { json.decodeFromJsonElement(ListSerializer(PlaylistDef.serializer()), arr) }.getOrNull()?.take(50)?.filter { it.kind == PlaylistDef.KIND_M3U || it.kind == PlaylistDef.KIND_XTREAM }
+            if (l != null) writePlaylists(l)
+        }
+        (o["active"] as? JsonPrimitive)?.content?.let { a -> setActive(a.takeIf { id -> _playlists.value.any { it.id == id } } ?: _playlists.value.firstOrNull()?.id) }
+        strs("favs")?.let { _favs.value = it.toSet(); e.putStringSet("favs", it.toSet()) }
+        strs("recents")?.let { _recents.value = it.take(30); e.putString("recents", it.take(30).joinToString("\n")) }
+        strs("locked")?.let { _locked.value = it.toSet(); e.putStringSet("locked", it.toSet()) }
+        strs("hidden")?.let { _hidden.value = it.toSet(); e.putStringSet("hidden", it.toSet()) }
+        strs("homeRows")?.let { _homeRows.value = it; e.putString("homeRows", it.joinToString("\n")) }
+        map("order")?.forEach { (k, v) -> val l = (v as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty(); _order.value = _order.value + (k to l); e.putString("gorder_$k", l.joinToString("\n")) }
+        map("epgOff")?.forEach { (k, v) -> (v as? JsonPrimitive)?.intOrNull?.let { n -> val c = n.coerceIn(-720, 720); _offsets.value = _offsets.value + (k to c); e.putInt("epgoff_$k", c) } }
+        map("lists")?.let { m -> saveListsMap(m.associate { (k, v) -> k to ((v as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }?.take(5000)?.toSet() ?: emptySet()) }) }
+        (o["start"] as? JsonPrimitive)?.content?.takeIf { it in setOf("home", "live", "guide", "movies", "series", "last") }?.let { _start.value = it; e.putString("start", it) }
+        (o["lang"] as? JsonPrimitive)?.content?.takeIf { it == "ar" || it == "en" }?.let { _lang.value = it; e.putString("lang", it) }
+        (o["refreshH"] as? JsonPrimitive)?.intOrNull?.takeIf { it in 0..168 }?.let { _refreshH.value = it; e.putInt("refreshH", it) }
+        (o["buffer"] as? JsonPrimitive)?.content?.let { n -> BufferMode.entries.firstOrNull { it.name == n }?.let { _buffer.value = it; e.putString("buffer", it.name) } }
+        (o["preview"] as? JsonPrimitive)?.booleanOrNull?.let { _preview.value = it; e.putBoolean("preview", it) }
+        (o["resume"] as? JsonPrimitive)?.booleanOrNull?.let { _resume.value = it; e.putBoolean("resume", it) }
+        (o["textScale"] as? JsonPrimitive)?.intOrNull?.takeIf { it in 0..2 }?.let { _textScale.value = it; e.putInt("textScale", it) }
+        (o["appearance"] as? JsonObject)?.let { a ->
+            fun <E : Enum<E>> pick(k: String, all: Array<E>, d: E) = all.firstOrNull { it.name == (a[k] as? JsonPrimitive)?.content } ?: d
+            val cur = _appearance.value
+            e.apply()
+            setAppearance(Appearance(pick("theme", ThemeId.entries.toTypedArray(), cur.theme), pick("accent", AccentId.entries.toTypedArray(), cur.accent),
+                pick("focus", FocusStyle.entries.toTypedArray(), cur.focus), pick("corner", CornerStyle.entries.toTypedArray(), cur.corner), pick("bg", BgStyle.entries.toTypedArray(), cur.background)))
+            return true
+        }
+        e.apply(); return true
+    }
 
     // ---- settings
     fun setLang(v: String) { _lang.value = v; sp.edit().putString("lang", v).apply() }
