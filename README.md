@@ -1,0 +1,27 @@
+# UrTV Player
+
+**English** · [العربية](#العربية)
+
+A standalone IPTV player for Android TV. **It contains no channels, no playlists and no links.** You add your own sources;
+the app only plays what you give it.
+
+- Playlists: M3U/M3U8 URL, Xtream Codes, XMLTV guide; several playlists, groups, search, favourites, recents
+- Add a playlist from your phone: scan the QR code on the TV (local network only, one-time session token)
+- Fast zapping (Up/Down, number entry), now/next, TV guide grid, audio/subtitle tracks, aspect modes, auto-reconnect
+- Parental PIN for chosen groups
+- Arabic (RTL) and English, D-pad only
+- Minimal permissions: `INTERNET`, `ACCESS_NETWORK_STATE`. No storage, overlay, install, analytics, ads or crash SDKs. No self-updater.
+
+Build: `gradle :core:test` (parsers, no Android SDK needed) · `gradle :app:assembleDebug` (needs the Android SDK).
+Release signing happens only in CI from secrets; no keys are in this repository.
+
+## العربية
+
+مشغّل IPTV مستقل لأجهزة Android TV. **لا يحتوي على أي قنوات ولا قوائم تشغيل ولا روابط.** تضيف مصادرك بنفسك، والتطبيق يشغّل ما تعطيه فقط.
+
+- قوائم التشغيل: رابط M3U/M3U8 أو Xtream Codes أو دليل XMLTV؛ عدة قوائم، مجموعات، بحث، مفضّلة، آخر ما شاهدت
+- أضف القائمة من هاتفك: امسح رمز QR على التلفاز (الشبكة المحلية فقط، رمز جلسة لمرة واحدة)
+- تنقّل سريع بين القنوات، دليل البرامج، المسارات الصوتية والترجمة، أوضاع العرض، إعادة اتصال تلقائية
+- رمز PIN للرقابة الأبوية على مجموعات تختارها
+- عربي (RTL) وإنجليزي، بالريموت فقط
+- أقل الصلاحيات: `INTERNET` و`ACCESS_NETWORK_STATE` فقط. بلا تخزين ولا تراكب ولا تثبيت ولا تحليلات ولا إعلانات. بلا تحديث ذاتي.
