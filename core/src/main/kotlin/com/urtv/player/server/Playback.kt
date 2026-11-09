@@ -96,6 +96,8 @@ interface MediaBackend {
     fun reportProgress(plan: PlaybackPlan, positionMs: Long, paused: Boolean)
     fun reportStop(plan: PlaybackPlan, positionMs: Long)
     fun setPlayed(item: MediaItem, played: Boolean)
+    /** Trailers hosted by the server itself (never external links). Empty when there are none. */
+    fun trailerItems(item: MediaItem): List<MediaItem> = emptyList()
     fun searchSubtitles(item: MediaItem, language: String): List<RemoteSubtitle>
     fun downloadSubtitle(item: MediaItem, sub: RemoteSubtitle)
 }

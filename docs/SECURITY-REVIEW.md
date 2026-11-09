@@ -35,3 +35,21 @@ Xtream/M3U credentials and tokens (they are in URLs too), the parental PIN, the 
 - A CVE scan could not run in the build sandbox (the vulnerability database host is blocked). Dependabot alerts cover this once GitHub
   reads the dependency graph; please enable "Dependabot security updates" on the repository.
 - Hostile video streams are decoded by Media3/ExoPlayer and the device's codecs; keep Media3 updated (Dependabot).
+
+## Addendum: home media-server client (Jellyfin, Emby, Plex)
+
+Code: `core/.../server/` (API clients, tested with canned and hostile JSON) and `app/.../server/` (UI, vault, player).
+
+| # | Threat | Fix |
+|---|---|---|
+| S1 | Server tokens read from app files | `servers.json` is written through `Secrets` (AES key in the Android Keystore). Tokens are never in preferences |
+| S2 | Tokens in URLs, logs or crash reports | Tokens travel in headers only (`Authorization: MediaBrowser … Token=` / `X-Plex-Token`); the player and image loader add them per request and only for the server's own origin. `ServerConfig`, `Req` and `ServerException` redact on `toString`/message; `Redact` strips `api_key`, `X-Plex-Token` etc.; server-supplied transcode URLs are stripped of `api_key` [`RedactTest`, `fallsBackToServerTranscodeAndStripsKeyFromUrl`] |
+| S3 | Discovery answered by a public or spoofed host | UDP replies from non-private senders, or advertising non-private addresses, are dropped [`DiscoveryTest`]. No `CHANGE_WIFI_MULTICAST_STATE`: a broadcast send plus unicast replies needs no lock |
+| S4 | Cleartext http to the internet | Server base URLs must be https, or http to a private host (RFC 1918, loopback, link-local, CGNAT, ULA, bare/`.local` names), re-checked on load and on every redirect; https→http downgrades refused [`NetSafetyTest`]. The Android network security config still permits cleartext globally for IPTV, because it cannot express private ranges: the rule for server traffic is enforced in code (**residual**: Coil/Media3 requests rely on URLs that were validated at configuration time) |
+| S5 | Silently trusting a bad certificate | A certificate the system rejects raises an error with its SHA-256 fingerprint; the user may pin that one certificate for that server. Nothing else is trusted. Pin is stored encrypted |
+| S6 | Hostile server JSON | Tolerant decoding, no exceptions escape, string/list caps, ids validated, 32 MB response cap, deep-nesting input handled [`HostileJsonTest`] |
+| S7 | Token sent to another host on redirect | The API client (`JavaTransport`) follows redirects itself and re-checks every hop; it never downgrades to http or leaves the LAN for http. **Residual:** media and image requests go through Media3/Coil, which follow redirects themselves; a same-scheme redirect from your own server to another host would carry the token header there. Only a compromised or misconfigured server can cause it |
+| S8 | Third-party subtitle keys | None in the app. Subtitle search/download uses the server's own plugin or agent |
+| S9 | Plex login | Official plex.tv PIN flow; the account token is never typed on the TV |
+
+Not tested against live servers: all behaviour is verified against canned responses based on the documented APIs.
