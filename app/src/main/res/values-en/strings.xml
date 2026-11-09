@@ -8,7 +8,7 @@
     <string name="tab_settings">Settings</string>
     <string name="all_channels">All channels</string>
     <string name="group_other">Other</string>
-    <string name="search_hint">Search channels</string>
+    <string name="search_hint">Search</string>
     <string name="no_playlists_title">No playlist yet</string>
     <string name="no_playlists_body">Add yours from your phone or type the link here. The app is a player only and contains no channels.</string>
     <string name="add_playlist">Add playlist</string>

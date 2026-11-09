@@ -8,7 +8,7 @@
     <string name="tab_settings">الإعدادات</string>
     <string name="all_channels">كل القنوات</string>
     <string name="group_other">أخرى</string>
-    <string name="search_hint">ابحث عن قناة</string>
+    <string name="search_hint">ابحث</string>
     <string name="no_playlists_title">ما عندك قائمة بعد</string>
     <string name="no_playlists_body">أضف قائمتك من جوالك أو اكتب الرابط هنا. التطبيق مشغّل فقط ولا يحتوي على أي قنوات.</string>
     <string name="add_playlist">إضافة قائمة</string>

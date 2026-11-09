@@ -5,15 +5,18 @@ object M3uParser {
     private val ATTR = Regex("""([A-Za-z0-9_\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,"']+))""")
     private val SCHEMES = listOf("http://", "https://", "rtmp://", "rtsp://", "udp://", "rtp://", "file://")
 
-    fun parse(text: String): ParsedPlaylist {
+    fun parse(text: String): ParsedPlaylist = parse(text.removePrefix("\uFEFF").lineSequence())
+
+    /** Streaming variant: reads one line at a time, so very large playlists never sit in memory as one String. */
+    fun parse(lines: Sequence<String>): ParsedPlaylist {
         val channels = ArrayList<Channel>()
         val epg = LinkedHashSet<String>()
         var skipped = 0
         var pending: Pending? = null
         var group = ""
 
-        for (raw in text.removePrefix("﻿").lineSequence()) {
-            val line = raw.trim()
+        for (raw in lines) {
+            val line = raw.trim().removePrefix("\uFEFF")
             if (line.isEmpty()) continue
             when {
                 line.startsWith("#EXTM3U", true) -> {
