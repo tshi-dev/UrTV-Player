@@ -63,3 +63,11 @@ dependencies {
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.test:core:1.6.1")
 }
+
+// Optional: point Robolectric at a pre-downloaded android-all jar directory (offline CI/sandboxes).
+System.getenv("ROBOLECTRIC_DIR")?.let { dir ->
+    tasks.withType<Test>().configureEach {
+        systemProperty("robolectric.offline", "true")
+        systemProperty("robolectric.dependency.dir", dir)
+    }
+}

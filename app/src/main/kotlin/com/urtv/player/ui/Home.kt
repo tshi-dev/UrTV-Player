@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -94,7 +95,7 @@ fun HomeScreen(
                 }
             }
             Spacer(Modifier.weight(1f))
-            if (active != null) Text(active.name, style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(220.dp))
+            if (active != null) Text(active.name, style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 200.dp).padding(horizontal = 16.dp))
         }
         Spacer(Modifier.height(16.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
