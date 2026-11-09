@@ -62,7 +62,7 @@ jobs:
         run: |
           ls -l app/build/outputs/apk/debug/*.apk
           "$ANDROID_HOME"/cmdline-tools/latest/bin/apkanalyzer dex references app/build/outputs/apk/debug/app-debug.apk || true
-          "$ANDROID_HOME"/build-tools/*/aapt2 dump permissions app/build/outputs/apk/debug/app-debug.apk || true
+          "$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)" dump permissions app/build/outputs/apk/debug/app-debug.apk || true
       - uses: actions/upload-artifact@v4
         with:
           name: urtv-player-debug
@@ -120,7 +120,7 @@ jobs:
       - name: Verify signature (v2 and v3) and size
         run: |
           apk=app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --verbose --print-certs "$apk" | tee verify.txt
+          "$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)" verify --verbose --print-certs "$apk" | tee verify.txt
           grep -q "v2 scheme (APK Signature Scheme v2): true" verify.txt
           grep -q "v3 scheme (APK Signature Scheme v3): true" verify.txt
           test "$(stat -c %s "$apk")" -le 4194304
