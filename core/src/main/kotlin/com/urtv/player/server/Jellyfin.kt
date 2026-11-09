@@ -283,6 +283,11 @@ class JellyfinBackend(override val config: ServerConfig, private val http: Trans
     override fun reportProgress(plan: PlaybackPlan, positionMs: Long, paused: Boolean) = report("/Sessions/Playing/Progress", plan, positionMs, paused)
     override fun reportStop(plan: PlaybackPlan, positionMs: Long) = report("/Sessions/Playing/Stopped", plan, positionMs, null)
 
+    override fun trailerItems(item: MediaItem): List<MediaItem> {
+        val arr = runCatching { parseJson(send("GET", "/Users/$uid/Items/${enc(item.id)}/LocalTrailers").body) as? JsonArray }.getOrNull() ?: return emptyList()
+        return arr.mapNotNull { (it as? JsonObject)?.let(::parseItem) }.take(3)
+    }
+
     override fun setPlayed(item: MediaItem, played: Boolean) { send(if (played) "POST" else "DELETE", "/Users/$uid/PlayedItems/${enc(item.id)}") }
 
     // Subtitle search/download goes through the server's own subtitle plugin; the app holds no provider key.

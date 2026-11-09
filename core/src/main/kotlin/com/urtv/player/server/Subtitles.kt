@@ -26,8 +26,11 @@ object SubtitleChoice {
     private fun isCommentary(s: StreamInfo) = s.title?.contains("commentary", true) == true
     private val imageCodecs = setOf("pgs", "pgssub", "hdmv_pgs_subtitle", "dvdsub", "dvd_subtitle", "vobsub", "dvbsub", "dvb_subtitle", "xsub")
     fun isImage(s: StreamInfo) = s.codec?.lowercase() in imageCodecs
-    /** PGS can be drawn by Media3 on most TVs; VobSub/DVB/XSUB are not decodable and need a server burn-in. */
-    fun needsBurnIn(s: StreamInfo) = isImage(s) && s.codec?.lowercase() !in setOf("pgs", "pgssub", "hdmv_pgs_subtitle")
+    /**
+     * Picture subtitles (PGS, VobSub, DVB) are burned in by the server's transcoder: that works on every TV and keeps the
+     * bitmap in sync. Text subtitles (SRT/ASS/SSA/VTT) are fetched as text and drawn by UrTV itself.
+     */
+    fun needsBurnIn(s: StreamInfo) = isImage(s)
 
     fun pickAudio(audio: List<StreamInfo>, prefs: LangPrefs): StreamInfo? {
         if (audio.isEmpty()) return null
