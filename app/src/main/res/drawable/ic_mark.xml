@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UrTV mark: gold play triangle with a sunset on a deep green tile (approved logo, option B). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="512dp" android:height="512dp" android:viewportWidth="512" android:viewportHeight="512">
+    <path android:pathData="M112,0 H400 A112,112 0 0 1 512,112 V400 A112,112 0 0 1 400,512 H112 A112,112 0 0 1 0,400 V112 A112,112 0 0 1 112,0 Z">
+        <aapt:attr name="android:fillColor"><gradient android:startX="0" android:startY="0" android:endX="512" android:endY="512" android:startColor="#103322" android:endColor="#03100A" /></aapt:attr>
+    </path>
+    <path android:pathData="M182,108 Q160,96 160,122 V390 Q160,416 182,404 L396,276 Q418,256 396,236 Z">
+        <aapt:attr name="android:fillColor"><gradient android:startX="160" android:startY="96" android:endX="418" android:endY="416" android:startColor="#F3D493" android:endColor="#C39B52" /></aapt:attr>
+    </path>
+    <group>
+        <clip-path android:pathData="M182,108 Q160,96 160,122 V390 Q160,416 182,404 L396,276 Q418,256 396,236 Z" />
+        <path android:fillColor="#0B2418" android:pathData="M220,262 A30,30 0 1 0 280,262 A30,30 0 1 0 220,262 Z" />
+        <path android:pathData="M150,318 C206,282 262,286 314,304 C350,316 384,306 420,290" android:strokeColor="#0B2418" android:strokeWidth="14" android:strokeLineCap="round" />
+    </group>
+</vector>

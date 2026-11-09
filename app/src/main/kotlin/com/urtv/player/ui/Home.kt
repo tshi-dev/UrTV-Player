@@ -97,7 +97,7 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 36.dp)) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(38.dp).clip(Rd(11)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 20) }
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_mark), null, Modifier.size(40.dp))
                 Spacer(Modifier.width(12.dp)); Text("UrTV", style = T.title.copy(fontSize = 28.sp))
             }
             Spacer(Modifier.weight(1f))
@@ -137,7 +137,7 @@ fun EmptyPlaylists(onAdd: () -> Unit) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(88.dp).clip(Rd(26)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 44) }
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_mark), null, Modifier.size(104.dp))
         Spacer(Modifier.height(28.dp))
         Text(stringResource(R.string.no_playlists_title), style = T.display)
         Spacer(Modifier.height(12.dp))
@@ -294,6 +294,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val hidden by store.hiddenGroups.collectAsState()
     val favs by store.favs.collectAsState()
     val recents by store.recents.collectAsState()
+    val lists by store.customLists.collectAsState()
     val epg by app.catalog.epg.collectAsState()
     val allGroups = remember(cat.channels) { Browse.groups(cat.channels) }
     val groups = remember(allGroups, order, hidden) { Browse.arrange(allGroups, order[pid].orEmpty(), hidden.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }.toSet()) }
@@ -302,7 +303,8 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val locked by store.lockedGroups.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     var pinReq by remember { mutableStateOf<PinRequest?>(null) }
-    LaunchedEffect(groups) { if (group !in groups && group != Browse.ALL && group != Browse.FAV && group != Browse.RECENT) group = Browse.ALL }
+    var deleteList by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(groups) { if (group !in groups && group != Browse.ALL && group != Browse.FAV && group != Browse.RECENT && !group.startsWith(Browse.LIST)) group = Browse.ALL }
     val gKey = groupKey(pid, group)
     val isLocked = group != Browse.ALL && gKey in locked && gKey !in app.unlocked
     val visibleChannels = remember(cat.channels, groups) { val g = groups.toSet(); cat.channels.filter { Browse.groupOf(it) in g } }
@@ -313,6 +315,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
             group == Browse.ALL -> visibleChannels
             group == Browse.FAV -> cat.channels.filter { chKey(pid, it) in favs }
             group == Browse.RECENT -> recents.mapNotNull { byKey[it] }
+            group.startsWith(Browse.LIST) -> (lists["$pid|${group.removePrefix(Browse.LIST)}"] ?: emptySet()).let { ks -> cat.channels.filter { chKey(pid, it) in ks } }
             else -> Browse.filter(cat.channels, group, "")
         }
     }
@@ -333,14 +336,16 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         // ---- groups rail: plain text rows with counts
         LazyColumn(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
-            val entries = listOf(Browse.ALL, Browse.FAV, Browse.RECENT) + groups
+            val myLists = lists.keys.filter { it.startsWith("$pid|") }.map { Browse.LIST + it.substringAfter('|') }
+            val entries = listOf(Browse.ALL, Browse.FAV, Browse.RECENT) + myLists + groups
             items(entries, key = { it }) { g ->
                 val gk = groupKey(pid, g)
-                val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.FAV -> stringResource(R.string.tab_favs); Browse.RECENT -> stringResource(R.string.tab_recents); Browse.OTHER -> stringResource(R.string.group_other); else -> g }
-                val n = when (g) { Browse.ALL -> cat.channels.size; Browse.FAV -> favs.count { it.startsWith("$pid|") }; Browse.RECENT -> recents.count { it.startsWith("$pid|") }; else -> counts[g] ?: 0 }
+                val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.FAV -> stringResource(R.string.tab_favs); Browse.RECENT -> stringResource(R.string.tab_recents); Browse.OTHER -> stringResource(R.string.group_other); else -> if (g.startsWith(Browse.LIST)) g.removePrefix(Browse.LIST) else g }
+                val n = when (g) { Browse.ALL -> cat.channels.size; Browse.FAV -> favs.count { it.startsWith("$pid|") }; Browse.RECENT -> recents.count { it.startsWith("$pid|") }; else -> if (g.startsWith(Browse.LIST)) (lists["$pid|${g.removePrefix(Browse.LIST)}"]?.size ?: 0) else counts[g] ?: 0 }
                 val special = g == Browse.ALL || g == Browse.FAV || g == Browse.RECENT
+                val isList = g.startsWith(Browse.LIST)
                 Tv({ group = g }, Modifier.fillMaxWidth().height(52.dp), selected = g == group, onFocus = { if (it) group = g },
-                    onLongClick = if (special) null else { { pinReq = if (hasPin) PinRequest.Verify { store.toggleLockedGroup(gk) } else PinRequest.SetNew { store.setPin(it); store.toggleLockedGroup(gk) } } }) {
+                    onLongClick = if (special) null else if (isList) { { deleteList = g.removePrefix(Browse.LIST) } } else { { pinReq = if (hasPin) PinRequest.Verify { store.toggleLockedGroup(gk) } else PinRequest.SetNew { store.setPin(it); store.toggleLockedGroup(gk) } } }) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(label, style = if (g == group) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         if (gk in locked) { Icon(Glyph.Lock, C.faint, 18); Spacer(Modifier.width(8.dp)) }
@@ -385,6 +390,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         PreviewPane(app, focused ?: list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
     }
     PinHost(pinReq, store) { pinReq = null }
+    deleteList?.let { n -> ConfirmDialog(stringResource(R.string.delete_list_confirm, n), onYes = { store.deleteList(pid, n); group = Browse.ALL; deleteList = null }, onNo = { deleteList = null }) }
 }
 
 /** One dense row: number, logo, name over programme (with time left at the end) and a thin progress bar. */
@@ -392,18 +398,18 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
 @Composable
 fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester?, onFocus: (Boolean) -> Unit) {
     var f by remember { mutableStateOf(false) }
-    Tv(onClick, Modifier.fillMaxWidth().height(70.dp), Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
+    Tv(onClick, Modifier.fillMaxWidth().height(76.dp), Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("$number", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
             Logo(ch, 44); Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(ch.name, style = T.row.copy(fontSize = 23.sp, lineHeight = 30.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f) Modifier.basicMarquee() else Modifier)
+                Text(ch.name, style = T.row.copy(fontSize = 25.sp, lineHeight = 32.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f) Modifier.basicMarquee() else Modifier)
                 if (now != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(now.title, style = T.small.copy(fontSize = 18.sp, lineHeight = 24.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(12.dp)); Text(leftText(now, nowMs), style = T.tiny.copy(fontSize = 15.sp))
+                        Text(now.title, style = T.small.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp)); Text(leftText(now, nowMs), style = T.tiny.copy(fontSize = 17.sp))
                     }
-                    Spacer(Modifier.height(3.dp)); ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1))
+                    Spacer(Modifier.height(3.dp)); ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1), Modifier.width(220.dp))
                 }
             }
             if (fav) { Spacer(Modifier.width(12.dp)); Icon(Glyph.Heart, if (f) C.onFocus else C.accent, 20, filled = true) }
@@ -422,12 +428,12 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
     }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(Color.Black)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && shownUrl == ch?.url) Color.Black else C.surfaceHi)) {
             if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
             if (ch != null) Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color(0x80000000)).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }
             }
-            if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 64) }
+            if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 132) }
         }
         if (ch != null) {
             val (now, _) = epg.nowNext(ch.epgId, nowMs)
