@@ -125,6 +125,22 @@ class Store(ctx: Context) {
     /** Queue an unstarted episode so the series shows up again in the row. */
     fun offerNext(item: WatchItem) { if (_watching.value.none { it.key == item.key }) writeWatching((listOf(item) + _watching.value).take(24)) }
 
+    // ---- custom lists ("my lists"): named sets of channels per playlist. Keys: "playlistId|name" -> channel keys.
+    private val _lists = MutableStateFlow(
+        sp.getString("lists", "")!!.lines().filter { it.contains('\t') }.associate { l -> l.substringBefore('\t') to l.substringAfter('\t').split(',').filter { it.isNotEmpty() }.toSet() })
+    val customLists: StateFlow<Map<String, Set<String>>> = _lists
+    private fun saveLists(m: Map<String, Set<String>>) { _lists.value = m; sp.edit().putString("lists", m.entries.joinToString("\n") { it.key.replace('\t', ' ').replace('\n', ' ') + "\t" + it.value.joinToString(",") }).apply() }
+    fun createList(pid: String, name: String): String {
+        val clean = name.trim().replace('\t', ' ').replace('\n', ' ').take(40).ifBlank { "List" }
+        saveLists(_lists.value + ("$pid|$clean" to (_lists.value["$pid|$clean"] ?: emptySet()))); return clean
+    }
+    fun toggleInList(pid: String, name: String, chKey: String) {
+        val k = "$pid|$name"; val cur = _lists.value[k] ?: emptySet()
+        saveLists(_lists.value + (k to if (chKey in cur) cur - chKey else cur + chKey))
+    }
+    fun deleteList(pid: String, name: String) = saveLists(_lists.value - "$pid|$name")
+    fun listNames(pid: String): List<String> = _lists.value.keys.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }
+
     // ---- start screen, home rows, live preview, watched marks
     private val _start = MutableStateFlow(sp.getString("start", "home")!!)
     val startScreen: StateFlow<String> = _start          // home | live | guide | movies | series | last

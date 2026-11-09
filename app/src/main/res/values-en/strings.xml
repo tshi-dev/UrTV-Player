@@ -173,4 +173,8 @@
     <string name="set_preview_hint">Plays the channel muted while you browse. Turn off on slow devices</string>
     <string name="set_resume_hint">Opens straight on the last channel you watched</string>
     <string name="set_theme_hint">Theme, accent, focus style, corners and background</string>
+    <string name="opt_my_lists">My lists</string>
+    <string name="new_list">New list</string>
+    <string name="list_default_name">List</string>
+    <string name="delete_list_confirm">Delete the list “%s”?</string>
 </resources>

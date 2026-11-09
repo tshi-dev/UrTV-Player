@@ -173,4 +173,8 @@
     <string name="set_preview_hint">يشغّل القناة بدون صوت أثناء التصفح. أوقفها إن كان جهازك بطيئًا</string>
     <string name="set_resume_hint">يفتح مباشرة على آخر قناة شاهدتها</string>
     <string name="set_theme_hint">الثيم واللون والتركيز والزوايا والخلفية</string>
+    <string name="opt_my_lists">قوائمي</string>
+    <string name="new_list">قائمة جديدة</string>
+    <string name="list_default_name">قائمة</string>
+    <string name="delete_list_confirm">حذف القائمة «%s»؟</string>
 </resources>
