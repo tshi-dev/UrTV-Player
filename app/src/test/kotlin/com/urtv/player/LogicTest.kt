@@ -1,0 +1,55 @@
+package com.urtv.player
+
+import com.urtv.player.core.Channel
+import com.urtv.player.core.Programme
+import com.urtv.player.data.Browse
+import com.urtv.player.data.EpgIndex
+import com.urtv.player.phone.Page
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class LogicTest {
+    private fun ch(n: String, g: String = "", num: Int? = null) = Channel(n, n, "http://example.com/$n", g, number = num)
+
+    @Test fun groupsKeepFirstSeenOrderAndBlankBecomesOther() {
+        val l = listOf(ch("a", "News"), ch("b"), ch("c", "News"), ch("d", "Kids"))
+        assertEquals(listOf("News", Browse.OTHER, "Kids"), Browse.groups(l))
+    }
+
+    @Test fun filterByGroupAndQuery() {
+        val l = listOf(ch("Alpha One", "News"), ch("Beta", "News"), ch("Alpha Two", "Kids"))
+        assertEquals(2, Browse.filter(l, "News", "").size)
+        assertEquals(listOf("Alpha One"), Browse.filter(l, "News", "alpha").map { it.name })
+        assertEquals(3, Browse.filter(l, Browse.ALL, "").size)
+    }
+
+    @Test fun numberEntryPrefersExplicitNumberThenPosition() {
+        val l = listOf(ch("a"), ch("b", num = 7), ch("c"))
+        assertEquals("b", Browse.byNumber(l, 7)?.name)
+        assertEquals("c", Browse.byNumber(l, 3)?.name)
+        assertNull(Browse.byNumber(l, 99))
+    }
+
+    @Test fun epgNowNextAndCaseInsensitiveLookup() {
+        val p = { s: Long, e: Long, t: String -> Programme("ch.one", s, e, t) }
+        val idx = EpgIndex.build(listOf(p(300, 400, "C"), p(0, 100, "A"), p(100, 300, "B")), 0, 1000)
+        assertEquals("B" to "C", idx.nowNext("ch.one", 150).let { it.first?.title to it.second?.title })
+        assertEquals("A", idx.nowNext("CH.ONE".lowercase(), 50).first?.title)
+        assertNull(idx.nowNext("ch.one", 500).first)       // after the last programme
+        assertNull(idx.nowNext("missing", 50).first)
+    }
+
+    @Test fun epgDropsProgrammesOutsideWindow() {
+        val idx = EpgIndex.build(listOf(Programme("x", 0, 10, "old"), Programme("x", 500, 600, "ok")), 100, 1000)
+        assertEquals(1, idx.forChannel("x").size)
+    }
+
+    @Test fun phonePageEscapesCodeAndShipsNoScript() {
+        val html = Page.form("\"><script>alert(1)</script>")
+        assertFalse(html.contains("<script"))
+        assertTrue(html.contains("&quot;&gt;&lt;script&gt;"))
+    }
+}
