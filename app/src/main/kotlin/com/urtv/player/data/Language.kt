@@ -9,8 +9,8 @@ import android.net.Uri
  */
 object Language {
     const val AUTO = "auto"
-    /** UrTV exposes its language read-only through this provider (no permission needed, language only). */
-    const val URTV_URI = "content://sa.urtv.home.language/language"
+    /** UrTV exposes its language read-only through this provider (one row, column "lang" = ar|en; normal permission READ_LANG). */
+    const val URTV_URI = "content://sa.urtv.home.lang/lang"
 
     fun resolve(choice: String, urtv: String?, system: String): String = when {
         choice == "ar" || choice == "en" -> choice
@@ -27,6 +27,6 @@ object Language {
 
     /** UrTV's language if the UrTV home app is installed and exposes it; otherwise null. Call off the main thread. */
     fun readUrtv(ctx: Context): String? = runCatching {
-        ctx.contentResolver.query(Uri.parse(URTV_URI), arrayOf("language"), null, null, null)?.use { c -> if (c.moveToFirst()) normalize(c.getString(0)) else null }
+        ctx.contentResolver.query(Uri.parse(URTV_URI), arrayOf("lang"), null, null, null)?.use { c -> if (c.moveToFirst()) normalize(c.getString(0)) else null }
     }.getOrNull()
 }
