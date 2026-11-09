@@ -45,6 +45,12 @@ private enum class Step { Passphrase, Working, Serving, Done, Failed }
 @Composable
 fun BackupScreen(app: UrtvApp, restore: Boolean, demo: Triple<String, String, String>? = null, onDone: (restored: Boolean) -> Unit) {
     BackHandler { onDone(false) }
+    if (demo == null && app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) {
+        Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 120.dp, vertical = 80.dp)) {
+            UnofficialNote(); Spacer(Modifier.height(24.dp)); TvButton(stringResource(R.string.back), { onDone(false) })
+        }
+        return
+    }
     val scope = rememberCoroutineScope()
     val main = remember { Handler(Looper.getMainLooper()) }
     var step by remember { mutableStateOf(if (restore) Step.Serving else Step.Passphrase) }

@@ -28,6 +28,10 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val ready by app.store.ready.collectAsState()
     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(C.bg)) {
         if (ready) AppContent(app, onLanguageChanged) else androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 130.dp)) { SkeletonRows(9) }
+        if (app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) androidx.compose.foundation.layout.Row(
+            androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 10.dp).background(C.danger.copy(alpha = 0.92f), Rd(10)).padding(horizontal = 22.dp, vertical = 6.dp)) {
+            Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.unofficial_build), style = T.small.copy(color = androidx.compose.ui.graphics.Color.Black))
+        }
         if (!app.splashDone) LaunchSplash { app.splashDone = true }
     }
 }

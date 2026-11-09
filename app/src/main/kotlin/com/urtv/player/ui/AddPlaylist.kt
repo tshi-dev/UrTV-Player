@@ -74,7 +74,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         Spacer(Modifier.height(48.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (mode) {
-                AddMode.Phone -> PhonePane(demo, ::save)
+                AddMode.Phone -> if (demo == null && app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) UnofficialNote() else PhonePane(demo, ::save)
                 AddMode.M3u -> FormPane(false, ::save)
                 AddMode.Xtream -> FormPane(true, ::save)
             }
@@ -155,5 +155,15 @@ private fun FormPane(xtream: Boolean, onSave: (PhoneInput) -> Unit) {
             val ok = if (xtream) server.isNotBlank() && user.isNotBlank() else url.trim().let { it.startsWith("http://", true) || it.startsWith("https://", true) }
             if (!ok) err = true else onSave(PhoneInput(name.trim(), if (xtream) "" else url.trim(), if (xtream) server.trim() else "", user.trim(), pass, epg.trim()))
         }, primary = true)
+    }
+}
+
+/** Shown instead of the LAN pairing page in an unofficial (repackaged) build. */
+@Composable
+fun UnofficialNote() {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+        Text(stringResource(R.string.unofficial_build), style = T.title.copy(color = C.danger))
+        Spacer(Modifier.height(12.dp))
+        Text(stringResource(R.string.unofficial_blocked), style = T.body.copy(color = C.muted), modifier = Modifier.width(900.dp))
     }
 }
