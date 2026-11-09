@@ -12,14 +12,31 @@ android {
         applicationId = "com.urtv.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = System.getenv("PLAYER_VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("PLAYER_VERSION_NAME") ?: "0.1.0"
+        // SHA-256 of OUR release signing certificate, passed in by CI (never stored in the repository). The app compares it
+        // with the certificate it is actually installed with; empty on local and fork builds, which therefore count as unofficial.
+        buildConfigField("String", "OFFICIAL_CERT_SHA256", "\"${System.getenv("PLAYER_CERT_SHA256") ?: ""}\"")
         // Only the two shipped languages (drops library string tables).
         resourceConfigurations += listOf("ar", "en")
+    }
+    // Release signing comes only from CI secrets: the workflow decodes the keystore to a temp file and sets these variables.
+    // Nothing here (or anywhere in the repository) holds a key or a password. v1 is off (minSdk 26); v2 + v3 are on.
+    signingConfigs {
+        val ks = System.getenv("PLAYER_KEYSTORE_FILE")
+        if (ks != null) create("release") {
+            storeFile = file(ks)
+            storePassword = System.getenv("PLAYER_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("PLAYER_KEY_ALIAS")
+            keyPassword = System.getenv("PLAYER_KEY_PASSWORD")
+            enableV1Signing = false; enableV2Signing = true; enableV3Signing = true
+        }
     }
     buildTypes {
         // R8 + resource shrinking on for every build type, so the debug APK is the real size.
         getByName("debug") {
+            // a different application id: a debug build can never overwrite or be mistaken for the official app
+            applicationIdSuffix = ".debug"; versionNameSuffix = "-debug"
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -28,12 +45,12 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signing config is injected by CI from secrets; nothing is stored in this repository.
+            signingConfigs.findByName("release")?.let { signingConfig = it }   // unsigned when the CI secrets are absent
         }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
-    buildFeatures { compose = true; buildConfig = false }
+    buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/*.version", "DebugProbesKt.bin", "kotlin-tooling-metadata.json", "/kotlin/**", "/META-INF/com/android/build/gradle/app-metadata.properties") }
     testOptions { unitTests { isReturnDefaultValues = true; isIncludeAndroidResources = true } }
 }

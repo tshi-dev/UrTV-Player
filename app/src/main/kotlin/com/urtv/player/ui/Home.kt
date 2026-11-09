@@ -99,6 +99,7 @@ fun HomeScreen(
             Row(Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_mark), null, Modifier.size(40.dp))
                 Spacer(Modifier.width(12.dp)); Text("UrTV", style = T.title.copy(fontSize = 28.sp))
+                if (app.integrity == com.urtv.player.data.Integrity.Status.Debug) { Spacer(Modifier.width(10.dp)); Chip(stringResource(R.string.debug_label)) }
             }
             Spacer(Modifier.weight(1f))
             Row(Modifier.clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
