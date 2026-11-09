@@ -19,6 +19,13 @@ object PlaybackTuning {
         return if (lowRam) b.copy(maxMs = minOf(b.maxMs, 15_000), minMs = minOf(b.minMs, 10_000), targetBytes = 8 * 1024 * 1024) else b
     }
 
+    /**
+     * Server media (Jellyfin/Emby/Plex files, often tens of Mbit/s): start after 1.5 s of media, keep up to a minute ahead,
+     * but bound by BYTES (time-over-size is switched off for this mode), smaller on low-RAM boxes.
+     */
+    fun serverBuffers(lowRam: Boolean): Buffers =
+        if (lowRam) Buffers(10_000, 30_000, 1_500, 3_000, 24 * 1024 * 1024) else Buffers(20_000, 60_000, 1_500, 3_000, 96 * 1024 * 1024)
+
     /** Never ask for more pixels than the screen shows (no 4K stream on a 1080p TV); a 4K screen may use 4K. */
     fun maxVideoSize(displayW: Int, displayH: Int): Pair<Int, Int> {
         val w = maxOf(displayW, displayH); val h = minOf(displayW, displayH)

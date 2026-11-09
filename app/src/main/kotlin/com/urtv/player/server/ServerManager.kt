@@ -104,11 +104,10 @@ class ServerManager(ctx: Context) {
 
     private val appCtx = ctx.applicationContext
 
-    /** [caps] with the bitrate limited by what the network has actually delivered (shared with the player's meter). */
-    fun capsNow(): DeviceCaps {
-        val est = runCatching { androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(appCtx).bitrateEstimate }.getOrDefault(0L)
+    /** [caps] with the bitrate limited by what the shared player's bandwidth meter has measured ([estimate], bit/s). */
+    fun capsNow(estimate: Long): DeviceCaps {
         // 75 % of the measured rate, never below 4 Mbit/s (the meter starts from a coarse guess) and never above the device limit.
-        val limit = if (est > 0) (est * 0.75).toLong().coerceIn(4_000_000L, caps.maxBitrate) else caps.maxBitrate
+        val limit = if (estimate > 0) (estimate * 0.75).toLong().coerceIn(4_000_000L, caps.maxBitrate) else caps.maxBitrate
         return caps.copy(maxBitrate = limit)
     }
 

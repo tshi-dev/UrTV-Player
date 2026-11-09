@@ -51,6 +51,7 @@ import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
 import com.urtv.player.ui.C
+import com.urtv.player.player.PlayStatus
 import com.urtv.player.ui.ProgressBar
 import com.urtv.player.ui.Spinner
 import com.urtv.player.ui.T
@@ -79,7 +80,7 @@ private fun streamLabel(s: StreamInfo): String {
 fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, startMs: Long, queueIn: List<MediaItem>, onExit: () -> Unit) {
     val mgr = app.servers
     val ctx = LocalContext.current
-    val sp = remember { ServerPlayer(ctx.applicationContext) }
+    val ctrl = app.player      // the one shared player: same tuning, buffers, stats overlay and reconnect logic as IPTV
     val scope = rememberCoroutineScope()
     val prefs by mgr.langPrefs.collectAsState(); val mode by mgr.subtitleMode.collectAsState(); val style by mgr.subtitleStyle.collectAsState()
 
@@ -102,7 +103,11 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
     var resultsLang by remember { mutableStateOf("") }
     var streak by remember { mutableStateOf(0) }
     val root = remember { FocusRequester() }
-    val paused by sp.paused.collectAsState(); val buffering by sp.buffering.collectAsState(); val ended by sp.ended.collectAsState(); val perr by sp.error.collectAsState()
+    val status by ctrl.status.collectAsState(); val paused by ctrl.paused.collectAsState(); val ended by ctrl.ended.collectAsState()
+    val buffering = status == PlayStatus.Loading || status == PlayStatus.Reconnecting
+    val perr = if (status == PlayStatus.Failed) "failed" else null
+    fun curPos() = ctrl.player?.currentPosition ?: 0L
+    fun curDur() = ctrl.player?.duration?.takeIf { it > 0 } ?: 0L
 
     /** (Re)starts playback of [it] at [at]. Picks audio and subtitles by the user's preferences unless overridden. */
     fun begin(it: MediaItem, at: Long, keepChoices: Boolean) {
@@ -115,10 +120,10 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
                 val sub = if (keepChoices && !subAuto) subSel else SubtitleChoice.pickSubtitle(full.subtitles, audio, prefs, mode)
                 audioSel = audio; subSel = sub
                 val burn = sub?.takeIf { s -> SubtitleChoice.needsBurnIn(s) }
-                val p = withContext(Dispatchers.IO) { backend.playback(full, mgr.capsNow(), PlayOptions(0, audio?.index, burn?.index)) }
-                plan?.let { old -> launch(Dispatchers.IO) { backend.reportStop(old, sp.position()) } }
+                val p = withContext(Dispatchers.IO) { backend.playback(full, mgr.capsNow(ctrl.bandwidthEstimate()), PlayOptions(0, audio?.index, burn?.index)) }
+                plan?.let { old -> launch(Dispatchers.IO) { backend.reportStop(old, curPos()) } }
                 plan = p
-                sp.start(p, at, prefs)
+                ctrl.playServer(full.cardTitle(), p.url, at, p.headers, prefs.audio.flatMap { l -> listOf(l, Lang.toIso3(l)) }.distinct())
                 offset = mgr.subOffset(full.id)
                 track = null
                 if (sub != null && burn == null) {
@@ -135,10 +140,10 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
     }
 
     LaunchedEffect(Unit) { begin(first, startMs, false) }
-    LaunchedEffect(Unit) { while (true) { delay(250); pos = sp.position(); dur = sp.duration().takeIf { it > 0 } ?: item.runtimeMs } }
+    LaunchedEffect(Unit) { while (true) { delay(250); pos = curPos(); dur = curDur().takeIf { it > 0 } ?: item.runtimeMs } }
     LaunchedEffect(plan) { // progress sync every 10 s, plus on pause changes
         val p = plan ?: return@LaunchedEffect
-        while (true) { delay(10_000); withContext(Dispatchers.IO) { backend.reportProgress(p, sp.position(), !(sp.player?.playWhenReady ?: false)) } }
+        while (true) { delay(10_000); withContext(Dispatchers.IO) { backend.reportProgress(p, curPos(), !(ctrl.player?.playWhenReady ?: false)) } }
     }
     LaunchedEffect(tick, bar, paused, panel) { if (bar && !paused && panel == Panel.None) { delay(4000); bar = false } }
     LaunchedEffect(panel) { if (panel == Panel.None) runCatching { root.requestFocus() } }
@@ -146,23 +151,24 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
         if (ended) { val nx = queue.firstOrNull(); if (nx != null) { queue = queue.drop(1); begin(nx, 0, false) } else { onExit() } }
     }
     fun finish() {
-        val p = plan; val at = sp.position()
+        val p = plan; val at = curPos()
         if (p != null) scope.launch(kotlinx.coroutines.NonCancellable) { withContext(Dispatchers.IO) { backend.reportStop(p, at) } }
-        sp.release(); onExit()
+        ctrl.stop(); onExit()
     }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { val p = plan; if (p != null) { val at = sp.position(); scope.launch(kotlinx.coroutines.NonCancellable) { withContext(Dispatchers.IO) { backend.reportStop(p, at) } } }; sp.release() }
-    DisposableEffect(Unit) { onDispose { sp.release() } }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { val p = plan; if (p != null) { val at = curPos(); scope.launch(kotlinx.coroutines.NonCancellable) { withContext(Dispatchers.IO) { backend.reportStop(p, at) } } }; ctrl.rememberPosition(); ctrl.release() }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { ctrl.resume() }
+    DisposableEffect(Unit) { onDispose { ctrl.stop() } }
     BackHandler { if (panel != Panel.None) panel = if (panel == Panel.Main) Panel.None else Panel.Main else if (bar && !paused) bar = false else finish() }
 
     val activeMarker = markers.firstOrNull { pos in it.startMs until it.endMs && (it.kind == MarkerKind.Intro || queue.isEmpty()) }
     val nextUp = queue.firstOrNull()?.takeIf { dur > 0 && pos > dur - 25_000 }
     val cues = if (panel == Panel.Style) listOf(Cue(0, 1, stringResource(R.string.srv_sample))) else track?.at(pos, offset).orEmpty()
 
-    fun jump(delta: Long) { sp.seekBy(delta); bar = true; tick++ }
-    fun setSub(s: StreamInfo?) { subAuto = false; subSel = s; panel = Panel.None; begin(item, sp.position(), true) }
+    fun jump(delta: Long) { ctrl.player?.let { p -> val d = if (p.duration > 0) p.duration - 1000 else Long.MAX_VALUE; p.seekTo((p.currentPosition + delta).coerceIn(0, d)) }; bar = true; tick++ }
+    fun setSub(s: StreamInfo?) { subAuto = false; subSel = s; panel = Panel.None; begin(item, curPos(), true) }
     fun setAudio(s: StreamInfo) { audioSel = s; panel = Panel.None
         val ord = item.audio.indexOfFirst { it.index == s.index }
-        if (plan?.mode == PlayMode.DirectPlay && ord >= 0) sp.selectAudioOrdinal(ord) else begin(item, sp.position(), true) }
+        if (plan?.mode == PlayMode.DirectPlay && ord >= 0) ctrl.tracks.value.audio.getOrNull(ord)?.let { o -> ctrl.selectAudio(o) } else begin(item, curPos(), true) }
     fun shift(d: Long) { offset = (offset + d).coerceIn(-30_000, 30_000); mgr.setSubOffset(item.id, offset) }
 
     Box(
@@ -175,11 +181,11 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val m = activeMarker
                     if (nextUp != null) { queue = queue.drop(1); begin(nextUp, 0, false) }
-                    else if (m != null) { sp.seekTo(m.endMs); bar = true; tick++ }
-                    else { sp.togglePause(); bar = true; tick++ }
+                    else if (m != null) { ctrl.player?.seekTo(m.endMs); bar = true; tick++ }
+                    else { ctrl.togglePause(); bar = true; tick++ }
                     true
                 }
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> { sp.togglePause(); bar = true; tick++; true }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> { ctrl.togglePause(); bar = true; tick++; true }
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_INFO -> { bar = true; tick++; true }
                 KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { panel = Panel.Main; true }
                 KeyEvent.KEYCODE_MEDIA_NEXT -> { queue.firstOrNull()?.let { n -> queue = queue.drop(1); begin(n, 0, false) }; true }
@@ -187,8 +193,9 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
             }
         },
     ) {
-        ServerVideo(sp)
+        com.urtv.player.ui.VideoSurface(ctrl)
         SubtitleOverlay(cues, style)
+        if (app.store.statsOverlay.collectAsState().value) com.urtv.player.ui.StatsOverlay(ctrl, Modifier.align(Alignment.TopStart).padding(40.dp))
         Box(Modifier.align(Alignment.Center)) {
             when {
                 failed != null || perr != null -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -233,23 +240,10 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
                     scope.launch {
                         val ok = withContext(Dispatchers.IO) { runCatching { backend.downloadSubtitle(item, r); true }.getOrDefault(false) }
                         if (ok) { val fresh = withContext(Dispatchers.IO) { runCatching { backend.item(item.id) }.getOrNull() }
-                            if (fresh != null) { item = fresh; subAuto = false; subSel = fresh.subtitles.lastOrNull { Lang.norm(it.language) == Lang.norm(r.language ?: resultsLang) } ?: subSel; begin(fresh, sp.position(), true) } }
+                            if (fresh != null) { item = fresh; subAuto = false; subSel = fresh.subtitles.lastOrNull { Lang.norm(it.language) == Lang.norm(r.language ?: resultsLang) } ?: subSel; begin(fresh, curPos(), true) } }
                     }
                 })
         }
-    }
-}
-
-@Composable
-private fun ServerVideo(sp: ServerPlayer) {
-    val ar by sp.aspect.collectAsState()
-    val gen by sp.gen.collectAsState()
-    BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
-        val box = maxWidth / maxHeight
-        val v = if (ar > 0f) ar else 16f / 9f
-        val w = if (v > box) maxWidth else maxHeight * v
-        val h = if (v > box) maxWidth / v else maxHeight
-        AndroidView({ SurfaceView(it) }, Modifier.requiredSize(w, h).align(Alignment.Center), update = { sv -> if (gen >= 0) sp.player?.setVideoSurfaceView(sv) })
     }
 }
 

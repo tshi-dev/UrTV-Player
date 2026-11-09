@@ -98,14 +98,36 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         val m = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY).mode; m.physicalWidth to m.physicalHeight
     }.getOrDefault(0 to 0)
 
+    // ---- server media (Jellyfin/Emby/Plex): same player, same tuning; headers only for the server's own origin
+    private var serverMode = false
+    private var serverHeaders: Map<String, String> = emptyMap()
+    private var serverOrigin: Uri? = null
+    private var audioLangs: List<String> = emptyList()
+    private var builtServer = false
+
+    private fun sameOrigin(a: Uri, b: Uri?): Boolean {
+        if (b == null) return false
+        fun port(u: Uri) = if (u.port >= 0) u.port else if (u.scheme == "https") 443 else 80
+        return a.scheme == b.scheme && a.host.equals(b.host, true) && port(a) == port(b)
+    }
+
+    /** Last measured throughput of the shared bandwidth meter (bit/s), or the saved seed before any measurement. */
+    fun bandwidthEstimate(): Long = meter?.bitrateEstimate?.takeIf { it > 0 } ?: PlaybackTuning.seedBitrate(prefs.getLong("bw", 0))
+
     private fun build(live: Boolean): ExoPlayer {
-        val http = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA)
+        val okhttp = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA)
+        val origin = serverOrigin; val hdrs = serverHeaders
+        val http: androidx.media3.datasource.DataSource.Factory = if (!serverMode) okhttp else androidx.media3.datasource.ResolvingDataSource.Factory(okhttp,
+            object : androidx.media3.datasource.ResolvingDataSource.Resolver {
+                override fun resolveDataSpec(dataSpec: androidx.media3.datasource.DataSpec) =
+                    if (sameOrigin(dataSpec.uri, origin)) dataSpec.withAdditionalHeaders(hdrs) else dataSpec
+            })
         dataFactory = http
         val extractors = DefaultExtractorsFactory().setTsExtractorFlags(
             DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS)
-        val buf = PlaybackTuning.buffers(buffer, live, lowRam)
+        val buf = if (serverMode) PlaybackTuning.serverBuffers(lowRam) else PlaybackTuning.buffers(buffer, live, lowRam)
         val load = DefaultLoadControl.Builder().setBufferDurationsMs(buf.minMs, buf.maxMs, buf.startMs, buf.rebufMs)
-            .setPrioritizeTimeOverSizeThresholds(true).setBackBuffer(if (live) 0 else 30_000, false).apply { if (buf.targetBytes > 0) setTargetBufferBytes(buf.targetBytes) }.build()
+            .setPrioritizeTimeOverSizeThresholds(!serverMode).setBackBuffer(if (live) 0 else 30_000, false).apply { if (buf.targetBytes > 0) setTargetBufferBytes(buf.targetBytes) }.build()
         val bm = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(ctx)
             .setInitialBitrateEstimate(PlaybackTuning.seedBitrate(prefs.getLong("bw", 0))).build()
         meter = bm
@@ -123,7 +145,8 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
         p.addListener(listener)
         surface?.let { p.setVideoSurfaceView(it) }
-        builtFor = buffer; builtLive = live
+        if (serverMode && audioLangs.isNotEmpty()) p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setPreferredAudioLanguages(*audioLangs.toTypedArray()).build()
+        builtFor = buffer; builtLive = live; builtServer = serverMode
         return p
     }
     private var dataFactory: androidx.media3.datasource.DataSource.Factory? = null
@@ -211,9 +234,21 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
 
     val isPreview get() = preview
 
-    fun playPreview(ch: Channel) { preview = true; startPlay(ch, 0L, false) }
+    fun playPreview(ch: Channel) { preview = true; serverMode = false; serverHeaders = emptyMap(); serverOrigin = null; startPlay(ch, 0L, false) }
 
-    fun play(ch: Channel, startMs: Long = 0L, isVod: Boolean = false) { preview = false; startPlay(ch, startMs, isVod) }
+    fun play(ch: Channel, startMs: Long = 0L, isVod: Boolean = false) { preview = false; serverMode = false; serverHeaders = emptyMap(); serverOrigin = null; startPlay(ch, startMs, isVod) }
+
+    /**
+     * Media from a home server. [headers] (the access token) go only to requests for [url]'s own origin; [langs] are the
+     * preferred audio languages (2- and 3-letter codes). Seekable, resumes at [startMs], reconnects in place like any VOD.
+     */
+    fun playServer(title: String, url: String, startMs: Long, headers: Map<String, String>, langs: List<String>) {
+        preview = false; serverMode = true; serverHeaders = headers; serverOrigin = Uri.parse(url); audioLangs = langs
+        startPlay(Channel(url, title, url), startMs, true)
+    }
+
+    /** Remember where we are so [resume] (after the activity was stopped) continues in place. */
+    fun rememberPosition() { if (vod) player?.currentPosition?.takeIf { it > 0 }?.let { startAtMs = it } }
 
     private fun startPlay(ch: Channel, startMs: Long, isVod: Boolean) {
         vod = isVod; startAtMs = startMs; _ended.value = false
@@ -227,7 +262,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
 
     private fun load(ch: Channel) {
         retryJob?.cancel()
-        if (player == null || builtFor != buffer || builtLive != !vod) { saveBandwidth(); player?.release(); player = build(!vod) }
+        if (player == null || builtFor != buffer || builtLive != !vod || builtServer != serverMode) { saveBandwidth(); player?.release(); player = build(!vod) }
         val p = player!!
         loadStartMs = System.currentTimeMillis(); readySince = false
         if (_attempt.value == 0) { rebuffers.reset(); p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoBitrate(Int.MAX_VALUE).build(); _stats.value = _stats.value.copy(capped = false) }
