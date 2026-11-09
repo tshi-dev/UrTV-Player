@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
 import com.urtv.player.ui.AppRoot
 import com.urtv.player.ui.UrtvTheme
@@ -25,6 +27,9 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val app = application as UrtvApp
-        setContent { UrtvTheme { AppRoot(app, onLanguageChanged = { recreate() }) } }
+        setContent {
+            val oled by app.store.oled.collectAsState(); val scale by app.store.textScale.collectAsState()
+            UrtvTheme(oled, scale) { AppRoot(app, onLanguageChanged = { recreate() }) }
+        }
     }
 }

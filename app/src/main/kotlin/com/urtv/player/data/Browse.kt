@@ -16,6 +16,13 @@ object Browse {
         return s.toList()
     }
 
+    /** Groups in the user's saved order (unknown ones keep first-seen order at the end), without hidden ones. */
+    fun arrange(groups: List<String>, order: List<String>, hidden: Set<String>, includeHidden: Boolean = false): List<String> {
+        val rank = order.withIndex().associate { it.value to it.index }
+        val sorted = groups.withIndex().sortedWith(compareBy({ rank[it.value] ?: (order.size + it.index) }, { it.index })).map { it.value }
+        return if (includeHidden) sorted else sorted.filter { it !in hidden }
+    }
+
     fun filter(channels: List<Channel>, group: String, query: String): List<Channel> {
         val q = query.trim()
         var l = if (group == ALL) channels else channels.filter { groupOf(it) == group }

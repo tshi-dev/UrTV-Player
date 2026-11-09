@@ -12,7 +12,7 @@ import androidx.compose.runtime.remember
 import com.urtv.player.UrtvApp
 import com.urtv.player.core.Channel
 
-private enum class Screen { Home, Player, Add, Movie, Series, Vod }
+private enum class Screen { Home, Player, Add, Groups, Movie, Series, Vod }
 
 @Composable
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
@@ -52,7 +52,7 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Home -> HomeScreen(
             app, tab, { tab = it },
             onPlay = { list, ch -> queue = list; playing = ch; screen = Screen.Player },
-            onAdd = { screen = Screen.Add }, onLanguage = onLanguageChanged, restoreKey = restoreKey,
+            onAdd = { screen = Screen.Add }, onLanguage = onLanguageChanged, restoreKey = restoreKey, onManageGroups = { screen = Screen.Groups },
             onOpenMovie = { detailId = it; screen = Screen.Movie }, onOpenSeries = { detailId = it; screen = Screen.Series },
             onCatchup = { ch, p ->
                 val d = def
@@ -70,5 +70,6 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
             PlayerScreen(app, queue, ch, onExit = { last -> restoreKey = chKey(cat.playlistId.orEmpty(), last); playing = null; screen = Screen.Home })
         } ?: run { screen = Screen.Home }
         Screen.Add -> AddPlaylistScreen(app) { screen = Screen.Home }
+        Screen.Groups -> GroupsManage(app) { tab = Tab.Settings; screen = Screen.Home }
     }
 }

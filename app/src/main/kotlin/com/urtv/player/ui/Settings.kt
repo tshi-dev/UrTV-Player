@@ -1,6 +1,9 @@
 package com.urtv.player.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +36,7 @@ import com.urtv.player.data.BufferMode
 private val REFRESH = listOf(0, 6, 12, 24, 48)
 
 @Composable
-fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit) {
+fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit) {
     val store = app.store
     val playlists by store.playlists.collectAsState()
     val active by store.activeId.collectAsState()
@@ -42,6 +45,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit) {
     val buffer by store.buffer.collectAsState()
     val resume by store.resumeLast.collectAsState()
     val hasPin by store.hasPin.collectAsState()
+    val textScale by store.textScale.collectAsState()
+    val oled by store.oled.collectAsState()
+    val offsets by store.epgOffsetMin.collectAsState()
     var pin by remember { mutableStateOf<PinRequest?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
 
@@ -71,6 +77,19 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit) {
         item { Setting(stringResource(R.string.set_buffer), stringResource(when (buffer) { BufferMode.Low -> R.string.buf_low; BufferMode.Normal -> R.string.buf_normal; BufferMode.High -> R.string.buf_high }), stringResource(R.string.set_buffer_hint)) {
             store.setBuffer(BufferMode.entries[(buffer.ordinal + 1) % BufferMode.entries.size]); app.player.buffer = store.buffer.value } }
         item { Setting(stringResource(R.string.set_resume), stringResource(if (resume) R.string.on else R.string.off)) { store.setResume(!resume) } }
+        item { Setting(stringResource(R.string.set_text_size), stringResource(listOf(R.string.size_normal, R.string.size_large, R.string.size_xl)[textScale])) { store.setTextScale((textScale + 1) % 3) } }
+        item { Setting(stringResource(R.string.set_theme), stringResource(if (oled) R.string.theme_oled else R.string.theme_dark)) { store.setOled(!oled) } }
+        if (active != null) {
+            item { Spacer(Modifier.height(8.dp)); SectionLabel(stringResource(R.string.set_active_playlist)) }
+            item {
+                val off = offsets[active] ?: 0
+                Setting(stringResource(R.string.set_epg_offset), (if (off > 0) "+" else "") + "%.1f h".format(java.util.Locale.US, off / 60f), stringResource(R.string.set_epg_offset_hint)) {
+                    val next = if (off >= 720) -720 else off + 30
+                    store.setEpgOffset(active!!, next); app.catalog.open(active)
+                }
+            }
+            item { Setting(stringResource(R.string.set_groups), "", stringResource(R.string.set_groups_hint)) { onManageGroups() } }
+        }
         item { Spacer(Modifier.height(8.dp)); SectionLabel(stringResource(R.string.set_parental)) }
         item { Setting(stringResource(R.string.set_pin), stringResource(if (hasPin) R.string.pin_set else R.string.pin_none), stringResource(R.string.set_pin_hint)) {
             pin = if (hasPin) PinRequest.Verify { pin = PinRequest.SetNew { store.setPin(it) } } else PinRequest.SetNew { store.setPin(it) } } }
@@ -116,3 +135,39 @@ fun ConfirmDialog(text: String, onYes: () -> Unit, onNo: () -> Unit) {
 
 private fun Modifier.background2(c: androidx.compose.ui.graphics.Color, s: androidx.compose.ui.graphics.Shape = androidx.compose.ui.graphics.RectangleShape) =
     this.then(Modifier.background(c, s))
+
+/** Show/hide and reorder groups of the active playlist. */
+@Composable
+fun GroupsManage(app: UrtvApp, onBack: () -> Unit) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
+    val store = app.store
+    val cat by app.catalog.state.collectAsState()
+    val order by store.groupOrder.collectAsState()
+    val hidden by store.hiddenGroups.collectAsState()
+    val pid = cat.playlistId.orEmpty()
+    val all = remember(cat.channels) { com.urtv.player.data.Browse.groups(cat.channels) }
+    val groups = com.urtv.player.data.Browse.arrange(all, order[pid].orEmpty(), emptySet(), includeHidden = true)
+    fun move(i: Int, d: Int) { val l = groups.toMutableList(); val j = i + d; if (j in l.indices) { val t = l[i]; l[i] = l[j]; l[j] = t; store.setGroupOrder(pid, l) } }
+    Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 64.dp, vertical = 36.dp)) {
+        Text(stringResource(R.string.set_groups), style = T.display)
+        Text(stringResource(R.string.set_groups_hint), style = T.small)
+        Spacer(Modifier.height(16.dp))
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)) {
+            itemsIndexed(groups, key = { _, g -> g }) { i, g ->
+                val hid = "$pid|$g" in hidden
+                val label = if (g == com.urtv.player.data.Browse.OTHER) stringResource(R.string.group_other) else g
+                Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Tv({ store.toggleHiddenGroup("$pid|$g") }, Modifier.weight(1f).fillMaxHeight()) {
+                        Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(label, style = T.body.copy(color = if (hid) C.muted else C.text), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            Text(stringResource(if (hid) R.string.hidden else R.string.shown), style = T.small.copy(color = if (hid) C.danger else C.accent2))
+                        }
+                    }
+                    Tv({ move(i, -1) }, Modifier.size(64.dp), RoundedCornerShape(16.dp)) { Text("▲", style = T.body, modifier = Modifier.align(Alignment.Center)) }
+                    Tv({ move(i, 1) }, Modifier.size(64.dp), RoundedCornerShape(16.dp)) { Text("▼", style = T.body, modifier = Modifier.align(Alignment.Center)) }
+                }
+            }
+        }
+        TvButton(stringResource(R.string.back), onBack)
+    }
+}

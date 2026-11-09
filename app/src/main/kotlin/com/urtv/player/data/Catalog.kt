@@ -102,7 +102,9 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 if (file.exists()) {
                     val now = System.currentTimeMillis()
                     val list = file.inputStream().buffered().use { XmltvParser.parse(it, keep) }
-                    _epg.value = EpgIndex.build(list, now - 3 * 3_600_000L, now + 36 * 3_600_000L)
+                    val off = (store.epgOffsetMin.value[def.id] ?: 0) * 60_000L
+                    val shifted = if (off == 0L) list else list.map { it.copy(startMs = it.startMs + off, stopMs = it.stopMs + off) }
+                    _epg.value = EpgIndex.build(shifted, now - 3 * 3_600_000L, now + 36 * 3_600_000L)
                 }
             }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Throwable) { /* guide is optional */ }

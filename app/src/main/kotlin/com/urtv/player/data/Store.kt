@@ -76,6 +76,25 @@ class Store(ctx: Context) {
         e.apply()
     }
 
+    // ---- per-playlist: EPG time offset, hidden groups, group order
+    private val _hidden = MutableStateFlow(sp.getStringSet("hidden", emptySet())!!.toSet())
+    val hiddenGroups: StateFlow<Set<String>> = _hidden
+    private val _order = MutableStateFlow(sp.all.filterKeys { it.startsWith("gorder_") }.mapKeys { it.key.removePrefix("gorder_") }.mapValues { (it.value as String).split('\n').filter { s -> s.isNotEmpty() } })
+    val groupOrder: StateFlow<Map<String, List<String>>> = _order
+    private val _offsets = MutableStateFlow(sp.all.filterKeys { it.startsWith("epgoff_") }.mapKeys { it.key.removePrefix("epgoff_") }.mapValues { (it.value as Int) })
+    val epgOffsetMin: StateFlow<Map<String, Int>> = _offsets
+    fun toggleHiddenGroup(key: String) { val s = _hidden.value.toMutableSet(); if (!s.add(key)) s.remove(key); _hidden.value = s; sp.edit().putStringSet("hidden", s).apply() }
+    fun setGroupOrder(pid: String, l: List<String>) { _order.value = _order.value + (pid to l); sp.edit().putString("gorder_$pid", l.joinToString("\n")).apply() }
+    fun setEpgOffset(pid: String, min: Int) { _offsets.value = _offsets.value + (pid to min); sp.edit().putInt("epgoff_$pid", min).apply() }
+
+    // ---- appearance
+    private val _textScale = MutableStateFlow(sp.getInt("textScale", 0))
+    val textScale: StateFlow<Int> = _textScale
+    private val _oled = MutableStateFlow(sp.getBoolean("oled", false))
+    val oled: StateFlow<Boolean> = _oled
+    fun setTextScale(v: Int) { _textScale.value = v; sp.edit().putInt("textScale", v).apply() }
+    fun setOled(v: Boolean) { _oled.value = v; sp.edit().putBoolean("oled", v).apply() }
+
     // ---- settings
     fun setLang(v: String) { _lang.value = v; sp.edit().putString("lang", v).apply() }
     fun setRefreshHours(v: Int) { _refreshH.value = v; sp.edit().putInt("refreshH", v).apply() }

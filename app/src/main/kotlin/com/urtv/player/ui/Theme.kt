@@ -1,6 +1,8 @@
 package com.urtv.player.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -11,10 +13,12 @@ import androidx.tv.material3.darkColorScheme
 
 /** Calm dark palette. Focus is always a bright ring plus lift, never colour alone. */
 object C {
-    val bg = Color(0xFF0B0D12)
-    val bgTop = Color(0xFF141826)
-    val surface = Color(0xFF151A24)
-    val surfaceHi = Color(0xFF1F2633)
+    /** True for the pure-black theme (OLED / dark rooms). Read inside composition, so toggling recomposes. */
+    var oled by androidx.compose.runtime.mutableStateOf(false)
+    val bg get() = if (oled) Color.Black else Color(0xFF0B0D12)
+    val bgTop get() = if (oled) Color(0xFF050505) else Color(0xFF141826)
+    val surface get() = if (oled) Color(0xFF0E0E10) else Color(0xFF151A24)
+    val surfaceHi get() = if (oled) Color(0xFF1A1B20) else Color(0xFF1F2633)
     val focusFill = Color(0xFF2B3550)
     val ring = Color(0xFFFFFFFF)
     val accent = Color(0xFF7C6CFF)
@@ -24,7 +28,7 @@ object C {
     val danger = Color(0xFFFF6B6B)
     val scrim = Color(0xCC05070B)
     val accentBrush = Brush.linearGradient(listOf(accent, accent2))
-    val bgBrush = Brush.verticalGradient(listOf(bgTop, bg))
+    val bgBrush get() = Brush.verticalGradient(listOf(bgTop, bg))
 }
 
 /** Large, generous line height so Arabic diacritics never clip at TV distance. */
@@ -38,6 +42,11 @@ object T {
 }
 
 @Composable
-fun UrtvTheme(content: @Composable () -> Unit) {
+fun UrtvTheme(oled: Boolean = false, textScale: Int = 0, content: @Composable () -> Unit) {
+    C.oled = oled
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    val scale = listOf(1f, 1.15f, 1.3f).getOrElse(textScale) { 1f }
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density, d.fontScale * scale)) {
     MaterialTheme(colorScheme = darkColorScheme(background = C.bg, surface = C.surface, primary = C.accent, onSurface = C.text, onBackground = C.text), content = content)
+    }
 }

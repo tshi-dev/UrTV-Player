@@ -102,4 +102,18 @@
     <string name="back">رجوع</string>
     <string name="season_n">الموسم %d</string>
     <string name="catchup">إعادة (فاتتك)</string>
+    <string name="set_text_size">حجم الخط</string>
+    <string name="size_normal">عادي</string>
+    <string name="size_large">كبير</string>
+    <string name="size_xl">كبير جدًا</string>
+    <string name="set_theme">المظهر</string>
+    <string name="theme_dark">داكن</string>
+    <string name="theme_oled">أسود تمامًا</string>
+    <string name="set_active_playlist">القائمة الحالية</string>
+    <string name="set_epg_offset">إزاحة وقت الدليل</string>
+    <string name="set_epg_offset_hint">إذا كانت أوقات البرامج متقدمة أو متأخرة عن الواقع</string>
+    <string name="set_groups">المجموعات</string>
+    <string name="set_groups_hint">أخفِ مجموعات أو غيّر ترتيبها</string>
+    <string name="shown">ظاهرة</string>
+    <string name="hidden">مخفية</string>
 </resources>
