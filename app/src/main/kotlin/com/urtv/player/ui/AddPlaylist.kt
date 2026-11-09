@@ -93,9 +93,9 @@ private fun PhonePane(onInput: (PhoneInput) -> Unit) {
     DisposableEffect(round) {
         closed = false; failed = false
         val ip = PhoneServer.lanAddress()
-        val srv = PhoneServer(onInput = { i -> main.post { onInput(i) } }, onClosed = { main.post { closed = true } })
-        if (ip == null || !srv.start()) { failed = true; info = null } else info = Triple("http://$ip:${srv.port}/?c=${srv.code}", srv.code, "$ip:${srv.port}")
-        onDispose { srv.close() }
+        val srv = ip?.let { PhoneServer(it, onInput = { i -> main.post { onInput(i) } }, onClosed = { main.post { closed = true } }) }
+        if (srv == null || !srv.start()) { failed = true; info = null } else info = Triple("http://${ip.hostAddress}:${srv.port}/?c=${srv.code}", srv.code, "${ip.hostAddress}:${srv.port}")
+        onDispose { srv?.close() }
     }
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically) {
         val i = info

@@ -74,14 +74,12 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
     private fun writeMovies(f: File, l: List<Movie>) = write(f, l.map { listOf(s(it.id), s(it.name), s(it.url), s(it.category), s(it.poster), s(it.rating), it.added.toString()) })
     private fun writeSeries(f: File, l: List<Series>) = write(f, l.map { listOf(s(it.id), s(it.name), s(it.category), s(it.poster), s(it.rating), s(it.year), it.added.toString(), s(it.plot)) })
     private fun write(f: File, rows: List<List<String>>) {
-        val tmp = File(f.path + ".tmp")
-        tmp.bufferedWriter().use { w -> for (r in rows) w.append(r.joinToString("\t")).append('\n') }
-        f.delete(); tmp.renameTo(f)
+        Secrets.write(f) { o -> o.bufferedWriter().use { w -> for (r in rows) w.append(r.joinToString("\t")).append('\n') } }   // URLs embed credentials
     }
     private fun rows(f: File, min: Int): List<List<String>> {
         if (!f.exists()) return emptyList()
         val out = ArrayList<List<String>>()
-        runCatching { f.bufferedReader().useLines { ls -> for (ln in ls) { val p = ln.split('\t'); if (p.size >= min) out += p } } }
+        runCatching { Secrets.read(f) { i -> i.bufferedReader().useLines { ls -> for (ln in ls) { val p = ln.split('\t'); if (p.size >= min) out += p } } } }
         return out
     }
     private fun readMovies(f: File) = rows(f, 7).map { Movie(it[0], it[1], it[2], it[3], it[4].ifEmpty { null }, it[5].ifEmpty { null }, null, it[6].toLongOrNull() ?: 0) }

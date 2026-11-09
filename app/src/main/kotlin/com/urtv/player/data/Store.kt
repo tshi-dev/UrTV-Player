@@ -38,12 +38,11 @@ class Store(ctx: Context) {
 
     // ---- playlists
     private fun readPlaylists(): List<PlaylistDef> = runCatching {
-        if (file.exists()) json.decodeFromString(ListSerializer(PlaylistDef.serializer()), file.readText()) else emptyList()
+        Secrets.readText(file)?.let { json.decodeFromString(ListSerializer(PlaylistDef.serializer()), it) } ?: emptyList()
     }.getOrDefault(emptyList())
 
     private fun writePlaylists(l: List<PlaylistDef>) {
-        val tmp = File(file.parentFile, "playlists.json.tmp")
-        tmp.writeText(json.encodeToString(ListSerializer(PlaylistDef.serializer()), l)); tmp.renameTo(file)
+        Secrets.writeText(file, json.encodeToString(ListSerializer(PlaylistDef.serializer()), l))   // encrypted: holds credentials
         _playlists.value = l
     }
 
@@ -97,11 +96,11 @@ class Store(ctx: Context) {
 
     // ---- continue watching (movies and episodes), newest first, capped
     private val wFile = File(ctx.filesDir, "watching.json")
-    private val _watching = MutableStateFlow(runCatching { if (wFile.exists()) json.decodeFromString(ListSerializer(WatchItem.serializer()), wFile.readText()) else emptyList() }.getOrDefault(emptyList()))
+    private val _watching = MutableStateFlow(runCatching { Secrets.readText(wFile)?.let { json.decodeFromString(ListSerializer(WatchItem.serializer()), it) } ?: emptyList() }.getOrDefault(emptyList()))
     val watching: StateFlow<List<WatchItem>> = _watching
     private fun writeWatching(l: List<WatchItem>) {
         _watching.value = l
-        runCatching { val t = File(wFile.parentFile, "watching.json.tmp"); t.writeText(json.encodeToString(ListSerializer(WatchItem.serializer()), l)); t.renameTo(wFile) }
+        runCatching { Secrets.writeText(wFile, json.encodeToString(ListSerializer(WatchItem.serializer()), l)) }
     }
     /** Called while playing. At 95 % the item counts as watched and leaves the row. */
     fun updateWatching(item: WatchItem) {
@@ -120,22 +119,37 @@ class Store(ctx: Context) {
     fun setResume(v: Boolean) { _resume.value = v; sp.edit().putBoolean("resume", v).apply() }
     fun langNow(): String = sp.getString("lang", "ar")!!
 
-    // ---- parental PIN (salted SHA-256; the PIN itself is never stored)
-    private fun hash(pin: String, salt: String) =
-        MessageDigest.getInstance("SHA-256").digest((salt + pin).toByteArray()).joinToString("") { "%02x".format(it) }
+    // ---- parental PIN: PBKDF2-HMAC-SHA256 with a random salt (the PIN is never stored) + lockout after repeated mistakes
+    private fun hash(pin: String, salt: String): String {
+        val spec = javax.crypto.spec.PBEKeySpec(pin.toCharArray(), salt.toByteArray(), 60_000, 256)
+        return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded.joinToString("") { "%02x".format(it) }
+    }
 
     fun setPin(pin: String?) {
         val e = sp.edit()
-        if (pin == null) { e.remove("pinHash").remove("pinSalt") } else {
-            val salt = ByteArray(8).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
-            e.putString("pinSalt", salt).putString("pinHash", hash(pin, salt))
+        if (pin == null) { e.remove("pinHash").remove("pinSalt").remove("pinFails").remove("pinLockUntil") } else {
+            val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+            e.putString("pinSalt", salt).putString("pinHash", hash(pin, salt)).putInt("pinFails", 0).putLong("pinLockUntil", 0)
         }
         e.apply(); _hasPin.value = pin != null
         if (pin == null) { _locked.value = emptySet(); sp.edit().remove("locked").apply() }
     }
-    fun checkPin(pin: String): Boolean {
+
+    /** Seconds the PIN pad is locked for (0 = open). 5 wrong tries lock it for 30 s, then it doubles up to 15 min. */
+    fun pinLockedSeconds(now: Long = System.currentTimeMillis()): Int = ((sp.getLong("pinLockUntil", 0) - now) / 1000).toInt().coerceAtLeast(0)
+
+    fun checkPin(pin: String, now: Long = System.currentTimeMillis()): Boolean {
         val h = sp.getString("pinHash", null) ?: return true
-        return MessageDigest.isEqual(h.toByteArray(), hash(pin, sp.getString("pinSalt", "")!!).toByteArray())
+        if (pinLockedSeconds(now) > 0) return false
+        val ok = MessageDigest.isEqual(h.toByteArray(), hash(pin, sp.getString("pinSalt", "")!!).toByteArray())
+        val e = sp.edit()
+        if (ok) e.putInt("pinFails", 0) else {
+            val f = sp.getInt("pinFails", 0) + 1
+            e.putInt("pinFails", f)
+            if (f >= 5) e.putLong("pinLockUntil", now + minOf(30_000L shl ((f - 5).coerceAtMost(5)), 900_000L))
+        }
+        e.apply()
+        return ok
     }
     fun toggleLockedGroup(key: String) {
         val s = _locked.value.toMutableSet(); if (!s.add(key)) s.remove(key)

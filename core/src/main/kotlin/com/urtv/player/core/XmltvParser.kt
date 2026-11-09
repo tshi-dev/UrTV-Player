@@ -7,6 +7,7 @@ import java.io.Reader
 
 /** Streaming XMLTV parser (XmlPullParser: built into Android, so no extra APK weight). Malformed documents yield what was read so far. */
 object XmltvParser {
+    const val MAX_PROGRAMMES = 1_500_000
     fun parse(input: InputStream, keepChannels: Set<String>? = null): List<Programme> = run { it.setInput(input, null) }(keepChannels)
     fun parse(reader: Reader, keepChannels: Set<String>? = null): List<Programme> = run { it.setInput(reader) }(keepChannels)
     fun parse(text: String, keepChannels: Set<String>? = null) = parse(java.io.StringReader(text.removePrefix("﻿").trimStart()), keepChannels)
@@ -14,10 +15,14 @@ object XmltvParser {
     private fun run(init: (XmlPullParser) -> Unit): (Set<String>?) -> List<Programme> = { keep ->
         val out = ArrayList<Programme>()
         try {
-            val p = XmlPullParserFactory.newInstance().newPullParser(); init(p)
+            val f = XmlPullParserFactory.newInstance()
+            f.isNamespaceAware = false
+            // No DTD / external entity processing: a hostile guide cannot read files or call out.
+            runCatching { f.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false) }
+            val p = f.newPullParser(); init(p)
             var ev = p.eventType
             while (ev != XmlPullParser.END_DOCUMENT) {
-                if (ev == XmlPullParser.START_TAG && p.name == "programme") readProgramme(p, keep)?.let(out::add)
+                if (ev == XmlPullParser.START_TAG && p.name == "programme") readProgramme(p, keep)?.let { if (out.size < MAX_PROGRAMMES) out.add(it) }
                 ev = p.next()
             }
         } catch (_: Exception) { /* keep partial result */ }
@@ -39,7 +44,7 @@ object XmltvParser {
         }
         if (start == null || stop == null || stop <= start) return null
         if (keep != null && ch !in keep) return null
-        return Programme(ch, start, stop, title, desc)
+        return Programme(ch.take(200), start, stop, title.take(300), desc.take(1500))
     }
 
     /** "20240131203000 +0300", "20240131203000", "202401312030 -0100" -> epoch millis (UTC). */
