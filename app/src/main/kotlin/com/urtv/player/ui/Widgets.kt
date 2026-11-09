@@ -42,45 +42,50 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Text
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
 
 /**
- * The one focusable building block. Focus is shown by a white ring, a lift and a lighter fill, so it is
- * visible on any background and never relies on colour alone.
+ * The one focusable building block. No outline at rest; focus = solid light surface with dark text, a 1.03 lift and
+ * (for image cards, [ring]) a white ring. A subtle fill marks the selected item (e.g. the current group).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Tv(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = RoundedCornerShape(12.dp),
     selected: Boolean = false,
     focusRequester: FocusRequester? = null,
     onFocus: (Boolean) -> Unit = {},
     onLongClick: (() -> Unit)? = null,
-    restColor: Color = C.surface,
+    restColor: Color = Color.Transparent,
+    ring: Boolean = false,
+    lift: Float = 1.03f,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, tween(140), label = "lift")
-    val fill by animateColorAsState(if (focused) C.focusFill else if (selected) C.surfaceHi else restColor, tween(140), label = "fill")
+    val scale by animateFloatAsState(if (focused) lift else 1f, tween(180), label = "lift")
+    val fill by animateColorAsState(if (focused && !ring) C.focusFill else if (selected) C.glass2 else restColor, tween(180), label = "fill")
     Box(
         modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer { scaleX = scale; scaleY = scale; shadowElevation = if (focused) 24f else 0f; this.shape = shape; clip = false }
             .clip(shape)
             .background(fill)
-            .border(if (focused) 3.dp else if (selected) 1.5.dp else 0.dp, if (focused) C.ring else C.accent, shape)
+            .let { if (focused && ring) it.border(3.dp, C.ring, shape) else it }
             .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
             .onFocusChanged { focused = it.isFocused; onFocus(it.isFocused) }
             .combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = onLongClick),
-    ) { content(focused) }
+    ) { androidx.compose.runtime.CompositionLocalProvider(LocalFocused provides (focused && !ring)) { content(focused) } }
 }
 
-/** Text button used for actions: primary ones get the accent gradient. */
+/** Action button. Primary = light surface even at rest; secondary = quiet layer that turns light on focus. */
 @Composable
 fun TvButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false, focusRequester: FocusRequester? = null) {
-    Tv(onClick, modifier.height(60.dp), RoundedCornerShape(30.dp), focusRequester = focusRequester, restColor = if (primary) C.accent else C.surfaceHi) {
-        Text(text, style = T.bodyBold, modifier = Modifier.align(Alignment.Center).padding(horizontal = 32.dp))
+    Tv(onClick, modifier.height(60.dp), RoundedCornerShape(14.dp), focusRequester = focusRequester, restColor = if (primary) C.text else C.surfaceHi) {
+        // primary at rest is already light, so its text is dark whether or not it is focused
+        val tone = if (primary) T.bodyBold.copy(color = C.onFocus) else T.bodyBold
+        Text(text, style = tone, maxLines = 1, modifier = Modifier.align(Alignment.Center).padding(horizontal = 32.dp))
     }
 }
 
@@ -97,16 +102,29 @@ fun Spinner(size: Int = 64) {
 
 @Composable
 fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(C.ring.copy(alpha = 0.15f))) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(4.dp).background(C.accentBrush))
+    val focused = LocalFocused.current
+    Box(modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(if (focused) Color(0x26000000) else Color(0x29FFFFFF))) {
+        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(3.dp).background(C.accent))
     }
 }
 
-/** Letter avatar fallback for channels without a logo. */
+/** Fallback tile for channels without a logo: the first letter on a tint derived from the name (stable per channel). */
 @Composable
 fun Monogram(name: String, size: Int = 52) {
-    Box(Modifier.size(size.dp).clip(RoundedCornerShape(14.dp)).background(C.surfaceHi), contentAlignment = Alignment.Center) {
-        Text(name.trim().take(1).uppercase(), style = T.bodyBold.copy(color = C.muted))
+    val t = name.trim()
+    val h = (t.fold(0) { a, c -> (a * 31 + c.code) and 0xFFFF } % 360).toFloat()
+    val letter = Regex("""\d{1,2}$""").find(t)?.value ?: (t.firstOrNull() ?: '?').toString()
+    Box(Modifier.size(size.dp).clip(RoundedCornerShape((size / 4.5f).dp))
+        .background(Brush.linearGradient(listOf(Color.hsv(h, 0.38f, 0.40f), Color.hsv((h + 30) % 360, 0.42f, 0.26f)))), contentAlignment = Alignment.Center) {
+        androidx.tv.material3.Text(letter.uppercase(), style = T.bodyBold.copy(color = Color.White, fontSize = (size * 0.42f).sp))
+    }
+}
+
+/** Small label chip (genre, year, rating, S/E badge): separates facts without a bullet character. */
+@Composable
+fun Chip(text: String, modifier: Modifier = Modifier) {
+    Box(modifier.clip(RoundedCornerShape(8.dp)).background(C.glass2).padding(horizontal = 10.dp, vertical = 2.dp)) {
+        Text(text, style = T.small.copy(color = C.text, fontSize = 17.sp), maxLines = 1)
     }
 }
 
@@ -125,21 +143,21 @@ fun FocusField(
     value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier,
     password: Boolean = false, ltr: Boolean = false, leading: @Composable (() -> Unit)? = null,
     imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Next,
-    focusRequester: FocusRequester? = null,
+    focusRequester: FocusRequester? = null, compact: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(if (compact) 12.dp else 16.dp)
     Row(
-        modifier.height(60.dp).clip(shape).background(if (focused) C.focusFill else C.surface)
-            .border(if (focused) 3.dp else 1.dp, if (focused) C.ring else C.surfaceHi, shape).padding(horizontal = 20.dp),
+        modifier.height(if (compact) 52.dp else 60.dp).clip(shape).background(if (focused) C.focusFill else C.surface)
+            .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) { leading(); androidx.compose.foundation.layout.Spacer(Modifier.size(14.dp)) }
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text(label, style = T.body.copy(color = C.muted), maxLines = 1)
+            if (value.isEmpty()) Text(label, style = T.body.copy(color = if (focused) C.onFocus3 else C.faint), maxLines = 1)
             androidx.compose.foundation.text.BasicTextField(
                 value, onChange, singleLine = true,
-                textStyle = T.body.copy(textAlign = if (ltr) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
+                textStyle = T.body.copy(color = if (focused) C.onFocus else C.text, textAlign = if (ltr) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
                     textDirection = if (ltr) androidx.compose.ui.text.style.TextDirection.Ltr else androidx.compose.ui.text.style.TextDirection.Content),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent2),
                 visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,

@@ -105,12 +105,26 @@ class Store(ctx: Context) {
     /** Called while playing. At 95 % the item counts as watched and leaves the row. */
     fun updateWatching(item: WatchItem) {
         val done = item.durMs > 0 && item.posMs > item.durMs * 0.95
+        if (done) markWatched(item.key) else if (item.posMs >= 5_000) markWatched(item.key, false)
         val rest = _watching.value.filter { it.key != item.key }
         writeWatching(if (done || item.posMs < 5_000) rest else (listOf(item) + rest).take(24))
     }
     fun removeWatching(key: String) { writeWatching(_watching.value.filter { it.key != key }); savePosition(key, 0, 0) }
     /** Queue an unstarted episode so the series shows up again in the row. */
     fun offerNext(item: WatchItem) { if (_watching.value.none { it.key == item.key }) writeWatching((listOf(item) + _watching.value).take(24)) }
+
+    // ---- start screen, home rows, live preview, watched marks
+    private val _start = MutableStateFlow(sp.getString("start", "home")!!)
+    val startScreen: StateFlow<String> = _start          // home | live | guide | movies | series | last
+    fun setStartScreen(v: String) { _start.value = v; sp.edit().putString("start", v).apply() }
+    private val _homeRows = MutableStateFlow(sp.getString("homeRows", "continue\nfavs\nrecent")!!.split('\n').filter { it.isNotEmpty() })
+    val homeRows: StateFlow<List<String>> = _homeRows   // ids in display order; hidden rows are simply absent
+    fun setHomeRows(l: List<String>) { _homeRows.value = l; sp.edit().putString("homeRows", l.joinToString("\n")).apply() }
+    private val _preview = MutableStateFlow(if (sp.contains("preview")) sp.getBoolean("preview", true) else !(ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice)
+    val livePreview: StateFlow<Boolean> = _preview
+    fun setLivePreview(v: Boolean) { _preview.value = v; sp.edit().putBoolean("preview", v).apply() }
+    fun isWatched(key: String) = sp.getBoolean("w_$key", false)
+    fun markWatched(key: String, v: Boolean = true) { sp.edit().apply { if (v) putBoolean("w_$key", true) else remove("w_$key") }.apply() }
 
     // ---- settings
     fun setLang(v: String) { _lang.value = v; sp.edit().putString("lang", v).apply() }

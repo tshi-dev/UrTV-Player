@@ -28,7 +28,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.data.Store
 
@@ -79,17 +78,17 @@ fun PinPad(title: String, error: String?, resetKey: Int, onCancel: () -> Unit, o
         },
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.width(420.dp).background(C.surface, RoundedCornerShape(28.dp)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(840.dp).background(C.surface, RoundedCornerShape(56.dp)).padding(64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, style = T.title)
-            Row(Modifier.padding(vertical = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                repeat(4) { Box(Modifier.size(20.dp).background(if (it < pin.length) C.accent2 else C.surfaceHi, CircleShape)) }
+            Row(Modifier.padding(vertical = 48.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                repeat(4) { Box(Modifier.size(40.dp).background(if (it < pin.length) C.accent2 else C.surfaceHi, CircleShape)) }
             }
-            Box(Modifier.height(32.dp)) { if (error != null) Text(error, style = T.small.copy(color = C.danger)) }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                for (r in 0 until 3) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.height(64.dp)) { if (error != null) Text(error, style = T.small.copy(color = C.danger)) }
+            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                for (r in 0 until 3) Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     for (c in 1..3) { val d = r * 3 + c; PadKey(d.toString(), Modifier, if (d == 5) first else null) { add(d) } }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     PadKey("⌫", Modifier) { pin = pin.dropLast(1) }
                     PadKey("0", Modifier) { add(0) }
                     PadKey("✕", Modifier) { onCancel() }
@@ -101,7 +100,7 @@ fun PinPad(title: String, error: String?, resetKey: Int, onCancel: () -> Unit, o
 
 @Composable
 private fun PadKey(label: String, modifier: Modifier, fr: FocusRequester? = null, onClick: () -> Unit) {
-    Tv(onClick, modifier.size(width = 108.dp, height = 72.dp), RoundedCornerShape(20.dp), focusRequester = fr, restColor = C.surfaceHi) {
+    Tv(onClick, modifier.size(width = 216.dp, height = 144.dp), RoundedCornerShape(40.dp), focusRequester = fr, restColor = C.surfaceHi) {
         Text(label, style = T.title, modifier = Modifier.align(Alignment.Center))
     }
 }

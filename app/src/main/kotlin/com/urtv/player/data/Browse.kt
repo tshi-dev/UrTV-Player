@@ -6,6 +6,8 @@ import com.urtv.player.core.Channel
 object Browse {
     const val ALL = "\u0000all"
     const val OTHER = "\u0000other"
+    const val FAV = "\u0000fav"
+    const val RECENT = "\u0000recent"
 
     fun groupOf(c: Channel) = c.group.ifBlank { OTHER }
 
