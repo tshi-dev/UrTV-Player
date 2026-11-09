@@ -95,6 +95,24 @@ class Store(ctx: Context) {
     fun setTextScale(v: Int) { _textScale.value = v; sp.edit().putInt("textScale", v).apply() }
     fun setOled(v: Boolean) { _oled.value = v; sp.edit().putBoolean("oled", v).apply() }
 
+    // ---- continue watching (movies and episodes), newest first, capped
+    private val wFile = File(ctx.filesDir, "watching.json")
+    private val _watching = MutableStateFlow(runCatching { if (wFile.exists()) json.decodeFromString(ListSerializer(WatchItem.serializer()), wFile.readText()) else emptyList() }.getOrDefault(emptyList()))
+    val watching: StateFlow<List<WatchItem>> = _watching
+    private fun writeWatching(l: List<WatchItem>) {
+        _watching.value = l
+        runCatching { val t = File(wFile.parentFile, "watching.json.tmp"); t.writeText(json.encodeToString(ListSerializer(WatchItem.serializer()), l)); t.renameTo(wFile) }
+    }
+    /** Called while playing. At 95 % the item counts as watched and leaves the row. */
+    fun updateWatching(item: WatchItem) {
+        val done = item.durMs > 0 && item.posMs > item.durMs * 0.95
+        val rest = _watching.value.filter { it.key != item.key }
+        writeWatching(if (done || item.posMs < 5_000) rest else (listOf(item) + rest).take(24))
+    }
+    fun removeWatching(key: String) { writeWatching(_watching.value.filter { it.key != key }); savePosition(key, 0, 0) }
+    /** Queue an unstarted episode so the series shows up again in the row. */
+    fun offerNext(item: WatchItem) { if (_watching.value.none { it.key == item.key }) writeWatching((listOf(item) + _watching.value).take(24)) }
+
     // ---- settings
     fun setLang(v: String) { _lang.value = v; sp.edit().putString("lang", v).apply() }
     fun setRefreshHours(v: Int) { _refreshH.value = v; sp.edit().putInt("refreshH", v).apply() }

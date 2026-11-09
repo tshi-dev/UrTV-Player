@@ -63,3 +63,11 @@ class ArrangeTest {
         assertEquals(g, Browse.arrange(g, listOf("gone"), emptySet()))
     }
 }
+
+class WatchItemTest {
+    @Test fun fractionAndTimeLeft() {
+        val w = com.urtv.player.data.WatchItem("k", "p", "movie", "t", url = "http://example.com/a", posMs = 30 * 60_000L, durMs = 120 * 60_000L)
+        assertEquals(0.25f, w.fraction); assertEquals(90, w.leftMin)
+        assertEquals(0f, w.copy(durMs = 0).fraction)
+    }
+}

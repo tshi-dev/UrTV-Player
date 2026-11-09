@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
+import com.urtv.player.data.WatchItem
 import com.urtv.player.player.PlayStatus
 import kotlinx.coroutines.delay
 
@@ -76,10 +77,21 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             delay(500)
             val p = ctrl.player ?: continue
             pos = p.currentPosition; dur = p.duration.takeIf { it > 0 } ?: 0
-            if (++n % 10 == 0) app.store.savePosition(item.key, pos, dur)
+            if (++n % 10 == 0) {
+                app.store.savePosition(item.key, pos, dur)
+                if (item.kind.isNotEmpty() && dur > 0) app.store.updateWatching(WatchItem(item.key, item.pid, item.kind, item.title, item.subtitle, item.image, item.url, pos, dur, System.currentTimeMillis()))
+            }
         }
     }
-    LaunchedEffect(ended) { if (ended) { app.store.savePosition(item.key, dur, dur); if (idx + 1 < items.size) idx++ else onExit() } }
+    LaunchedEffect(ended) {
+        if (ended) {
+            app.store.savePosition(item.key, dur, dur)
+            if (item.kind.isNotEmpty()) app.store.updateWatching(WatchItem(item.key, item.pid, item.kind, item.title, item.subtitle, item.image, item.url, dur, dur, System.currentTimeMillis()))
+            val nx = items.getOrNull(idx + 1)
+            if (nx != null && nx.kind.isNotEmpty()) app.store.offerNext(WatchItem(nx.key, nx.pid, nx.kind, nx.title, nx.subtitle, nx.image, nx.url, 0, 0, System.currentTimeMillis()))
+            if (nx != null) idx++ else onExit()
+        }
+    }
     LaunchedEffect(tick, bar, paused) { if (bar && !paused && !options) { delay(4000); bar = false } }
     LaunchedEffect(options) { if (!options) runCatching { root.requestFocus() } }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { app.store.savePosition(item.key, pos, dur); ctrl.release() }
