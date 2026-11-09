@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -54,7 +53,6 @@ import com.urtv.player.data.Browse
 import com.urtv.player.data.CatalogState
 import com.urtv.player.data.EpgIndex
 import com.urtv.player.data.LoadError
-import com.urtv.player.data.rememberLogo
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -265,8 +263,10 @@ fun ChannelCard(ch: Channel, now: Programme?, nowMs: Long, fav: Boolean, onClick
 
 @Composable
 fun Logo(ch: Channel, size: Int) {
-    val img by rememberLogo(ch.logo)
-    val b = img
-    if (b != null) Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) { Image(b, null, Modifier.size(size.dp), contentScale = ContentScale.Fit) }
-    else Monogram(ch.name, size)
+    val url = ch.logo
+    if (url.isNullOrBlank()) Monogram(ch.name, size)
+    else coil3.compose.SubcomposeAsyncImage(
+        model = url, contentDescription = null, modifier = Modifier.size(size.dp), contentScale = ContentScale.Fit,
+        error = { Monogram(ch.name, size) }, loading = { Monogram(ch.name, size) },
+    )
 }
