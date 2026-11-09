@@ -66,9 +66,9 @@ fun AddPlaylistScreen(app: UrtvApp, onDone: () -> Unit) {
         Spacer(Modifier.height(20.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             for (m in AddMode.entries) {
-                Tv({ mode = m }, Modifier.height(52.dp), RoundedCornerShape(26.dp), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = if (m == AddMode.Phone) first else null) {
+                Tv({ mode = m }, Modifier.height(52.dp), Rd(26), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = if (m == AddMode.Phone) first else null) {
                     Text(stringResource(when (m) { AddMode.Phone -> R.string.add_phone; AddMode.M3u -> R.string.kind_m3u; AddMode.Xtream -> R.string.kind_xtream }),
-                        style = if (m == mode) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp))
+                        style = if (m == mode) T.bodyBold else T.body.copy(color = mutedInk()), modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp))
                 }
             }
         }
@@ -103,16 +103,16 @@ private fun PhonePane(onInput: (PhoneInput) -> Unit) {
         else Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) { if (!failed) Spinner() }
         Column(Modifier.weight(1f)) {
             when {
-                failed -> { Text(stringResource(R.string.phone_no_lan), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.phone_no_lan_hint), style = T.body.copy(color = C.muted)) }
+                failed -> { Text(stringResource(R.string.phone_no_lan), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.phone_no_lan_hint), style = T.body.copy(color = mutedInk())) }
                 closed -> { Text(stringResource(R.string.phone_closed), style = T.title); Spacer(Modifier.height(20.dp)); TvButton(stringResource(R.string.retry), { round++ }, primary = true) }
                 i != null -> {
                     Text(stringResource(R.string.phone_step1), style = T.title)
                     Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.phone_step2), style = T.body.copy(color = C.muted))
+                    Text(stringResource(R.string.phone_step2), style = T.body.copy(color = mutedInk()))
                     Spacer(Modifier.height(20.dp))
-                    Text(i.third, style = T.title.copy(color = C.accent2), modifier = Modifier.padding(bottom = 4.dp))
+                    Text(i.third, style = T.title.copy(color = accentInk()), modifier = Modifier.padding(bottom = 4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.phone_code), style = T.body.copy(color = C.muted)); Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.phone_code), style = T.body.copy(color = mutedInk())); Spacer(Modifier.width(12.dp))
                         Text(i.second.chunked(3).joinToString(" "), style = T.display.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(4f, androidx.compose.ui.unit.TextUnitType.Sp)))
                     }
                     Spacer(Modifier.height(12.dp))
@@ -128,7 +128,7 @@ fun Qr(text: String, modifier: Modifier) {
     val m = remember(text) {
         QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 1, 1, mapOf(EncodeHintType.MARGIN to 0, EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M))
     }
-    Canvas(modifier.background(Color.White, RoundedCornerShape(20.dp))) {
+    Canvas(modifier.background(Color.White, Rd(20))) {
         val quiet = size.minDimension * 0.07f
         val cell = (size.minDimension - 2 * quiet) / m.width
         for (y in 0 until m.height) for (x in 0 until m.width) if (m.get(x, y)) drawRect(Color.Black, Offset(quiet + x * cell, quiet + y * cell), Size(cell + 0.6f, cell + 0.6f))
@@ -150,7 +150,7 @@ private fun FormPane(xtream: Boolean, onSave: (PhoneInput) -> Unit) {
             FocusField(pass, { pass = it; err = false }, stringResource(R.string.f_pass), Modifier.fillMaxWidth(), password = true, ltr = true)
         }
         FocusField(epg, { epg = it }, stringResource(R.string.f_epg), Modifier.fillMaxWidth(), ltr = true, imeAction = androidx.compose.ui.text.input.ImeAction.Done)
-        if (err) Text(stringResource(R.string.f_invalid), style = T.body.copy(color = C.danger))
+        if (err) Text(stringResource(R.string.f_invalid), style = T.body.copy(color = dangerInk()))
         TvButton(stringResource(R.string.save), {
             val ok = if (xtream) server.isNotBlank() && user.isNotBlank() else url.trim().let { it.startsWith("http://", true) || it.startsWith("https://", true) }
             if (!ok) err = true else onSave(PhoneInput(name.trim(), if (xtream) "" else url.trim(), if (xtream) server.trim() else "", user.trim(), pass, epg.trim()))

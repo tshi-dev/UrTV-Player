@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 enum class Glyph { Heart, Lock, Search, Play, Plus, Refresh, Check }
 
 @Composable
-fun Icon(g: Glyph, tint: Color = C.text, size: Int = 28, filled: Boolean = false) {
+fun Icon(g: Glyph, tint: Color = ink(), size: Int = 28, filled: Boolean = false) {
     Canvas(Modifier.size(size.dp)) {
         val s = this.size.minDimension; val w = s * 0.09f
         val st = Stroke(w, cap = StrokeCap.Round)

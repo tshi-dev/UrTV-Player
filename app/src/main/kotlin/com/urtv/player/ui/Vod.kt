@@ -80,26 +80,26 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         LazyColumn(Modifier.width(280.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(8.dp)) {
             items(listOf(ALL) + cats, key = { it }) { c ->
-                Tv({ cat = c }, Modifier.fillMaxWidth().height(56.dp), RoundedCornerShape(14.dp), selected = c == cat, onFocus = { if (it) cat = c }) {
+                Tv({ cat = c }, Modifier.fillMaxWidth().height(56.dp), Rd(14), selected = c == cat, onFocus = { if (it) cat = c }) {
                     Text(if (c == ALL) stringResource(R.string.all_categories) else c, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp))
                 }
             }
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.fillMaxWidth(), leading = { Icon(Glyph.Search, C.muted, 26) },
+            FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.fillMaxWidth(), leading = { Icon(Glyph.Search, mutedInk(), 26) },
                 imeAction = androidx.compose.ui.text.input.ImeAction.Search)
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {
                 when {
-                    list.isEmpty() && vod.loading -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
+                    list.isEmpty() && vod.loading -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = mutedInk())) }
                     list.isEmpty() && vod.failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.err_network), style = T.title); Spacer(Modifier.height(16.dp))
                         TvButton(stringResource(R.string.retry), { app.vod.open(app.store.playlists.value.firstOrNull { it.id == vod.playlistId }, true) }, primary = true) }
-                    list.isEmpty() -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center))
+                    list.isEmpty() -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = mutedInk()), modifier = Modifier.align(Alignment.Center))
                     else -> LazyVerticalGrid(GridCells.Adaptive(140.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        itemsIndexed(list, key = { _, p -> p.id }) { _, p -> PosterCard(p) { onOpen(p.id) } }
+                        itemsIndexed(list, key = { _, p -> p.id }) { _, p -> PosterCard(p, { onOpen(p.id) }) { if (it) Backdrop.url = p.image } }
                     }
                 }
             }
@@ -108,14 +108,14 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
 }
 
 @Composable
-private fun PosterCard(p: Poster, onClick: () -> Unit) {
-    Tv(onClick, Modifier.fillMaxWidth().aspectRatio(0.68f), RoundedCornerShape(16.dp)) {
+private fun PosterCard(p: Poster, onClick: () -> Unit, onFocus: (Boolean) -> Unit = {}) {
+    Tv(onClick, Modifier.fillMaxWidth().aspectRatio(0.68f), Rd(16), onFocus = onFocus) {
         Placeholder(p.title)
         if (!p.image.isNullOrBlank()) SubcomposeAsyncImage(p.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, loading = {}, error = {})
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0xEE05070B))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to C.videoScrim)))
         Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
-            Text(p.title, style = T.small.copy(color = C.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!p.meta.isNullOrBlank() && p.meta != "0") Text("★ ${p.meta}", style = T.tiny.copy(color = C.accent2))
+            Text(p.title, style = T.small.copy(color = ink()), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!p.meta.isNullOrBlank() && p.meta != "0") Text("★ ${p.meta}", style = T.tiny.copy(color = accentInk()))
         }
     }
 }
@@ -133,13 +133,13 @@ private fun Placeholder(title: String) {
 private fun DetailFrame(poster: String?, title: String, meta: String, plot: String, extra: String, buttons: @Composable () -> Unit, below: @Composable () -> Unit = {}) {
     Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 64.dp, vertical = 40.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-            Box(Modifier.width(240.dp).aspectRatio(0.68f).clip(RoundedCornerShape(20.dp))) {
+            Box(Modifier.width(240.dp).aspectRatio(0.68f).clip(Rd(20))) {
                 Placeholder(title)
                 if (!poster.isNullOrBlank()) SubcomposeAsyncImage(poster, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, loading = {}, error = {})
             }
             Column(Modifier.weight(1f)) {
                 Text(title, style = T.display, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (meta.isNotBlank()) Text(meta, style = T.body.copy(color = C.accent2))
+                if (meta.isNotBlank()) Text(meta, style = T.body.copy(color = accentInk()))
                 Spacer(Modifier.height(12.dp))
                 if (plot.isNotBlank()) Text(plot, style = T.body, maxLines = 5, overflow = TextOverflow.Ellipsis)
                 if (extra.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(extra, style = T.small, maxLines = 2, overflow = TextOverflow.Ellipsis) }
@@ -188,13 +188,13 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
     }, below = {
         when {
             eps == null -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { Spinner() }
-            eps!!.isEmpty() -> Text(stringResource(R.string.err_empty), style = T.body.copy(color = C.muted))
+            eps!!.isEmpty() -> Text(stringResource(R.string.err_empty), style = T.body.copy(color = mutedInk()))
             else -> {
                 val fr = remember { FocusRequester() }
                 LaunchedEffect(season, eps) { runCatching { fr.requestFocus() } }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp)) {
-                    items(seasons) { n -> Tv({ season = n }, Modifier.height(48.dp), RoundedCornerShape(24.dp), selected = n == season, onFocus = { if (it) season = n }) {
-                        Text(stringResource(R.string.season_n, n), style = if (n == season) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp)) } }
+                    items(seasons) { n -> Tv({ season = n }, Modifier.height(48.dp), Rd(24), selected = n == season, onFocus = { if (it) season = n }) {
+                        Text(stringResource(R.string.season_n, n), style = if (n == season) T.bodyBold else T.body.copy(color = mutedInk()), modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp)) } }
                 }
                 // The episode you were in the middle of (else the first) gets focus.
                 val firstOpen = list.indexOfFirst { app.store.position(vodKey(def.id, it.id)) > 0 }.coerceAtLeast(0)
@@ -204,7 +204,7 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
                         Tv({ onPlay(list.map { VodPlay(s.name, it.url, vodKey(def.id, it.id), def.id, "episode", "S${it.season}·E${it.number} · ${it.title}", it.image ?: s.poster) }, i, pos) }, Modifier.fillMaxWidth().height(80.dp),
                             focusRequester = if (i == firstOpen) fr else null) {
                             Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("${e.number}", style = T.title.copy(color = C.accent2), modifier = Modifier.width(56.dp))
+                                Text("${e.number}", style = T.title.copy(color = accentInk()), modifier = Modifier.width(56.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(e.title, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     if (e.plot.isNotBlank()) Text(e.plot, style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)

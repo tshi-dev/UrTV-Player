@@ -64,8 +64,8 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 
     if (rows.isEmpty()) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            if (cat.epgLoading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = C.muted)) }
-            else { Text(stringResource(R.string.no_guide), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.no_guide_hint), style = T.body.copy(color = C.muted)) }
+            if (cat.epgLoading) { Spinner(); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.loading), style = T.body.copy(color = mutedInk())) }
+            else { Text(stringResource(R.string.no_guide), style = T.title); Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.no_guide_hint), style = T.body.copy(color = mutedInk())) }
         }
         return
     }
@@ -93,7 +93,7 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
                 Row(Modifier.fillMaxWidth().height(ROW_H).padding(vertical = 3.dp)) {
                     Row(Modifier.width(NAME_W).fillMaxSize().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Logo(ch, 40); Spacer(Modifier.width(10.dp))
-                        Text(ch.name, style = T.small.copy(color = C.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(ch.name, style = T.small.copy(color = ink()), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Box(Modifier.weight(1f).horizontalScroll(scroll)) {
                         GuideRow(ch, epg.forChannel(ch.epgId), start, nowOffset, nowMs, onFocus = { detail = it }) { p ->
@@ -109,16 +109,17 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
 @Composable
 private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset: Dp, nowMs: Long, onFocus: (Programme) -> Unit, onClick: (Programme) -> Unit) {
     val end = start + SPAN_MIN * 60_000L
+    val nowLine = LocalTheme.current.accent.copy(alpha = 0.7f)
     Box(Modifier.width(DP_PER_MIN * SPAN_MIN).fillMaxSize().drawBehind {
-        val x = nowOffset.toPx(); drawLine(C.accent2.copy(alpha = 0.7f), Offset(x, 0f), Offset(x, size.height), 3f)
+        val x = nowOffset.toPx(); drawLine(nowLine, Offset(x, 0f), Offset(x, size.height), 3f)
     }) {
         for (p in progs) {
             if (p.stopMs <= start || p.startMs >= end) continue
             val s = maxOf(p.startMs, start); val e = minOf(p.stopMs, end)
             val x = DP_PER_MIN * ((s - start) / 60_000f); val w = DP_PER_MIN * ((e - s) / 60_000f) - 4.dp
             if (w < 12.dp) continue
-            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize(), RoundedCornerShape(12.dp), selected = nowMs in p.startMs until p.stopMs, onFocus = { if (it) onFocus(p) }) {
-                Text(p.title, style = T.small.copy(color = if (p.stopMs < nowMs && ch.archiveDays > 0) C.accent2 else C.text), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp))
+            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize(), Rd(12), selected = nowMs in p.startMs until p.stopMs, onFocus = { if (it) onFocus(p) }) {
+                Text(p.title, style = T.small.copy(color = if (p.stopMs < nowMs && ch.archiveDays > 0) accentInk() else ink()), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp))
             }
         }
     }
