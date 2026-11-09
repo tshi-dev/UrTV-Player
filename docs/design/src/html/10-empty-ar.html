@@ -1,0 +1,33 @@
+<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><style>
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_400Regular.ttf');font-weight:400}
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_500Medium.ttf');font-weight:500}
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_600SemiBold.ttf');font-weight:600}
+:root{--bg:#0E0F11;--s1:#16181B;--s2:#1E2125;--t1:#F2F2F2;--t2:rgba(242,242,242,.70);--t3:rgba(242,242,242,.45);--acc:#0A84FF;--glass:rgba(255,255,255,.07);--glass2:rgba(255,255,255,.13)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--t1);font-family:'Plex',sans-serif;font-weight:400;font-size:24px;font-variant-numeric:tabular-nums}
+body{position:relative}
+.glow{position:absolute;inset:0;background:radial-gradient(900px 600px at 12% -10%,rgba(38,64,110,.30),transparent 70%),radial-gradient(900px 600px at 95% 110%,rgba(92,59,31,.22),transparent 70%)}
+.wrap{position:absolute;inset:0;padding:40px 72px}
+.top{height:72px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:14px;font-weight:600;font-size:28px;letter-spacing:.3px;width:300px}
+.mark{width:40px;height:40px;border-radius:12px;background:var(--t1);display:grid;place-items:center}
+.mark:after{content:'';border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #0E0F11;margin-inline-start:3px}
+[dir=rtl] .mark:after{border-width:9px 15px 9px 0;border-color:transparent #0E0F11 transparent transparent;margin-inline-start:0;margin-inline-end:3px}
+.nav{display:flex;gap:4px;background:var(--glass);border-radius:999px;padding:6px;border:1px solid rgba(255,255,255,.06)}
+.nav span{padding:10px 26px;border-radius:999px;font-size:22px;color:var(--t2)}
+.nav span.on{background:var(--glass2);color:var(--t1);font-weight:500}
+.nav span.f{background:var(--t1);color:#111;font-weight:500}
+.clock{width:300px;text-align:end;color:var(--t2);font-size:22px;display:flex;justify-content:flex-end;gap:14px;align-items:center}
+.clock b{color:var(--t1);font-weight:500;font-size:26px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--acc);display:inline-block}
+.dim{color:var(--t2)} .dim3{color:var(--t3)}
+.bar{height:3px;border-radius:2px;background:rgba(255,255,255,.16);overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+.tile{border-radius:10px;display:grid;place-items:center;font-weight:600;color:#fff}
+.art{position:absolute;inset:0}
+.row-title{font-size:26px;font-weight:600;margin:0 0 16px}
+.btn{display:inline-flex;align-items:center;height:60px;padding:0 34px;border-radius:14px;font-size:24px;font-weight:500;background:var(--s2);color:var(--t1)}
+.btn.f{background:var(--t1);color:#111}
+.pill{display:inline-block;padding:4px 14px;border-radius:999px;background:var(--glass2);font-size:18px}
+.em{height:860px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.em h1{font-size:52px;font-weight:600;margin:28px 0 14px}.em p{font-size:24px;color:var(--t2);max-width:760px;line-height:1.7;margin-bottom:40px}
+.em .mark{width:88px;height:88px;border-radius:26px}.em .mark:after{border-width:19px 0 19px 31px}[dir=rtl] .em .mark:after{border-width:19px 31px 19px 0}.bt{display:flex;gap:16px}</style><body><div class="glow"></div><div class="wrap">
+<div class="top"><div class="brand"><div class="mark"></div>UrTV</div><div class="nav"><span class="">الرئيسية</span><span class="on">القنوات</span><span class="">أفلام</span><span class="">مسلسلات</span><span class="">الدليل</span><span class="">الإعدادات</span></div><div class="clock"><span>الاثنين</span><b>2٠:٤٥</b></div></div><div class="em"><div class="mark"></div><h1>ما عندك قائمة بعد</h1><p>أضف قائمتك من جوالك أو اكتب الرابط هنا. التطبيق مشغّل فقط ولا يحتوي على أي قنوات.</p><div class="bt"><span class="btn f">إضافة قائمة</span><span class="btn">كتابة الرابط</span></div></div></div></body></html>

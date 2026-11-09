@@ -1,0 +1,40 @@
+<!doctype html><html dir="ltr" lang="en"><meta charset="utf-8"><style>
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_400Regular.ttf');font-weight:400}
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_500Medium.ttf');font-weight:500}
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_600SemiBold.ttf');font-weight:600}
+:root{--bg:#0E0F11;--s1:#16181B;--s2:#1E2125;--t1:#F2F2F2;--t2:rgba(242,242,242,.70);--t3:rgba(242,242,242,.45);--acc:#0A84FF;--glass:rgba(255,255,255,.07);--glass2:rgba(255,255,255,.13)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--t1);font-family:'Plex',sans-serif;font-weight:400;font-size:24px;font-variant-numeric:tabular-nums}
+body{position:relative}
+.glow{position:absolute;inset:0;background:radial-gradient(900px 600px at 12% -10%,rgba(38,64,110,.30),transparent 70%),radial-gradient(900px 600px at 95% 110%,rgba(92,59,31,.22),transparent 70%)}
+.wrap{position:absolute;inset:0;padding:40px 72px}
+.top{height:72px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:14px;font-weight:600;font-size:28px;letter-spacing:.3px;width:300px}
+.mark{width:40px;height:40px;border-radius:12px;background:var(--t1);display:grid;place-items:center}
+.mark:after{content:'';border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #0E0F11;margin-inline-start:3px}
+[dir=rtl] .mark:after{border-width:9px 15px 9px 0;border-color:transparent #0E0F11 transparent transparent;margin-inline-start:0;margin-inline-end:3px}
+.nav{display:flex;gap:4px;background:var(--glass);border-radius:999px;padding:6px;border:1px solid rgba(255,255,255,.06)}
+.nav span{padding:10px 26px;border-radius:999px;font-size:22px;color:var(--t2)}
+.nav span.on{background:var(--glass2);color:var(--t1);font-weight:500}
+.nav span.f{background:var(--t1);color:#111;font-weight:500}
+.clock{width:300px;text-align:end;color:var(--t2);font-size:22px;display:flex;justify-content:flex-end;gap:14px;align-items:center}
+.clock b{color:var(--t1);font-weight:500;font-size:26px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--acc);display:inline-block}
+.dim{color:var(--t2)} .dim3{color:var(--t3)}
+.bar{height:3px;border-radius:2px;background:rgba(255,255,255,.16);overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+.tile{border-radius:10px;display:grid;place-items:center;font-weight:600;color:#fff}
+.art{position:absolute;inset:0}
+.row-title{font-size:26px;font-weight:600;margin:0 0 16px}
+.btn{display:inline-flex;align-items:center;height:60px;padding:0 34px;border-radius:14px;font-size:24px;font-weight:500;background:var(--s2);color:var(--t1)}
+.btn.f{background:var(--t1);color:#111}
+.pill{display:inline-block;padding:4px 14px;border-radius:999px;background:var(--glass2);font-size:18px}
+.pl{position:absolute;inset:0}.scrim{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.88) 0%,rgba(0,0,0,.55) 22%,transparent 46%),linear-gradient(to bottom,rgba(0,0,0,.45),transparent 18%)}
+.osd{position:absolute;inset-inline:84px;bottom:64px;display:flex;gap:34px;align-items:flex-end}
+.osd .info{flex:1}.osd h1{font-size:44px;font-weight:600;margin:10px 0 6px}.osd .meta{font-size:22px;color:var(--t2);display:flex;gap:18px;align-items:center}
+.osd .bar{margin:18px 0 12px;height:4px}.osd .nx{font-size:21px;color:var(--t2)}
+.top2{position:absolute;inset-inline:84px;top:48px;display:flex;justify-content:space-between;font-size:22px;color:var(--t2)}
+.chips{display:flex;gap:12px}.chip{background:var(--glass2);padding:8px 18px;border-radius:999px;font-size:19px;backdrop-filter:blur(8px)}
+.mg{position:absolute;inset-block:0;inset-inline-start:0;width:640px;background:linear-gradient(to right,rgba(8,9,10,.94),rgba(8,9,10,.86) 75%,transparent);padding:56px 40px}
+[dir=rtl] .mg{background:linear-gradient(to left,rgba(8,9,10,.94),rgba(8,9,10,.86) 75%,transparent)}
+.mg .r{display:flex;align-items:center;gap:16px;height:80px;padding:0 18px;border-radius:12px}.mg .num{width:46px;color:var(--t3);font-size:20px}.mg .mid{flex:1}.mg .nm{font-size:23px;font-weight:500}.mg .np{font-size:18px;color:var(--t2)}
+.mg .r.f{background:var(--t1);color:#111}.mg .r.f .num,.mg .r.f .np{color:#555}</style><body><div class="pl"><div class="art" style="background:linear-gradient(160deg,hsl(321 35% 20%),hsl(1 40% 12%));overflow:hidden"><div style="position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;width:250px;height:280px;left:11%;top:37%;background:hsl(32 45% 44%)"></div><div style="position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;width:267px;height:364px;left:26%;top:67%;background:hsl(19 45% 43%)"></div><div style="position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;width:377px;height:402px;left:80%;top:44%;background:hsl(19 45% 37%)"></div></div></div><div class="scrim"></div><div class="mg"><div class="r"><div class="num">101</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(42 38% 34%),hsl(72 42% 22%))">1</div><div class="mid"><div class="nm">Example News 1</div><div class="np">Late Movie</div></div></div><div class="r"><div class="num">102</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(43 38% 34%),hsl(73 42% 22%))">2</div><div class="mid"><div class="nm">Example News 2</div><div class="np">Nature World</div></div></div><div class="r f"><div class="num">103</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(70 38% 34%),hsl(100 42% 22%))">1</div><div class="mid"><div class="nm">Example Sports 1</div><div class="np">Cartoon Hour</div></div></div><div class="r"><div class="num">104</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(71 38% 34%),hsl(101 42% 22%))">2</div><div class="mid"><div class="nm">Example Sports 2</div><div class="np">Open Talk</div></div></div><div class="r"><div class="num">105</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(265 38% 34%),hsl(295 42% 22%))">E</div><div class="mid"><div class="nm">Example Movies</div><div class="np">Music Corner</div></div></div><div class="r"><div class="num">106</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(241 38% 34%),hsl(271 42% 22%))">E</div><div class="mid"><div class="nm">Example Docs</div><div class="np">Special Report</div></div></div><div class="r"><div class="num">107</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(3 38% 34%),hsl(33 42% 22%))">E</div><div class="mid"><div class="nm">Example Kids</div><div class="np">Main Bulletin</div></div></div><div class="r"><div class="num">108</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(18 38% 34%),hsl(48 42% 22%))">E</div><div class="mid"><div class="nm">Example Variety</div><div class="np">Live Match</div></div></div><div class="r"><div class="num">109</div><div class="tile" style="width:46px;height:46px;font-size:20px;background:linear-gradient(135deg,hsl(151 38% 34%),hsl(181 42% 22%))">E</div><div class="mid"><div class="nm">Example Music</div><div class="np">Late Movie</div></div></div></div></body></html>

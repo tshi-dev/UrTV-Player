@@ -1,0 +1,34 @@
+<!doctype html><html dir="ltr" lang="en"><meta charset="utf-8"><style>
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_400Regular.ttf');font-weight:400}
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_500Medium.ttf');font-weight:500}
+@font-face{font-family:'Plex';src:url('fonts/IBMPlexSansArabic_600SemiBold.ttf');font-weight:600}
+:root{--bg:#0E0F11;--s1:#16181B;--s2:#1E2125;--t1:#F2F2F2;--t2:rgba(242,242,242,.70);--t3:rgba(242,242,242,.45);--acc:#0A84FF;--glass:rgba(255,255,255,.07);--glass2:rgba(255,255,255,.13)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--t1);font-family:'Plex',sans-serif;font-weight:400;font-size:24px;font-variant-numeric:tabular-nums}
+body{position:relative}
+.glow{position:absolute;inset:0;background:radial-gradient(900px 600px at 12% -10%,rgba(38,64,110,.30),transparent 70%),radial-gradient(900px 600px at 95% 110%,rgba(92,59,31,.22),transparent 70%)}
+.wrap{position:absolute;inset:0;padding:40px 72px}
+.top{height:72px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:14px;font-weight:600;font-size:28px;letter-spacing:.3px;width:300px}
+.mark{width:40px;height:40px;border-radius:12px;background:var(--t1);display:grid;place-items:center}
+.mark:after{content:'';border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #0E0F11;margin-inline-start:3px}
+[dir=rtl] .mark:after{border-width:9px 15px 9px 0;border-color:transparent #0E0F11 transparent transparent;margin-inline-start:0;margin-inline-end:3px}
+.nav{display:flex;gap:4px;background:var(--glass);border-radius:999px;padding:6px;border:1px solid rgba(255,255,255,.06)}
+.nav span{padding:10px 26px;border-radius:999px;font-size:22px;color:var(--t2)}
+.nav span.on{background:var(--glass2);color:var(--t1);font-weight:500}
+.nav span.f{background:var(--t1);color:#111;font-weight:500}
+.clock{width:300px;text-align:end;color:var(--t2);font-size:22px;display:flex;justify-content:flex-end;gap:14px;align-items:center}
+.clock b{color:var(--t1);font-weight:500;font-size:26px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--acc);display:inline-block}
+.dim{color:var(--t2)} .dim3{color:var(--t3)}
+.bar{height:3px;border-radius:2px;background:rgba(255,255,255,.16);overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+.tile{border-radius:10px;display:grid;place-items:center;font-weight:600;color:#fff}
+.art{position:absolute;inset:0}
+.row-title{font-size:26px;font-weight:600;margin:0 0 16px}
+.btn{display:inline-flex;align-items:center;height:60px;padding:0 34px;border-radius:14px;font-size:24px;font-weight:500;background:var(--s2);color:var(--t1)}
+.btn.f{background:var(--t1);color:#111}
+.pill{display:inline-block;padding:4px 14px;border-radius:999px;background:var(--glass2);font-size:18px}
+.st{display:grid;grid-template-columns:360px 1fr;gap:56px;margin-top:30px}.mi{padding:16px 22px;border-radius:12px;font-size:24px;color:var(--t2)}.mi.on{background:var(--glass2);color:var(--t1);font-weight:500}
+.sr{display:flex;justify-content:space-between;align-items:center;height:84px;padding:0 26px;border-radius:14px;font-size:24px;border-bottom:1px solid rgba(255,255,255,.05)}.sr .v{color:var(--t2)}
+.sr.f{background:var(--t1);color:#111;transform:scale(1.015);border-bottom:0;box-shadow:0 10px 30px rgba(0,0,0,.4)}.sr.f .v{color:#444}</style><body><div class="glow"></div><div class="wrap">
+<div class="top"><div class="brand"><div class="mark"></div>UrTV</div><div class="nav"><span class="">Home</span><span class="">Channels</span><span class="">Movies</span><span class="">Series</span><span class="">Guide</span><span class="on">Settings</span></div><div class="clock"><span>Mon</span><b>20:45</b></div></div><div class="st"><div><div class="mi on">General</div><div class="mi">Playlists</div><div class="mi">Playback</div><div class="mi">Appearance</div><div class="mi">Parental control</div><div class="mi">About</div></div><div><div class="sr"><span>Language</span><span class="v">English</span></div><div class="sr f"><span>Auto-refresh playlist</span><span class="v">Every 24 h</span></div><div class="sr"><span>Buffer</span><span class="v">Normal</span></div><div class="sr"><span>Resume last channel on start</span><span class="v">On</span></div><div class="sr"><span>Guide time offset</span><span class="v">+0.0 h</span></div><div class="sr"><span>Text size</span><span class="v">Normal</span></div></div></div></div></body></html>
