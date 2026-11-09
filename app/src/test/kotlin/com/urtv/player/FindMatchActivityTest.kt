@@ -47,4 +47,12 @@ class FindMatchActivityTest {
         assertEquals(false, I.callerAllowed("sa.urtv.home", emptyList(), pin)); assertEquals(false, I.callerAllowed(null, listOf(same), pin))
         assertEquals(false, I.callerAllowed("sa.urtv.home", listOf(same), ""), "no pin configured: nobody accepted")
     }
+
+    @Test fun realPinIsSetAndMatchesOnlyThatCertificate() {
+        val I = com.urtv.player.data.Integrity
+        val real = "bc71eeacc4614d3c165129898b8fea979c75f8918c355070e84436e3183dab2b"
+        assertEquals(real, I.URTV_CERT_SHA256)
+        assertTrue(I.callerAllowed("sa.urtv.home", listOf(real.uppercase())))
+        assertEquals(false, I.callerAllowed("sa.urtv.home", listOf("13ade7d009a07f5ba5bab0b7734bd449df10dd47b53868dfa28e44cd8069dfea")), "the Player's own key is not UrTV's")
+    }
 }

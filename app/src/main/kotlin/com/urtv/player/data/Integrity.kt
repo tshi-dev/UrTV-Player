@@ -39,10 +39,10 @@ object Integrity {
 
     /**
      * Which apps may call the exported FIND_MATCH activity: the UrTV home app or its screensaver, signed by exactly one
-     * certificate that equals UrTV's release certificate. [URTV_CERT_SHA256] stays empty (nobody is accepted) until the real
-     * digest is supplied by the UrTV owner; it is a public fingerprint, never a key.
+     * certificate that equals UrTV's release certificate. [URTV_CERT_SHA256] is the public fingerprint of UrTV's release signing
+     * certificate (a pin, never a key); an empty value would accept nobody. Also used to trust UrTV's language provider.
      */
-    const val URTV_CERT_SHA256 = ""
+    const val URTV_CERT_SHA256 = "bc71eeacc4614d3c165129898b8fea979c75f8918c355070e84436e3183dab2b"
     val URTV_PACKAGES = setOf("sa.urtv.home", "sa.urtv.screensaver")
 
     fun callerAllowed(pkg: String?, signers: Collection<String>, pin: String = URTV_CERT_SHA256): Boolean {

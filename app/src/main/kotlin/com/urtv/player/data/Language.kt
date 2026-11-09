@@ -26,7 +26,12 @@ object Language {
     fun systemLanguage(): String = android.content.res.Resources.getSystem().configuration.locales.let { if (it.isEmpty) "ar" else it[0].language }
 
     /** UrTV's language if the UrTV home app is installed and exposes it; otherwise null. Call off the main thread. */
+    private const val URTV_AUTHORITY = "sa.urtv.home.lang"
+
     fun readUrtv(ctx: Context): String? = runCatching {
+        // only trust the answer if the provider belongs to sa.urtv.home signed by UrTV's release certificate
+        val owner = ctx.packageManager.resolveContentProvider(URTV_AUTHORITY, 0)?.packageName
+        if (owner != "sa.urtv.home" || !Integrity.callerAllowed(owner, Integrity.certDigestsOf(ctx, owner))) return@runCatching null
         ctx.contentResolver.query(Uri.parse(URTV_URI), arrayOf("lang"), null, null, null)?.use { c -> if (c.moveToFirst()) normalize(c.getString(0)) else null }
     }.getOrNull()
 }
