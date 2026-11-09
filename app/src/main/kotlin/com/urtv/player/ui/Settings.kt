@@ -34,14 +34,18 @@ import androidx.compose.ui.unit.dp
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
 import com.urtv.player.data.Browse
+import com.urtv.player.server.serverSettings
 import com.urtv.player.data.BufferMode
 
 private val REFRESH = listOf(0, 6, 12, 24, 48)
-private enum class Section(val label: Int) { General(R.string.set_general), Playlists(R.string.set_playlists), Playback(R.string.set_playback), Appearance(R.string.set_theme), Home(R.string.set_home), Parental(R.string.set_parental), About(R.string.set_about) }
-private val STARTS = listOf("home", "live", "guide", "movies", "series", "last")
+private enum class Section(val label: Int) { Server(R.string.srv_settings_title), General(R.string.set_general), Playlists(R.string.set_playlists), Playback(R.string.set_playback), Appearance(R.string.set_theme), Home(R.string.set_home), Parental(R.string.set_parental), About(R.string.set_about) }
+private val STARTS = listOf("home", "live", "guide", "movies", "series", "last", "server")
 
 @Composable
-fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit, onManageHome: () -> Unit) {
+fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onManageGroups: () -> Unit, onManageHome: () -> Unit, onAddServer: () -> Unit = {}) {
+    val homeOnly by app.servers.homeOnly.collectAsState()
+    val hasServers by app.servers.servers.collectAsState()
+    var removeServer by remember { mutableStateOf<String?>(null) }
     val store = app.store
     val playlists by store.playlists.collectAsState()
     val active by store.activeId.collectAsState()
@@ -58,22 +62,25 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val offsets by store.epgOffsetMin.collectAsState()
     val start by store.startScreen.collectAsState()
     val isXtream = playlists.firstOrNull { it.id == active }?.isXtream == true
-    var section by remember { mutableStateOf(Section.General) }
+    // «Home server only» hides everything that belongs to IPTV.
+    val shown = Section.entries.filter { !homeOnly || it == Section.Server || it == Section.General || it == Section.Appearance || it == Section.About }
+    var section by remember { mutableStateOf(if (homeOnly) Section.Server else Section.General) }
     var pin by remember { mutableStateOf<PinRequest?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
         Column(Modifier.width(300.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            for (s in Section.entries) Tv({ section = s }, Modifier.fillMaxWidth().height(56.dp), selected = s == section, onFocus = { if (it) section = s }) {
+            for (s in shown) Tv({ section = s }, Modifier.fillMaxWidth().height(56.dp), selected = s == section, onFocus = { if (it) section = s }) {
                 Text(stringResource(s.label), style = if (s == section) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 18.dp))
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxHeight(), contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             when (section) {
+                Section.Server -> serverSettings(app, onAddServer) { removeServer = it }
                 Section.General -> {
                     item { Setting(stringResource(R.string.set_language), if (lang == "ar") "العربية" else "English") { store.setLang(if (lang == "ar") "en" else "ar"); onLanguage() } }
-                    item { Setting(stringResource(R.string.set_refresh), if (refresh == 0) stringResource(R.string.manual) else stringResource(R.string.every_hours, refresh)) { store.setRefreshHours(REFRESH[(REFRESH.indexOf(refresh) + 1) % REFRESH.size]) } }
-                    item { Setting(stringResource(R.string.set_resume), stringResource(if (resume) R.string.on else R.string.off), stringResource(R.string.set_resume_hint)) { store.setResume(!resume) } }
+                    if (!homeOnly) item { Setting(stringResource(R.string.set_refresh), if (refresh == 0) stringResource(R.string.manual) else stringResource(R.string.every_hours, refresh)) { store.setRefreshHours(REFRESH[(REFRESH.indexOf(refresh) + 1) % REFRESH.size]) } }
+                    if (!homeOnly) item { Setting(stringResource(R.string.set_resume), stringResource(if (resume) R.string.on else R.string.off), stringResource(R.string.set_resume_hint)) { store.setResume(!resume) } }
                 }
                 Section.Playlists -> {
                     for (p in playlists) item(key = p.id) {
@@ -110,7 +117,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                 }
                 Section.Home -> {
                     item {
-                        val opts = STARTS.filter { isXtream || (it != "movies" && it != "series") }
+                        val opts = STARTS.filter { (isXtream || (it != "movies" && it != "series")) && (it != "server" || hasServers.isNotEmpty()) }
                         Setting(stringResource(R.string.set_start), startLabel(start), stringResource(R.string.set_start_hint)) { store.setStartScreen(opts[(opts.indexOf(start).coerceAtLeast(0) + 1) % opts.size]) }
                     }
                     item { Setting(stringResource(R.string.home_customize), "", stringResource(R.string.home_customize_hint)) { onManageHome() } }
@@ -125,13 +132,14 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
         }
     }
     PinHost(pin, store) { pin = null }
+    removeServer?.let { id -> ConfirmDialog(stringResource(R.string.srv_remove_confirm), onYes = { app.servers.remove(id); removeServer = null }, onNo = { removeServer = null }) }
     confirmDelete?.let { id ->
         ConfirmDialog(stringResource(R.string.remove_confirm), onYes = { app.catalog.forget(id); app.vod.forget(id); store.removePlaylist(id); app.catalog.open(store.activeId.value); confirmDelete = null }, onNo = { confirmDelete = null })
     }
 }
 
 @Composable
-private fun startLabel(v: String) = stringResource(when (v) { "live" -> R.string.tab_live; "guide" -> R.string.tab_guide; "movies" -> R.string.tab_movies; "series" -> R.string.tab_series; "last" -> R.string.start_last; else -> R.string.tab_home })
+private fun startLabel(v: String) = stringResource(when (v) { "live" -> R.string.tab_live; "guide" -> R.string.tab_guide; "movies" -> R.string.tab_movies; "series" -> R.string.tab_series; "last" -> R.string.start_last; "server" -> R.string.srv_tab_server; else -> R.string.tab_home })
 
 @Composable
 private fun Setting(label: String, value: String, hint: String? = null, onClick: () -> Unit) {
