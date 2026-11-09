@@ -50,10 +50,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
 import com.urtv.player.core.Channel
@@ -155,7 +157,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     ) {
         if (!blocked) VideoSurface(ctrl)
         val sub by ctrl.cue.collectAsState()
-        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp, start = 120.dp, end = 120.dp).background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 4.dp))
+        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 200.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
 
         // status
         val paused by ctrl.paused.collectAsState()
@@ -170,31 +172,32 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         }
 
         // number entry
-        AnimatedVisibility(digits.isNotEmpty(), Modifier.align(Alignment.TopEnd).padding(48.dp), enter = fadeIn(), exit = fadeOut()) {
-            Text(digits, style = T.display.copy(fontSize = androidx.compose.ui.unit.TextUnit(72f, androidx.compose.ui.unit.TextUnitType.Sp)), modifier = Modifier.background(Color(0xAA000000), RoundedCornerShape(20.dp)).padding(horizontal = 28.dp, vertical = 8.dp))
+        AnimatedVisibility(digits.isNotEmpty(), Modifier.align(Alignment.TopEnd).padding(80.dp), enter = fadeIn(), exit = fadeOut()) {
+            Text(digits, style = T.display.copy(fontSize = androidx.compose.ui.unit.TextUnit(72f, androidx.compose.ui.unit.TextUnitType.Sp)), modifier = Modifier.background(Color(0xAA000000), Rd(20)).padding(horizontal = 28.dp, vertical = 8.dp))
         }
 
-        // info banner
-        AnimatedVisibility(overlay == Overlay.Info, Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 3 }, exit = fadeOut() + slideOutVertically { it / 3 }) {
+        // info banner: bottom scrim, logo + number + name + live pill, programme title, time bar, next
+        AnimatedVisibility(overlay == Overlay.Info, Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 4 }, exit = fadeOut() + slideOutVertically { it / 4 }) {
             val (now, next) = epg.nowNext(shown.epgId, nowMs)
-            Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE05070B)))).padding(horizontal = 64.dp, vertical = 36.dp).padding(top = 40.dp), verticalAlignment = Alignment.CenterVertically) {
-                Logo(shown, 88)
-                Spacer(Modifier.width(24.dp))
+            Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF0000000)))).padding(horizontal = 84.dp).padding(top = 90.dp, bottom = 56.dp), verticalAlignment = Alignment.Bottom) {
+                Logo(shown, 96)
+                Spacer(Modifier.width(28.dp))
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${Browse.numberOf(all, shown)}", style = T.title.copy(color = C.accent2)); Spacer(Modifier.width(14.dp))
-                        Text(shown.name, style = T.display.copy(fontSize = androidx.compose.ui.unit.TextUnit(34f, androidx.compose.ui.unit.TextUnitType.Sp)), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (chKey(pid, shown) in favs) { Spacer(Modifier.width(14.dp)); Icon(Glyph.Heart, C.accent2, 28, filled = true) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text("${Browse.numberOf(all, shown)}", style = T.row.copy(color = C.text))
+                        Text(shown.name, style = T.row.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        Row(Modifier.clip(RoundedCornerShape(50)).background(C.glass2).padding(horizontal = 12.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = C.text, fontSize = 15.sp))
+                        }
+                        if (chKey(pid, shown) in favs) Icon(Glyph.Heart, C.accent, 24, filled = true)
                     }
                     if (now != null) {
-                        Spacer(Modifier.height(6.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${stringResource(R.string.now)}  ${fmtTime(now.startMs)}–${fmtTime(now.stopMs)}", style = T.small); Spacer(Modifier.width(12.dp))
-                            Text(now.title, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Spacer(Modifier.height(6.dp)); ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs), Modifier.fillMaxWidth(0.5f))
-                    }
-                    if (next != null) { Spacer(Modifier.height(6.dp)); Text("${stringResource(R.string.next)}  ${fmtTime(next.startMs)}  ${next.title}", style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        Text(now.title, style = T.display.copy(fontSize = 40.sp, lineHeight = 54.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { Text("${fmtTime(now.startMs)} – ${fmtTime(now.stopMs)}", style = T.small); Text(leftText(now, nowMs), style = T.small) }
+                        Spacer(Modifier.height(12.dp))
+                        ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1))
+                    } else Text(shown.name, style = T.display.copy(fontSize = 40.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (next != null) { Spacer(Modifier.height(12.dp)); Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text(stringResource(R.string.next), style = T.small.copy(color = C.text)); Text("${fmtTime(next.startMs)}  ${next.title}", style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
                 }
             }
         }
@@ -236,18 +239,19 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     val fr = remember { FocusRequester() }
-    LaunchedEffect(Unit) { state.scrollToItem((idx - 2).coerceAtLeast(0)); runCatching { fr.requestFocus() } }
-    Box(Modifier.fillMaxHeight().width(600.dp).background(Brush.horizontalGradient(listOf(Color(0xF005070B), Color(0xE005070B), Color.Transparent), startX = 0f))) {
-        LazyColumn(Modifier.fillMaxSize(), state, contentPadding = PaddingValues(horizontal = 32.dp, vertical = 48.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LaunchedEffect(Unit) { state.scrollToItem((idx - 3).coerceAtLeast(0)); runCatching { fr.requestFocus() } }
+    // scrim fades toward the video from the start side
+    Box(Modifier.fillMaxHeight().width(660.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE0080909), Color.Transparent)))) {
+        LazyColumn(Modifier.fillMaxSize(), state, contentPadding = PaddingValues(start = 40.dp, end = 100.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
-                Tv({ onPick(c) }, Modifier.fillMaxWidth().height(84.dp), RoundedCornerShape(16.dp), selected = i == idx, focusRequester = if (i == idx) fr else null, restColor = Color(0x66151A24)) {
+                Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = if (i == idx) fr else null, lift = 1.02f) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${Browse.numberOf(all, c)}", style = T.small, modifier = Modifier.width(52.dp))
-                        Logo(c, 48); Spacer(Modifier.width(14.dp))
+                        Text("${Browse.numberOf(all, c)}", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
+                        Logo(c, 44); Spacer(Modifier.width(16.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(c.name, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (now != null) Text(now.title, style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(c.name, style = T.row.copy(fontSize = 23.sp, lineHeight = 30.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (now != null) Text(now.title, style = T.small.copy(fontSize = 18.sp, lineHeight = 24.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -265,7 +269,7 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     val audio = tracks.audio.firstOrNull { it.selected }
     val text = tracks.text.firstOrNull { it.selected }
-    Column(Modifier.fillMaxHeight().width(480.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE005070B), Color(0xF005070B)))).padding(start = 64.dp, end = 32.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
+    Column(Modifier.fillMaxHeight().width(620.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE0080909), Color(0xF2080909)))).padding(start = 110.dp, end = 60.dp, top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
         Text(title, style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         OptRow(stringResource(R.string.opt_audio), audio?.label ?: stringResource(R.string.none), fr) {
             if (tracks.audio.size > 1) ctrl.selectAudio(tracks.audio[(tracks.audio.indexOf(audio) + 1) % tracks.audio.size])
@@ -284,10 +288,10 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
 
 @Composable
 private fun OptRow(label: String, value: String, fr: FocusRequester? = null, onClick: () -> Unit) {
-    Tv(onClick, Modifier.fillMaxWidth().height(64.dp), RoundedCornerShape(16.dp), focusRequester = fr, restColor = Color(0x66151A24)) {
+    Tv(onClick, Modifier.fillMaxWidth().height(60.dp), Rd(12), focusRequester = fr) {
         Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = T.body, modifier = Modifier.weight(1f))
-            Text(value, style = T.bodyBold.copy(color = C.accent2), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, style = T.bodyBold.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

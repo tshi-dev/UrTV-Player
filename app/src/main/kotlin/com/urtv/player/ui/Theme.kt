@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -22,6 +23,12 @@ import androidx.tv.material3.darkColorScheme
 import androidx.tv.material3.lightColorScheme
 import com.urtv.player.data.Appearance
 import com.urtv.player.data.BgStyle
+
+val Plex = androidx.compose.ui.text.font.FontFamily(
+    androidx.compose.ui.text.font.Font(com.urtv.player.R.font.plex_regular, FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(com.urtv.player.R.font.plex_medium, FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(com.urtv.player.R.font.plex_semibold, FontWeight.SemiBold),
+)
 
 val LocalTheme = compositionLocalOf { resolveSpec(Appearance()) }
 /** True inside a focused [Tv]: text and icons switch to the colour that reads on the focus fill. */
@@ -44,6 +51,16 @@ object C {
     val scrim get() = spec.scrim
     val text get() = spec.text
     val muted get() = spec.text.copy(alpha = spec.mutedAlpha)
+    /** 45 % text: numbers, counts, hints. */
+    val faint get() = spec.text.copy(alpha = if (spec.mutedAlpha > 0.8f) 0.7f else 0.45f)
+    /** Layers over any background: quiet fill for the nav pill and the selected item, and hairlines. */
+    val glass get() = spec.text.copy(alpha = 0.07f)
+    val glass2 get() = spec.text.copy(alpha = 0.13f)
+    val hairline get() = spec.text.copy(alpha = 0.08f)
+    /** Text colour on the focused fill (dark on the solid light fill, the normal text colour otherwise). */
+    val onFocus get() = spec.onFocus
+    val onFocus2 get() = spec.onFocus.copy(alpha = 0.72f)
+    val onFocus3 get() = spec.onFocus.copy(alpha = 0.5f)
     /** Fill of the thin progress bars and now-lines. */
     val accentBrush: Brush get() = SolidColor(spec.accent)
     val bgBrush: Brush get() = if (spec.background == BgStyle.Solid) SolidColor(spec.bg) else Brush.verticalGradient(listOf(spec.bgTop, spec.bg))
@@ -66,24 +83,28 @@ object C {
 /** Rounded shape whose radius follows the corner style. */
 @Composable fun Rd(dp: Int): RoundedCornerShape = RoundedCornerShape((dp * LocalTheme.current.cornerScale).dp)
 
-/** Large, generous line height so Arabic diacritics never clip at TV distance. Colours follow focus. */
+/** Type scale for 1080p: title 32, row 24, body 22, small 19. Colours follow focus. Tabular figures line up times and numbers. */
 object T {
     private val f @Composable get() = LocalTheme.current.font
-    val display @Composable get() = TextStyle(fontSize = 44.sp, lineHeight = 60.sp, fontWeight = FontWeight.Bold, color = ink(), fontFamily = f)
-    val title @Composable get() = TextStyle(fontSize = 30.sp, lineHeight = 42.sp, fontWeight = FontWeight.SemiBold, color = ink(), fontFamily = f)
-    val body @Composable get() = TextStyle(fontSize = 22.sp, lineHeight = 32.sp, color = ink(), fontFamily = f)
-    val bodyBold @Composable get() = body.copy(fontWeight = FontWeight.SemiBold)
-    val small @Composable get() = TextStyle(fontSize = 18.sp, lineHeight = 26.sp, color = mutedInk(), fontFamily = f)
-    val tiny @Composable get() = TextStyle(fontSize = 15.sp, lineHeight = 22.sp, color = mutedInk(), fontFamily = f)
+    private fun s(size: Int, line: Int, w: FontWeight, f: FontFamily, c: Color) = TextStyle(fontSize = size.sp, lineHeight = line.sp, fontWeight = w, color = c, fontFamily = f, fontFeatureSettings = "tnum")
+    val display @Composable get() = s(44, 60, FontWeight.SemiBold, f, ink())
+    val title @Composable get() = s(32, 44, FontWeight.SemiBold, f, ink())
+    val row @Composable get() = s(24, 34, FontWeight.Medium, f, ink())
+    val body @Composable get() = s(22, 32, FontWeight.Normal, f, ink())
+    val bodyBold @Composable get() = s(22, 32, FontWeight.Medium, f, ink())
+    val small @Composable get() = s(19, 28, FontWeight.Normal, f, mutedInk())
+    val tiny @Composable get() = s(16, 24, FontWeight.Normal, f, mutedInk().copy(alpha = 0.64f * LocalTheme.current.mutedAlpha / 0.7f))
 }
 
 @Composable
 fun UrtvTheme(appearance: Appearance = Appearance(), textScale: Int = 0, content: @Composable () -> Unit) {
     val spec = remember(appearance) { resolveSpec(appearance) }
     C.spec = spec
-    val d = LocalDensity.current
+    // Fixed 1920 x 1080 dp canvas on every TV (1 dp = 1 px at 1080p), independent of the box's density setting.
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val widthPx = ctx.resources.displayMetrics.widthPixels.coerceAtLeast(1)
     val scale = listOf(1f, 1.15f, 1.3f).getOrElse(textScale) { 1f }
-    CompositionLocalProvider(LocalTheme provides spec, LocalDensity provides Density(d.density, d.fontScale * scale)) {
+    CompositionLocalProvider(LocalTheme provides spec, LocalDensity provides Density(widthPx / 1920f, scale)) {
         MaterialTheme(
             colorScheme = if (spec.dark) darkColorScheme(background = spec.bg, surface = spec.surface, primary = spec.accent, onSurface = spec.text, onBackground = spec.text)
             else lightColorScheme(background = spec.bg, surface = spec.surface, primary = spec.accent, onSurface = spec.text, onBackground = spec.text),
