@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- IPTV providers are mostly plain http, so cleartext stays allowed; but only the system CA store is trusted
+     (user-installed CAs, used for TLS interception, are not). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+</network-security-config>
