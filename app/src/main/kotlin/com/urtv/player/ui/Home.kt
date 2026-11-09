@@ -80,7 +80,7 @@ fun HomeScreen(
     app: UrtvApp, tab: Tab, onTab: (Tab) -> Unit,
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
     restoreKey: String?,
-    onManageGroups: () -> Unit = {}, onManageHome: () -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {},
+    onManageGroups: () -> Unit = {}, onManageHome: () -> Unit = {}, onBackup: (Boolean) -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {},
     onCatchup: (Channel, Programme) -> Unit = { _, _ -> }, onResume: (WatchItem) -> Unit = {},
 ) {
     val store = app.store
@@ -121,7 +121,7 @@ fun HomeScreen(
                 Tab.Movies -> PosterBrowse(app, true, onOpenMovie)
                 Tab.Series -> PosterBrowse(app, false, onOpenSeries)
                 Tab.Guide -> GuideScreen(app, cat, onPlay, onCatchup)
-                Tab.Settings -> SettingsScreen(app, onAdd, onLanguage, onManageGroups, onManageHome)
+                Tab.Settings -> SettingsScreen(app, onAdd, onLanguage, onManageGroups, onManageHome, onBackup)
             }
         }
     }

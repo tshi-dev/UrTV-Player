@@ -18,11 +18,18 @@ data class PhoneInput(val name: String, val url: String, val server: String, val
  * One-shot LAN page for adding a playlist from a phone. Local network only, protected by a random
  * 6-digit session code, closes after one successful submit, 5 wrong codes, or 10 minutes.
  */
+enum class PhoneMode { Add, Backup, Restore }
+
 class PhoneServer(
     private val bind: InetAddress,
     private val onInput: (PhoneInput) -> Unit,
     private val onClosed: () -> Unit,
     private val lifetimeMs: Long = 10 * 60_000L,
+    private val mode: PhoneMode = PhoneMode.Add,
+    /** Backup mode: the already-encrypted file the phone may download once. */
+    private val backupBlob: ByteArray? = null,
+    /** Restore mode: receives the uploaded (still encrypted) file. */
+    private val onBlob: (ByteArray) -> Unit = {},
 ) {
     val code: String = "%06d".format(SecureRandom().nextInt(1_000_000))
     @Volatile var port: Int = 0; private set
@@ -74,16 +81,31 @@ class PhoneServer(
         val path = target.substringBefore('?')
         val query = parseForm(target.substringAfter('?', ""))
         val len = header("content-length")?.toIntOrNull() ?: 0
-        if (len < 0 || len > 8192) { respond(out, 413, "text/plain", "too large"); return }
-        val body = if (method == "POST" && len > 0) String(readN(inp, len), Charsets.UTF_8) else ""
+        val maxBody = if (mode == PhoneMode.Restore && path == "/restore") MAX_BLOB else 8192
+        if (len < 0 || len > maxBody) { respond(out, 413, "text/plain", "too large"); return }
+        val raw = if (method == "POST" && len > 0) readN(inp, len) else ByteArray(0)
+        val body = if (mode == PhoneMode.Restore && path == "/restore") "" else String(raw, Charsets.UTF_8)
         when {
             method == "GET" && path == "/" -> {
                 val c = query["c"]
                 if (c != null && !checkCode(c)) respond(out, 200, "text/html", Page.codeForm(true))
-                else if (c != null) respond(out, 200, "text/html", Page.form(c))
+                else if (c != null) respond(out, 200, "text/html", when (mode) { PhoneMode.Add -> Page.form(c); PhoneMode.Backup -> Page.backup(c); PhoneMode.Restore -> Page.restore(c) })
                 else respond(out, 200, "text/html", Page.codeForm(false))
             }
-            method == "POST" && path == "/add" -> {
+            mode == PhoneMode.Backup && method == "GET" && path == "/backup" -> {
+                if (!checkCode(query["c"] ?: "")) { respond(out, 403, "text/html", Page.codeForm(true)); return }
+                val blob = backupBlob ?: run { respond(out, 404, "text/plain", "not found"); return }
+                respondBytes(out, "application/octet-stream", blob, "attachment; filename=\"urtv-backup.urb\"")
+                done = true
+            }
+            mode == PhoneMode.Restore && method == "POST" && path == "/restore" -> {
+                if (!checkCode(query["c"] ?: "")) { respond(out, 403, "text/html", Page.codeForm(true)); return }
+                val file = multipartFile(header("content-type").orEmpty(), raw)
+                if (file == null || file.isEmpty()) { respond(out, 400, "text/html", Page.restore(query["c"].orEmpty(), error = true)); return }
+                respond(out, 200, "text/html", Page.done())
+                onBlob(file); done = true
+            }
+            mode == PhoneMode.Add && method == "POST" && path == "/add" -> {
                 val f = parseForm(body)
                 if (!checkCode(f["c"] ?: "")) { respond(out, 403, "text/html", Page.codeForm(true)); return }
                 val input = PhoneInput(f["name"].orEmpty().trim().take(60), f["url"].orEmpty().trim(), f["server"].orEmpty().trim(), f["user"].orEmpty().trim(), f["pass"].orEmpty(), f["epg"].orEmpty().trim())
@@ -94,6 +116,27 @@ class PhoneServer(
             }
             else -> respond(out, 404, "text/plain", "not found")
         }
+    }
+
+    /** The bytes of the first file part of a multipart/form-data body, or null. */
+    private fun multipartFile(contentType: String, body: ByteArray): ByteArray? {
+        val boundary = Regex("boundary=\"?([^\";]+)\"?").find(contentType)?.groupValues?.get(1)?.takeIf { it.length in 1..200 } ?: return null
+        val delim = "--$boundary".toByteArray(Charsets.ISO_8859_1)
+        val start = indexOf(body, delim, 0); if (start < 0) return null
+        val hdrEnd = indexOf(body, "\r\n\r\n".toByteArray(), start); if (hdrEnd < 0) return null
+        val from = hdrEnd + 4
+        val end = indexOf(body, ("\r\n--$boundary").toByteArray(Charsets.ISO_8859_1), from); if (end < from) return null
+        return body.copyOfRange(from, end)
+    }
+
+    private fun indexOf(h: ByteArray, n: ByteArray, from: Int): Int {
+        outer@ for (i in from..h.size - n.size) { for (j in n.indices) if (h[i + j] != n[j]) continue@outer; return i }
+        return -1
+    }
+
+    private fun respondBytes(o: java.io.OutputStream, type: String, b: ByteArray, disposition: String) {
+        val h = "HTTP/1.1 200 OK\r\nContent-Type: $type\r\nContent-Length: ${b.size}\r\nContent-Disposition: $disposition\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n"
+        o.write(h.toByteArray(Charsets.ISO_8859_1)); o.write(b); o.flush()
     }
 
     private fun checkCode(c: String): Boolean {
@@ -133,6 +176,7 @@ class PhoneServer(
     }
 
     companion object {
+        const val MAX_BLOB = 1_000_000
         private fun isLocal(a: InetAddress) = a.isSiteLocalAddress || a.isLinkLocalAddress || a.isLoopbackAddress ||
             (a.address.size == 16 && (a.address[0].toInt() and 0xfe) == 0xfc)
 
