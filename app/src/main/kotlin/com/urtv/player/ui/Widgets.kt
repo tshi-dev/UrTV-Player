@@ -72,7 +72,7 @@ fun Tv(
             .border(if (focused) 3.dp else if (selected) 1.5.dp else 0.dp, if (focused) C.ring else C.accent, shape)
             .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
             .onFocusChanged { focused = it.isFocused; onFocus(it.isFocused) }
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = onLongClick),
     ) { content(focused) }
 }
 

@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -79,6 +79,7 @@ fun HomeScreen(
     val playlists by store.playlists.collectAsState()
     val active = playlists.firstOrNull { it.id == cat.playlistId }
     val tabFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
     Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 48.dp, vertical = 28.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -205,9 +206,19 @@ fun ChannelGrid(
     val favs by store.favs.collectAsState()
     val now by rememberNow()
     val state = rememberLazyGridState()
-    val restoreIdx = remember(list, restoreKey) { if (restoreKey == null) -1 else list.indexOfFirst { chKey(pid, it) == restoreKey } }
+    // Focus bookkeeping: remember the focused card; if it disappears (e.g. un-favourited) or we come back
+    // from the player, put focus on the nearest card so the D-pad never loses its place.
+    var lastIdx by remember { mutableStateOf(-1) }
+    var focusIdx by remember(restoreKey) { mutableStateOf(if (restoreKey == null) -1 else list.indexOfFirst { chKey(pid, it) == restoreKey }) }
+    var prevSize by remember { mutableStateOf(list.size) }
+    LaunchedEffect(list.size) {
+        if (list.size < prevSize && lastIdx >= 0 && list.isNotEmpty()) focusIdx = minOf(lastIdx, list.size - 1)
+        prevSize = list.size
+    }
     val fr = remember { FocusRequester() }
-    LaunchedEffect(restoreIdx) { if (restoreIdx >= 0) { state.scrollToItem(restoreIdx); runCatching { fr.requestFocus() } } }
+    LaunchedEffect(focusIdx, list.size) {
+        if (focusIdx in list.indices) { state.scrollToItem(focusIdx); runCatching { fr.requestFocus() }; lastIdx = focusIdx; focusIdx = -1 }
+    }
 
     Box(Modifier.fillMaxSize()) {
         if (list.isEmpty()) {
@@ -221,11 +232,11 @@ fun ChannelGrid(
             }
         } else LazyVerticalGrid(GridCells.Adaptive(320.dp), Modifier.fillMaxSize(), state, contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(list, key = { it.url }) { ch ->
+            itemsIndexed(list, key = { _, c -> c.url }) { i, ch ->
                 val k = chKey(pid, ch)
                 ChannelCard(ch, epg.nowNext(ch.epgId, now).first, now, k in favs,
                     onClick = { onPlay(list, ch) }, onLong = { store.toggleFav(k) },
-                    focusRequester = if (list.indexOf(ch) == restoreIdx) fr else null)
+                    focusRequester = if (i == focusIdx) fr else null, onFocus = { if (it) lastIdx = i })
             }
         }
     }
@@ -233,8 +244,8 @@ fun ChannelGrid(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChannelCard(ch: Channel, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester? = null) {
-    Tv(onClick, Modifier.fillMaxWidth().height(96.dp), RoundedCornerShape(18.dp), focusRequester = focusRequester, onLongClick = onLong) {
+fun ChannelCard(ch: Channel, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester? = null, onFocus: (Boolean) -> Unit = {}) {
+    Tv(onClick, Modifier.fillMaxWidth().height(96.dp), RoundedCornerShape(18.dp), focusRequester = focusRequester, onFocus = onFocus, onLongClick = onLong) {
         Row(Modifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Logo(ch, 64)
             Spacer(Modifier.width(14.dp))
