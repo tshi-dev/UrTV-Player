@@ -66,7 +66,7 @@ import java.util.Locale
 
 private fun clock(ms: Long): String { val s = (ms / 1000).coerceAtLeast(0); return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60) }
 
-private enum class Panel { None, Main, Audio, Subs, Style, Offset, Online, Results }
+internal enum class Panel { None, Main, Audio, Subs, Style, Offset, Online, Results }
 
 @Composable
 private fun streamLabel(s: StreamInfo): String {
@@ -214,18 +214,7 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
             }
         }
         androidx.compose.animation.AnimatedVisibility(bar || paused, Modifier.align(Alignment.BottomCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-            Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE05070B)))).padding(horizontal = 64.dp).padding(top = 60.dp, bottom = 36.dp)) {
-                Text(item.cardTitle(), style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (item.type == ItemType.Episode) Text(episodeLabel(item.seasonNumber, item.episodeNumber) + "  " + item.name, style = T.small, maxLines = 1)
-                Spacer(Modifier.height(12.dp))
-                ProgressBar(if (dur > 0) pos / dur.toFloat() else 0f)
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth()) {
-                    Text(clock(pos), style = T.small); Spacer(Modifier.weight(1f))
-                    plan?.let { Text(stringResource(if (it.mode == PlayMode.DirectPlay) R.string.srv_direct else R.string.srv_transcoding), style = T.tiny) }
-                    Spacer(Modifier.weight(1f)); Text(if (dur > 0) clock(dur) else "", style = T.small)
-                }
-            }
+            OsdBar(item, pos, dur, plan)
         }
         if (panel != Panel.None) Box(Modifier.align(Alignment.CenterEnd)) {
             OptionsPanel(panel, item, plan, audioSel, subSel, prefs, style, offset, results, resultsLang,
@@ -248,7 +237,7 @@ fun ServerPlayerScreen(app: UrtvApp, backend: MediaBackend, first: MediaItem, st
 }
 
 @Composable
-private fun OptionsPanel(
+internal fun OptionsPanel(
     panel: Panel, item: MediaItem, plan: PlaybackPlan?, audio: StreamInfo?, sub: StreamInfo?, prefs: LangPrefs, style: SubtitleStyle, offset: Long,
     results: Res<List<RemoteSubtitle>>, resultsLang: String,
     go: (Panel) -> Unit, onAudio: (StreamInfo) -> Unit, onSub: (StreamInfo?) -> Unit, onShift: (Long) -> Unit, onResetOffset: () -> Unit,
@@ -301,6 +290,23 @@ private fun Opt(label: String, value: String, fr: FocusRequester? = null, select
         Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = T.body, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (value.isNotEmpty()) Text(value, style = T.small.copy(color = accentInk()), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp))
+        }
+    }
+}
+
+/** The bottom bar: title, episode label, progress, times and whether the file plays directly or is transcoded. */
+@Composable
+internal fun OsdBar(item: MediaItem, pos: Long, dur: Long, plan: PlaybackPlan?) {
+    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE05070B)))).padding(horizontal = 72.dp).padding(top = 64.dp, bottom = 40.dp)) {
+        Text(item.cardTitle(), style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (item.type == ItemType.Episode) Text(episodeLabel(item.seasonNumber, item.episodeNumber) + "  " + item.name, style = T.small, maxLines = 1)
+        Spacer(Modifier.height(14.dp))
+        ProgressBar(if (dur > 0) pos / dur.toFloat() else 0f)
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Text(clock(pos), style = T.small); Spacer(Modifier.weight(1f))
+            plan?.let { Text(stringResource(if (it.mode == PlayMode.DirectPlay) R.string.srv_direct else R.string.srv_transcoding), style = T.tiny) }
+            Spacer(Modifier.weight(1f)); Text(if (dur > 0) clock(dur) else "", style = T.small)
         }
     }
 }

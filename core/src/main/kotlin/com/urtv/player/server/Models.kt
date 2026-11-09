@@ -9,7 +9,8 @@ enum class Sort { Name, Added, Year, Rating }
 data class Library(val id: String, val name: String, val kind: LibraryKind)
 enum class LibraryKind { Movies, Shows, Collections, Other }
 
-data class Person(val name: String, val role: String?, val kind: String?)
+/** [image] is a server-relative path (no token) when the server itself hosts the portrait; null otherwise (no third-party image hosts are used). */
+data class Person(val name: String, val role: String?, val kind: String?, val image: String? = null)
 
 data class StreamInfo(
     val index: Int,

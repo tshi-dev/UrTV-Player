@@ -87,6 +87,7 @@ interface MediaBackend {
     fun similar(id: String, limit: Int = 12): List<MediaItem>
     fun search(text: String, limit: Int = 40): List<MediaItem>
     fun imageUrl(item: MediaItem, kind: Img, width: Int): String?
+    fun personImageUrl(p: Person, width: Int): String? = null
     /** Headers to attach to every request to this server (media, images, subtitles). Contains the token. */
     fun authHeaders(): Map<String, String>
     fun playback(item: MediaItem, caps: DeviceCaps, opts: PlayOptions): PlaybackPlan

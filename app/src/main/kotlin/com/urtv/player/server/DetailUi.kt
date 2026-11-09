@@ -35,6 +35,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.ui.C
@@ -69,39 +74,32 @@ fun DetailScreen(backend: MediaBackend, id: String, onPlay: (MediaItem, Long, Li
 }
 
 @Composable
-private fun Backdrop(item: MediaItem, backend: MediaBackend) {
-    val headers = remember(backend) { backend.authHeaders() }
-    Box(Modifier.fillMaxSize()) {
-        val kind = if (Img.Backdrop in item.images) Img.Backdrop else Img.Poster
-        Art(backend.imageUrl(item, kind, 1280), headers, Modifier.fillMaxSize().padding(start = 360.dp))
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to C.bg, 0.5f to C.bg.copy(alpha = 0.93f), 1f to Color.Transparent)))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to C.bg)))
-    }
-}
-
-@Composable
 private fun MoviePage(backend: MediaBackend, item: MediaItem, onChanged: () -> Unit, onPlay: (MediaItem, Long, List<MediaItem>) -> Unit, onOpen: (MediaItem) -> Unit) {
     val scope = rememberCoroutineScope()
     val similar by load(item.id) { backend.similar(item.id) }
     val first = remember { FocusRequester() }
     LaunchedEffect(item.id) { runCatching { first.requestFocus() } }
     Box(Modifier.fillMaxSize()) {
-        Backdrop(item, backend)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        LaunchedEffect(item.id) { ServerBackdrop.item = item; ServerBackdrop.backend = backend }
+        val headers = remember(backend) { backend.authHeaders() }
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             item {
-                Column(Modifier.widthIn(max = 820.dp).padding(top = 24.dp, start = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(item.name, style = T.display, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.widthIn(max = 880.dp).padding(top = 24.dp, start = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // the title logo when the server has one, otherwise the title in large type
+                    if (Img.Logo in item.images) Art(backend.imageUrl(item, Img.Logo, 800), headers, Modifier.widthIn(max = 560.dp).height(120.dp), ContentScale.Fit, monogram = false)
+                    else Text(item.name, style = T.display.copy(fontSize = 52.sp, lineHeight = 64.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (item.tagline.isNotBlank()) Text(item.tagline, style = T.body.copy(color = mutedInk()), maxLines = 1)
                     MetaRow(item)
-                    if (item.genres.isNotEmpty()) Text(item.genres.take(4).joinToString("   "), style = T.small)
-                    if (item.overview.isNotBlank()) Text(item.overview, style = T.body.copy(color = C.text.copy(alpha = 0.85f)), maxLines = 5, overflow = TextOverflow.Ellipsis)
+                    BadgeRow(item)
+                    if (item.genres.isNotEmpty()) Text(item.genres.take(4).joinToString("   "), style = metaStyle())
+                    if (item.overview.isNotBlank()) Text(item.overview, style = T.body.copy(fontSize = 24.sp, lineHeight = 34.sp, color = C.text.copy(alpha = 0.88f)), maxLines = 5, overflow = TextOverflow.Ellipsis)
                     if (item.resumeMs > 0 && item.runtimeMs > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ProgressBar(item.progress, Modifier.width(260.dp)); Text(stringResource(R.string.srv_left_min, ((item.runtimeMs - item.resumeMs) / 60_000L).toInt().coerceAtLeast(1)), style = T.small)
+                        ProgressBar(item.progress, Modifier.width(300.dp)); Text(stringResource(R.string.srv_left_min, ((item.runtimeMs - item.resumeMs) / 60_000L).toInt().coerceAtLeast(1)), style = metaStyle())
                     }
                     ActionRow(backend, item, onChanged, onPlay, first)
                 }
             }
-            if (item.people.isNotEmpty()) item { CastRow(item) }
+            if (item.people.isNotEmpty()) item { CastRow(item, backend) }
             val sim = (similar as? Res.Ok)?.v.orEmpty()
             if (sim.isNotEmpty()) item { ItemRow(stringResource(R.string.srv_similar), sim, backend, wide = false, onFocus = {}, onClick = onOpen, onLong = null) }
         }
@@ -126,13 +124,15 @@ private fun ActionRow(backend: MediaBackend, item: MediaItem, onChanged: () -> U
 }
 
 @Composable
-private fun CastRow(item: MediaItem) {
+private fun CastRow(item: MediaItem, backend: MediaBackend) {
+    val headers = remember(backend) { backend.authHeaders() }
     Column {
         SectionLabel(stringResource(R.string.srv_cast))
-        LazyRow(contentPadding = PaddingValues(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
             items(item.people.filter { it.kind == null || it.kind == "Actor" || it.kind == "GuestStar" }.take(20)) { p ->
-                Column(Modifier.width(210.dp).background(C.surface, Rd(12)).padding(14.dp)) {
-                    Text(p.name, style = T.small.copy(color = C.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.width(140.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Art(backend.personImageUrl(p, 240), headers, Modifier.size(104.dp).clip(CircleShape), title = p.name)
+                    Text(p.name, style = T.small.copy(color = C.text), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                     Text(p.role ?: " ", style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
@@ -148,7 +148,7 @@ private fun CollectionPage(backend: MediaBackend, item: MediaItem, onOpen: (Medi
         when (val r = kids) {
             is Res.Loading -> Centered { Spinner() }
             is Res.Fail -> Centered { Text(errorText(r.e), style = T.title) }
-            is Res.Ok -> LazyVerticalGrid(GridCells.Adaptive(168.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            is Res.Ok -> LazyVerticalGrid(GridCells.Adaptive(190.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 gridItems(r.v, key = { it.id }) { PosterCard(it, backend, { onOpen(it) }) }
             }
         }
@@ -171,19 +171,19 @@ private fun ShowPage(backend: MediaBackend, show: MediaItem, version: Int, onCha
     val headers = remember(backend) { backend.authHeaders() }
 
     Box(Modifier.fillMaxSize()) {
-        Backdrop(show, backend)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        LaunchedEffect(show.id) { ServerBackdrop.item = show; ServerBackdrop.backend = backend }
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                Column(Modifier.widthIn(max = 820.dp).padding(top = 24.dp, start = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(show.name, style = T.display, maxLines = 2, overflow = TextOverflow.Ellipsis)          // the series name: once
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        show.year?.let { Text("$it", style = T.small) }
+                Column(Modifier.widthIn(max = 880.dp).padding(top = 24.dp, start = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(show.name, style = T.display.copy(fontSize = 52.sp, lineHeight = 64.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)          // the series name: once
+                    Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        show.year?.let { Text("$it", style = metaStyle()) }
                         show.officialRating?.takeIf { it.isNotBlank() }?.let { Badge(it) }
-                        if (seasons.isNotEmpty()) Text(stringResource(R.string.srv_seasons_n, seasons.size), style = T.small)
-                        show.rating?.let { Text("★ " + "%.1f".format(java.util.Locale.US, it), style = T.small) }
+                        if (seasons.isNotEmpty()) Text(stringResource(R.string.srv_seasons_n, seasons.size), style = metaStyle())
+                        show.rating?.let { Text("★ " + "%.1f".format(java.util.Locale.US, it), style = metaStyle()) }
                     }
-                    if (show.genres.isNotEmpty()) Text(show.genres.take(4).joinToString("   "), style = T.small)
-                    if (show.overview.isNotBlank()) Text(show.overview, style = T.body.copy(color = C.text.copy(alpha = 0.85f)), maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    if (show.genres.isNotEmpty()) Text(show.genres.take(4).joinToString("   "), style = metaStyle())
+                    if (show.overview.isNotBlank()) Text(show.overview, style = T.body.copy(fontSize = 24.sp, lineHeight = 34.sp, color = C.text.copy(alpha = 0.88f)), maxLines = 4, overflow = TextOverflow.Ellipsis)
                     if (playTarget != null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 6.dp)) {
                         val label = episodeLabel(playTarget.seasonNumber, playTarget.episodeNumber)
                         TvButton(stringResource(if (playTarget.resumeMs > 0) R.string.srv_resume_ep else R.string.srv_play_ep, label), { onPlay(playTarget, playTarget.resumeMs, eps.dropWhile { it.id != playTarget.id }.drop(1)) }, primary = true, focusRequester = first)
@@ -204,21 +204,21 @@ private fun ShowPage(backend: MediaBackend, show: MediaItem, version: Int, onCha
                 is Res.Loading -> item { Centered { Spinner() } }
                 is Res.Fail -> item { Text(errorText(r.e), style = T.title) }
                 is Res.Ok -> items(r.v, key = { it.id }) { e ->
-                    Tv({ onPlay(e, e.resumeMs, r.v.dropWhile { it.id != e.id }.drop(1)) }, Modifier.fillMaxWidth().height(124.dp), Rd(14),
+                    Tv({ onPlay(e, e.resumeMs, r.v.dropWhile { it.id != e.id }.drop(1)) }, Modifier.fillMaxWidth().height(150.dp), Rd(14),
                         onLongClick = { scope.launch { withContext(Dispatchers.IO) { runCatching { backend.setPlayed(e, !e.played) } }; onChanged() } }) {
-                        Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(0.34f).aspectRatio(16f / 9f)) {
-                                Art(backend.imageUrl(e, Img.Thumb, 480), headers, Modifier.fillMaxSize().background(C.surfaceHi, Rd(10)))
+                        Row(Modifier.fillMaxSize().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.width(240.dp).aspectRatio(16f / 9f).clip(Rd(10))) {
+                                Art(backend.imageUrl(e, Img.Thumb, 480), headers, Modifier.fillMaxSize(), title = e.name)
                                 if (e.progress > 0f) ProgressBar(e.progress, Modifier.align(Alignment.BottomCenter).padding(8.dp))
                             }
-                            Column(Modifier.weight(0.66f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(e.episodeNumber?.let { "$it" } ?: "", style = T.bodyBold.copy(color = com.urtv.player.ui.accentInk()))
                                     Text(e.name, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                                    if (e.played) Text("✓", style = T.small.copy(color = com.urtv.player.ui.accentInk()))
-                                    val rt = runtimeText(e.runtimeMs, stringResource(R.string.srv_h), stringResource(R.string.srv_m)); if (rt.isNotEmpty()) Text(rt, style = T.tiny)
+                                    if (e.played) WatchedMark()
+                                    val rt = runtimeText(e.runtimeMs, stringResource(R.string.srv_h), stringResource(R.string.srv_m)); if (rt.isNotEmpty()) Text(rt, style = T.small)
                                 }
-                                if (e.overview.isNotBlank()) Text(e.overview, style = T.tiny, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (e.overview.isNotBlank()) Text(e.overview, style = T.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }

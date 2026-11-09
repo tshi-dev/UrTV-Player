@@ -32,7 +32,6 @@ import androidx.tv.material3.Text
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
 import com.urtv.player.ui.C
-import com.urtv.player.ui.PosterBackdrop
 import com.urtv.player.ui.Rd
 import com.urtv.player.ui.SettingsScreen
 import com.urtv.player.ui.T
@@ -78,10 +77,11 @@ fun ServerRoot(app: UrtvApp, onLanguage: () -> Unit, onIptv: () -> Unit) {
     }
 
     val tabFocus = remember { FocusRequester() }
+    LaunchedEffect(current, backend) { ServerBackdrop.item = null; ServerBackdrop.backend = backend }   // screens set it again, after this
     LaunchedEffect(Unit) { if (cfg == null) runCatching { tabFocus.requestFocus() } }
     Box(Modifier.fillMaxSize().background(C.bgBrush)) {
-        PosterBackdrop()
-        Column(Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 28.dp)) {
+        BackdropLayer()      // full-bleed, behind everything
+        Column(Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 36.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("UrTV", style = T.display.copy(fontSize = 36.sp), modifier = Modifier.padding(end = 32.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

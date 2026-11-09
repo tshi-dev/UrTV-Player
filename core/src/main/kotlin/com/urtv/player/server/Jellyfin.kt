@@ -131,7 +131,7 @@ class JellyfinBackend(override val config: ServerConfig, private val http: Trans
             runtimeMs = ticksToMs(o.l("RunTimeTicks")),
             resumeMs = ticksToMs(ud?.l("PlaybackPositionTicks")), played = ud?.b("Played") == true,
             genres = o.sa("Genres").take(12),
-            people = o.a("People").mapNotNull { p -> p.s("Name")?.let { Person(it, p.s("Role"), p.s("Type")) } }.take(40),
+            people = o.a("People").mapNotNull { p -> p.s("Name")?.let { n -> Person(n, p.s("Role"), p.s("Type"), p.s("Id")?.takeIf { id -> id.length <= 64 }?.let { id -> p.s("PrimaryImageTag")?.let { t -> "/Items/$id/Images/Primary?tag=${enc(t)}" } }) } }.take(40),
             streams = streamsJson.mapNotNull(::parseStream).take(200),
             container = src?.s("Container") ?: o.s("Container"),
             childCount = o.i("ChildCount") ?: 0, unplayed = ud?.i("UnplayedItemCount") ?: 0,
@@ -201,6 +201,8 @@ class JellyfinBackend(override val config: ServerConfig, private val http: Trans
 
     override fun imageUrl(item: MediaItem, kind: Img, width: Int): String? =
         item.images[kind]?.takeIf { it.startsWith("/Items/") }?.let { "$base$prefix$it&maxWidth=${width.coerceIn(64, 3840)}&quality=90" }
+
+    override fun personImageUrl(p: Person, width: Int): String? = p.image?.takeIf { it.startsWith("/Items/") }?.let { "$base$prefix$it&maxWidth=${width.coerceIn(64, 1024)}&quality=90" }
 
     // ---------------------------------------------------------------- playback
     override fun playback(item: MediaItem, caps: DeviceCaps, opts: PlayOptions): PlaybackPlan {

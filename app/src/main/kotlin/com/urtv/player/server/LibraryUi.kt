@@ -70,7 +70,8 @@ fun LibraryScreen(backend: MediaBackend, lib: Library, onOpen: (MediaItem) -> Un
     }
 
     Column(Modifier.fillMaxSize()) {
-        Hero(focused, backend, 250.dp)
+        androidx.compose.runtime.LaunchedEffect(focused?.id) { ServerBackdrop.item = focused; ServerBackdrop.backend = backend }
+        Hero(focused, 250.dp)
         Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(lib.name, style = T.title, modifier = Modifier.padding(end = 12.dp))
             TvButton(sortName(sort) + if (desc) " ↓" else " ↑", { sortIx = (sortIx + 1) % SORTS.size })
@@ -81,7 +82,7 @@ fun LibraryScreen(backend: MediaBackend, lib: Library, onOpen: (MediaItem) -> Un
         when {
             total < 0 -> Centered { Spinner() }
             items.isEmpty() -> Centered { Text(stringResource(if (failed) R.string.srv_unreachable else R.string.srv_empty), style = T.title) }
-            else -> LazyVerticalGrid(GridCells.Adaptive(168.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+            else -> LazyVerticalGrid(GridCells.Adaptive(190.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
                     PosterCard(it, backend, { onOpen(it) }, onFocus = { f -> if (f) { focused = it; if (i >= items.size - 24 && items.size < total) want = items.size + 60 } })
@@ -137,7 +138,7 @@ fun SearchScreen(backend: MediaBackend, onOpen: (MediaItem) -> Unit) {
             is Res.Loading -> Centered { Spinner() }
             is Res.Fail -> Centered { Text(errorText(r.e), style = T.title) }
             is Res.Ok -> if (r.v.isEmpty()) { if (text.trim().length >= 2) Centered { Text(stringResource(R.string.srv_empty), style = T.title) } }
-                else LazyVerticalGrid(GridCells.Adaptive(168.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                else LazyVerticalGrid(GridCells.Adaptive(190.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     itemsIndexed(r.v, key = { _, it -> it.id }) { _, it -> PosterCard(it, backend, { onOpen(it) }) }
                 }
         }

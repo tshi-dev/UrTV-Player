@@ -51,7 +51,9 @@ fun ServerHome(backend: MediaBackend, onOpen: (MediaItem) -> Unit, onPlay: (Medi
             val d = r.v
             if (d.resume.isEmpty() && d.next.isEmpty() && d.latest.isEmpty()) Centered { Text(stringResource(R.string.srv_empty), style = T.title) }
             else Column(Modifier.fillMaxSize()) {
-                Hero(focused ?: d.resume.firstOrNull() ?: d.next.firstOrNull() ?: d.latest.firstOrNull()?.second?.firstOrNull(), backend, 330.dp)
+                val shown = focused ?: d.resume.firstOrNull() ?: d.next.firstOrNull() ?: d.latest.firstOrNull()?.second?.firstOrNull()
+                androidx.compose.runtime.LaunchedEffect(shown?.id) { ServerBackdrop.item = shown; ServerBackdrop.backend = backend }
+                Hero(shown, 360.dp)
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     if (d.resume.isNotEmpty()) item(key = "resume") { ItemRow(stringResource(R.string.srv_continue), d.resume, backend, wide = true, onFocus = { focused = it }, onClick = onPlay, onLong = onOpen) }
                     if (d.next.isNotEmpty()) item(key = "next") { ItemRow(stringResource(R.string.srv_next_up), d.next, backend, wide = true, onFocus = { focused = it }, onClick = onPlay, onLong = onOpen) }
