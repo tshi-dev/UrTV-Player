@@ -2,7 +2,7 @@ pluginManagement {
     repositories { google { content { includeGroupByRegex("com\\.android.*|com\\.google.*|androidx.*") } }; maven("https://repo1.maven.org/maven2/"); gradlePluginPortal() }
     // Versions live here so the Android plugins resolve only when :app is included (no SDK = core only).
     plugins {
-        id("com.android.application") version "8.7.3"
+        id("com.android.application") version "9.5.1"
         id("org.jetbrains.kotlin.android") version "2.0.21"
         id("org.jetbrains.kotlin.jvm") version "2.0.21"
         id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
