@@ -120,6 +120,9 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         Secrets.write(f) { o -> o.bufferedWriter().use { w -> for (c in l) w.append(listOf(s(c.id), s(c.name), s(c.url), s(c.group), s(c.logo), s(c.epgId), c.number?.toString() ?: "", s(c.streamId), c.archiveDays.toString()).joinToString("\t")).append('\n') } }
     }
 
+    /** Channels last cached for a playlist (empty if never loaded). Call off the main thread. */
+    fun cachedChannels(id: String): List<Channel> = readCache(chFile(id))
+
     private fun readCache(f: File): List<Channel> {
         if (!f.exists()) return emptyList()
         val out = ArrayList<Channel>()

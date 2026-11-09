@@ -36,4 +36,28 @@ object Integrity {
     }.getOrDefault(emptyList())
 
     fun check(ctx: Context): Status = evaluate(com.urtv.player.BuildConfig.OFFICIAL_CERT_SHA256, installedCertDigests(ctx), com.urtv.player.BuildConfig.DEBUG)
+
+    /**
+     * Which apps may call the exported FIND_MATCH activity: the UrTV home app or its screensaver, signed by exactly one
+     * certificate that equals UrTV's release certificate. [URTV_CERT_SHA256] stays empty (nobody is accepted) until the real
+     * digest is supplied by the UrTV owner; it is a public fingerprint, never a key.
+     */
+    const val URTV_CERT_SHA256 = ""
+    val URTV_PACKAGES = setOf("sa.urtv.home", "sa.urtv.screensaver")
+
+    fun callerAllowed(pkg: String?, signers: Collection<String>, pin: String = URTV_CERT_SHA256): Boolean {
+        val p = normalize(pin)
+        if (pkg == null || pkg !in URTV_PACKAGES || p.isEmpty() || signers.size != 1) return false
+        return normalize(signers.single()) == p
+    }
+
+    @Suppress("DEPRECATION")
+    fun certDigestsOf(ctx: Context, pkg: String): List<String> = runCatching {
+        val pm = ctx.packageManager
+        val sigs = if (Build.VERSION.SDK_INT >= 28) {
+            val info = pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo
+            (if (info?.hasMultipleSigners() == true) info.apkContentsSigners else info?.signingCertificateHistory?.takeLast(1)?.toTypedArray()).orEmpty().toList()
+        } else pm.getPackageInfo(pkg, PackageManager.GET_SIGNATURES).signatures.orEmpty().toList()
+        sigs.map { s -> MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) } }
+    }.getOrDefault(emptyList())
 }

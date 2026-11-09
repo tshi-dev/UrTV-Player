@@ -2,7 +2,6 @@ package com.urtv.player
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -17,7 +16,7 @@ import com.urtv.player.ui.UrtvTheme
 
 /**
  * «Find the channel for this match». Called by the UrTV home app with startActivityForResult and action
- * sa.urtv.player.action.FIND_MATCH. Anything else, or a caller not signed with the same key as this app, is ignored: the activity
+ * sa.urtv.player.action.FIND_MATCH. Anything else, or a caller that is not UrTV (package sa.urtv.home or sa.urtv.screensaver, signed by UrTV's release certificate), is ignored: the activity
  * closes at once with RESULT_CANCELED and nothing is read from the intent. All extras are untrusted text used only to compare
  * with the user's own channel names and guide; no URL from the caller is ever opened.
  *
@@ -28,8 +27,7 @@ class FindMatchActivity : ComponentActivity() {
 
     private fun callerIsUrtv(): Boolean {
         val pkg = callingPackage ?: return false
-        if (pkg == packageName) return false
-        return runCatching { packageManager.checkSignatures(pkg, packageName) == PackageManager.SIGNATURE_MATCH }.getOrDefault(false)
+        return com.urtv.player.data.Integrity.callerAllowed(pkg, com.urtv.player.data.Integrity.certDigestsOf(this, pkg))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

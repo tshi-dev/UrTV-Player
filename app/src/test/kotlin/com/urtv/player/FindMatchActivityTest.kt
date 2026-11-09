@@ -35,4 +35,16 @@ class FindMatchActivityTest {
         assertEquals(12, r.channels.size); assertTrue(r.channels.all { it.length <= 80 })
         assertEquals(1_700_000_000_000L, r.kickoffMs)
     }
+
+    @Test fun onlyUrtvPackagesWithTheSingleReleaseCertAreAccepted() {
+        val pin = "AA:BB:CC:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:00:11:22"
+        val same = "aabbcc00112233445566778899aabbccddeeff00112233445566778899001122"
+        val I = com.urtv.player.data.Integrity
+        assertTrue(I.callerAllowed("sa.urtv.home", listOf(same), pin)); assertTrue(I.callerAllowed("sa.urtv.screensaver", listOf(same), pin))
+        assertEquals(false, I.callerAllowed("com.evil", listOf(same), pin), "right cert, wrong package")
+        assertEquals(false, I.callerAllowed("sa.urtv.home", listOf("00" + same.drop(2)), pin), "right package, another cert")
+        assertEquals(false, I.callerAllowed("sa.urtv.home", listOf(same, same), pin), "must be a single signer")
+        assertEquals(false, I.callerAllowed("sa.urtv.home", emptyList(), pin)); assertEquals(false, I.callerAllowed(null, listOf(same), pin))
+        assertEquals(false, I.callerAllowed("sa.urtv.home", listOf(same), ""), "no pin configured: nobody accepted")
+    }
 }

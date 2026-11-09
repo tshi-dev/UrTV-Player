@@ -39,8 +39,8 @@ import kotlinx.coroutines.withContext
 
 private sealed interface FmState {
     object Finding : FmState
-    data class Pick(val hits: List<MatchFinder.Hit>, val remembered: String?) : FmState
-    data class Play(val channel: Channel) : FmState
+    data class Pick(val hits: List<MatchFinder.Hit>, val remembered: String?, val pids: Map<String, String>) : FmState
+    data class Play(val channel: Channel, val pid: String = "") : FmState
     object None : FmState
 }
 
@@ -61,21 +61,29 @@ fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, 
         if (state !is FmState.Finding || !cat.settled) return@LaunchedEffect
         if (cat.channels.isNotEmpty() && cat.epgLoading) delay(6000)
         else if (cat.channels.any { it.epgId != null } && app.catalog.epg.value.isEmpty) delay(1500)   // the guide starts loading just after the list
-        val pid = cat.playlistId.orEmpty()
+        val active = cat.playlistId.orEmpty()
         val recents = store.recents.value
-        val channels = cat.channels
+        val lists = store.playlists.value.map { it.id }
+        val activeChannels = cat.channels
         val guide = app.catalog.epg.value
-        val hits = withContext(Dispatchers.Default) {
-            MatchFinder.find(req, channels, recentRank = { c -> recents.indexOf(chKey(pid, c)).let { if (it < 0) Int.MAX_VALUE else it } }) { id -> guide.forChannel(id) }
+        // every playlist's channel names (from the cache); the guide only exists for the active one
+        val found = withContext(Dispatchers.Default) {
+            lists.flatMap { id ->
+                val chs = if (id == active) activeChannels else app.catalog.cachedChannels(id)
+                MatchFinder.find(req, chs, recentRank = { c -> recents.indexOf(chKey(id, c)).let { if (it < 0) Int.MAX_VALUE else it } }) { e -> if (id == active) guide.forChannel(e) else emptyList() }
+                    .map { id to it }
+            }.distinctBy { it.second.channel.url }
+                .sortedWith(compareByDescending<Pair<String, MatchFinder.Hit>> { it.second.score }.thenByDescending { it.second.quality }.thenBy { if (it.first == active) 0 else 1 })
         }
+        val hits = found.map { it.second }
+        val pids = found.associate { it.second.channel.url to it.first }
         val remembered = store.matchPick(req.competitionKey)
         state = when {
             hits.isEmpty() -> FmState.None
-            hits.size == 1 -> FmState.Play(hits[0].channel)
+            hits.size == 1 -> FmState.Play(hits[0].channel, pids[hits[0].channel.url].orEmpty())
             else -> {
-                // the channel picked last time for this competition goes first
-                val front = hits.firstOrNull { chKey(pid, it.channel) == remembered }
-                FmState.Pick(if (front != null) listOf(front) + hits.filter { it !== front } else hits, remembered)
+                val front = hits.firstOrNull { chKey(pids[it.channel.url].orEmpty(), it.channel) == remembered }
+                FmState.Pick(if (front != null) listOf(front) + hits.filter { it !== front } else hits, remembered, pids)
             }
         }
     }
@@ -99,7 +107,6 @@ fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, 
                 BackHandler { onClose() }
                 val first = remember { FocusRequester() }
                 LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
-                val pid = cat.playlistId.orEmpty()
                 Column(Modifier.fillMaxSize().padding(horizontal = 160.dp, vertical = 70.dp)) {
                     Text(stringResource(R.string.fm_title), style = T.title)
                     if (req.homeEn.isNotBlank() || req.homeAr.isNotBlank()) {
@@ -110,10 +117,10 @@ fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, 
                     }
                     LazyColumn(Modifier.padding(top = 28.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         itemsIndexed(s.hits) { i, h ->
-                            val key = chKey(pid, h.channel)
+                            val hp = s.pids[h.channel.url].orEmpty(); val key = chKey(hp, h.channel)
                             Tv(onClick = {
                                 store.setMatchPick(req.competitionKey, key)
-                                state = FmState.Play(h.channel)
+                                state = FmState.Play(h.channel, hp)
                             }, Modifier.fillMaxWidth().height(84.dp).let { if (i == 0) it.focusRequester(first) else it }, shape = Rd(14), restColor = C.surface) {
                                 Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Logo(h.channel, 52)
@@ -132,7 +139,7 @@ fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, 
                 }
             }
             is FmState.Play -> {
-                LaunchedEffect(Unit) { onPlayed() }
+                LaunchedEffect(Unit) { onPlayed(); if (s.pid.isNotEmpty() && s.pid != app.catalog.state.value.playlistId) app.catalog.open(s.pid) }
                 PlayerScreen(app, listOf(s.channel), s.channel, onExit = { onClose() })
             }
         }

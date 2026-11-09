@@ -60,10 +60,10 @@ Code: `app/.../FindMatchActivity.kt`, `app/.../ui/FindMatch.kt`, `core/.../Match
 
 | # | Threat | Fix |
 |---|---|---|
-| F1 | Any app launching the exported activity or feeding it input | Accepted only from a caller signed with the same key as this app: the calling package (available only to `startActivityForResult`, so a plain `startActivity` has none) is checked with `PackageManager.checkSignatures`. Wrong action, no verifiable caller or another signer: the activity closes at once with `RESULT_CANCELED` and reads nothing from the intent [`FindMatchActivityTest`] |
+| F1 | Any app launching the exported activity or feeding it input | Accepted only from package `sa.urtv.home` or `sa.urtv.screensaver` whose single signing certificate equals the pinned UrTV release certificate (`Integrity.URTV_CERT_SHA256`; empty = nobody accepted). The calling package exists only for `startActivityForResult`, so a plain `startActivity` has none. Wrong action, no verifiable caller or another signer: the activity closes at once with `RESULT_CANCELED` and reads nothing from the intent [`FindMatchActivityTest`] |
 | F2 | Hostile extras (huge strings, wrong types, many channel names, odd kickoff) | Read with defensive getters; every string is stripped of control characters and capped at 80 chars, at most 12 channel names, kickoff outside ±7 days replaced by now [`MatchFinderTest`, `FindMatchActivityTest`] |
 | F3 | Caller steering playback to an attacker URL | Extras are only compared with the user's own channel names and guide text; no URL from the caller is read, opened or played. Only channels already in the user's playlist can start |
 | F4 | Information leak back to the caller | The result is only `RESULT_OK` (something played) or `RESULT_CANCELED`; no channel, playlist or credential is returned |
 | F5 | Remembered pick | Stored per competition as the usual hashed channel key (`playlistId|hash`), never a URL |
 
-Residual: a debug build of the player and a release build of UrTV (or the reverse) do not match signatures, so the call is ignored there by design.
+Residual: the pin must be supplied by the UrTV owner; a debug-signed UrTV is rejected by design.
