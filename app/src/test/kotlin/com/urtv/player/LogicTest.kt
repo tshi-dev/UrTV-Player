@@ -53,3 +53,13 @@ class LogicTest {
         assertTrue(html.contains("&quot;&gt;&lt;script&gt;"))
     }
 }
+
+class ArrangeTest {
+    @Test fun savedOrderThenFirstSeenAndHiddenRemoved() {
+        val g = listOf("A", "B", "C", "D")
+        assertEquals(listOf("C", "A", "B", "D"), Browse.arrange(g, listOf("C", "A"), emptySet()))
+        assertEquals(listOf("C", "B", "D"), Browse.arrange(g, listOf("C", "A"), setOf("A")))
+        assertEquals(listOf("C", "A", "B", "D"), Browse.arrange(g, listOf("C", "A"), setOf("A"), includeHidden = true))
+        assertEquals(g, Browse.arrange(g, listOf("gone"), emptySet()))
+    }
+}

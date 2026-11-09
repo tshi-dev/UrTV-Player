@@ -102,4 +102,18 @@
     <string name="back">Back</string>
     <string name="season_n">Season %d</string>
     <string name="catchup">Catch-up</string>
+    <string name="set_text_size">Text size</string>
+    <string name="size_normal">Normal</string>
+    <string name="size_large">Large</string>
+    <string name="size_xl">Extra large</string>
+    <string name="set_theme">Theme</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_oled">Pure black</string>
+    <string name="set_active_playlist">Current playlist</string>
+    <string name="set_epg_offset">Guide time offset</string>
+    <string name="set_epg_offset_hint">If programme times run ahead of or behind reality</string>
+    <string name="set_groups">Groups</string>
+    <string name="set_groups_hint">Hide groups or change their order</string>
+    <string name="shown">Shown</string>
+    <string name="hidden">Hidden</string>
 </resources>

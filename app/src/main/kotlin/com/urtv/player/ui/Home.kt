@@ -72,7 +72,7 @@ fun HomeScreen(
     app: UrtvApp, tab: Tab, onTab: (Tab) -> Unit,
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
     restoreKey: String?,
-    onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {}, onCatchup: (Channel, Programme) -> Unit = { _, _ -> },
+    onManageGroups: () -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {}, onCatchup: (Channel, Programme) -> Unit = { _, _ -> },
 ) {
     val store = app.store
     val cat by app.catalog.state.collectAsState()
@@ -118,7 +118,7 @@ fun HomeScreen(
                     ChannelGrid(app, cat, list, stringResource(R.string.empty_recents), onPlay, restoreKey)
                 }
                 Tab.Guide -> GuideScreen(app, cat, onPlay, onCatchup)
-                Tab.Settings -> SettingsScreen(app, onAdd, onLanguage)
+                Tab.Settings -> SettingsScreen(app, onAdd, onLanguage, onManageGroups)
             }
         }
     }
@@ -141,15 +141,21 @@ fun EmptyPlaylists(onAdd: () -> Unit) {
 private fun LiveTab(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel) -> Unit, restoreKey: String?) {
     val store = app.store
     val pid = cat.playlistId.orEmpty()
-    val groups = remember(cat.channels) { Browse.groups(cat.channels) }
+    val order by store.groupOrder.collectAsState()
+    val hidden by store.hiddenGroups.collectAsState()
+    val allGroups = remember(cat.channels) { Browse.groups(cat.channels) }
+    val groups = remember(allGroups, order, hidden) { Browse.arrange(allGroups, order[pid].orEmpty(), hidden.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }.toSet()) }
     var group by remember(pid) { mutableStateOf(Browse.ALL) }
     var query by remember(pid) { mutableStateOf("") }
     val locked by store.lockedGroups.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     var pinReq by remember { mutableStateOf<PinRequest?>(null) }
+    LaunchedEffect(groups) { if (group != Browse.ALL && group !in groups) group = Browse.ALL }
     val gKey = groupKey(pid, group)
     val isLocked = group != Browse.ALL && gKey in locked && gKey !in app.unlocked
-    val list = remember(cat.channels, group, query) { Browse.filter(cat.channels, group, query) }
+    // While searching, look in every visible group so a channel is never hidden from search by the group filter.
+    val visibleChannels = remember(cat.channels, groups) { val g = groups.toSet(); cat.channels.filter { Browse.groupOf(it) in g } }
+    val list = remember(cat.channels, visibleChannels, group, query) { if (query.isNotBlank()) Browse.filter(visibleChannels, Browse.ALL, query) else if (group == Browse.ALL) visibleChannels else Browse.filter(cat.channels, group, "") }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         LazyColumn(Modifier.width(280.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 8.dp)) {
