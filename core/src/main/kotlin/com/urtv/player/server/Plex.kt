@@ -98,6 +98,7 @@ class PlexBackend(override val config: ServerConfig, private val http: Transport
             unplayed = if (leaf > 0) (leaf - viewedLeaf).coerceAtLeast(0) else 0, images = img,
             addedMs = (o.l("addedAt") ?: 0) * 1000, partPath = part?.s("key")?.takeIf { it.startsWith("/") },
             bitrate = media?.l("bitrate")?.let { it * 1000 },
+            trailers = if ((o.o("Extras")?.i("size") ?: 0) > 0) listOf("extras") else emptyList(),
         )
     }
 
@@ -144,7 +145,7 @@ class PlexBackend(override val config: ServerConfig, private val http: Transport
     }
     override fun genres(lib: Library) = genreMap(lib).keys.sorted().take(100)
 
-    override fun item(id: String): MediaItem? = metas(container("/library/metadata/${enc(id)}?includeMarkers=1")).firstOrNull()
+    override fun item(id: String): MediaItem? = metas(container("/library/metadata/${enc(id)}?includeMarkers=1&includeExtras=1")).firstOrNull()
     override fun seasons(seriesId: String) = metas(container("/library/metadata/${enc(seriesId)}/children")).filter { it.type == ItemType.Season }
     override fun episodes(seriesId: String, seasonId: String) = metas(container("/library/metadata/${enc(seasonId)}/children"))
     override fun children(id: String) = metas(container("/library/metadata/${enc(id)}/children"))
@@ -198,6 +199,10 @@ class PlexBackend(override val config: ServerConfig, private val http: Transport
     override fun reportStart(plan: PlaybackPlan, positionMs: Long) = timeline(plan, "playing", positionMs)
     override fun reportProgress(plan: PlaybackPlan, positionMs: Long, paused: Boolean) = timeline(plan, if (paused) "paused" else "playing", positionMs)
     override fun reportStop(plan: PlaybackPlan, positionMs: Long) = timeline(plan, "stopped", positionMs)
+
+    override fun trailerItems(item: MediaItem): List<MediaItem> = runCatching {
+        container("/library/metadata/${enc(item.id)}/extras")?.a("Metadata")?.filter { it.i("extraType") == 1 }?.mapNotNull(::parseItem)?.take(3)
+    }.getOrNull() ?: emptyList()
 
     override fun setPlayed(item: MediaItem, played: Boolean) { send("GET", (if (played) "/:/scrobble?" else "/:/unscrobble?") + q("key" to item.id, "identifier" to "com.plexapp.plugins.library")) }
 

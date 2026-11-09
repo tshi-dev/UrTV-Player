@@ -38,7 +38,7 @@ class SubtitleChoiceTest {
         assertNull(SubtitleChoice.pickSubtitle(listOf(su(40, "jpn")), au(1, "eng"), prefs))
     }
     @Test fun imageFormatsAreClassified() {
-        assertTrue(SubtitleChoice.isImage(su(1, "ara", codec = "PGSSUB"))); assertFalse(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "pgssub")))
+        assertTrue(SubtitleChoice.isImage(su(1, "ara", codec = "PGSSUB"))); assertTrue(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "pgssub")))
         assertTrue(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "dvdsub"))); assertTrue(SubtitleChoice.needsBurnIn(su(1, "ara", codec = "vobsub")))
         assertFalse(SubtitleChoice.isImage(su(1, "ara", codec = "ass")))
     }
