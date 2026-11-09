@@ -120,7 +120,7 @@ private fun GuideRow(ch: Channel, progs: List<Programme>, start: Long, nowOffset
             val x = DP_PER_MIN * ((s - start) / 60_000f); val w = DP_PER_MIN * ((e - s) / 60_000f) - 4.dp
             if (w < 12.dp) continue
             val catchup = p.stopMs < nowMs && ch.archiveDays > 0
-            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize().drawBehind { drawLine(C.hairline, Offset(0f, 8f), Offset(0f, size.height - 8f), 1f) }, RoundedCornerShape(10.dp), lift = 1.02f, onFocus = { if (it) onFocus(p) }) {
+            Tv({ onClick(p) }, Modifier.offset(x = x).width(w).fillMaxSize().drawBehind { drawLine(C.hairline, Offset(0f, 8f), Offset(0f, size.height - 8f), 1f) }, Rd(10), lift = 1.02f, onFocus = { if (it) onFocus(p) }) {
                 Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp)) {
                     Text(p.title, style = T.small.copy(color = C.text, fontSize = 19.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(fmtTime(p.startMs), style = T.tiny.copy(color = if (catchup) C.accent else C.faint, fontSize = 15.sp))

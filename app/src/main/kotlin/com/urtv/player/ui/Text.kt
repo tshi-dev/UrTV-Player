@@ -23,7 +23,7 @@ fun Text(
         C.text -> C.onFocus
         C.muted -> C.onFocus2
         C.faint -> C.onFocus3
-        C.accent -> C.accent
+        C.accent -> LocalTheme.current.onFocusSolid
         else -> c
     }
     TvText(text, modifier, style = style.copy(color = color), maxLines = maxLines, overflow = overflow, softWrap = softWrap, textAlign = textAlign ?: TextAlign.Unspecified)

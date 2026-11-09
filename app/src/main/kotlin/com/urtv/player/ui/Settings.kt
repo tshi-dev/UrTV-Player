@@ -52,7 +52,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val resume by store.resumeLast.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     val textScale by store.textScale.collectAsState()
-    val oled by store.oled.collectAsState()
+    val look by store.appearance.collectAsState()
+    var appearance by remember { mutableStateOf(false) }
+    if (appearance) { AppearanceScreen(store) { appearance = false }; return }
     val offsets by store.epgOffsetMin.collectAsState()
     val start by store.startScreen.collectAsState()
     val isXtream = playlists.firstOrNull { it.id == active }?.isXtream == true
@@ -104,7 +106,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                 }
                 Section.Appearance -> {
                     item { Setting(stringResource(R.string.set_text_size), stringResource(listOf(R.string.size_normal, R.string.size_large, R.string.size_xl)[textScale])) { store.setTextScale((textScale + 1) % 3) } }
-                    item { Setting(stringResource(R.string.set_theme), stringResource(if (oled) R.string.theme_oled else R.string.theme_dark)) { store.setOled(!oled) } }
+                    item { Setting(stringResource(R.string.set_theme), stringResource(themeName(look.theme)) + "  " + stringResource(accentName(look.accent)), stringResource(R.string.set_theme_hint)) { appearance = true } }
                 }
                 Section.Home -> {
                     item {
@@ -150,7 +152,7 @@ fun ConfirmDialog(text: String, onYes: () -> Unit, onNo: () -> Unit) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     Box(Modifier.fillMaxSize().background(C.scrim), contentAlignment = Alignment.Center) {
-        Column(Modifier.width(540.dp).background(C.surface, RoundedCornerShape(22.dp)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(540.dp).background(C.surface, Rd(22)).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text, style = T.title)
             Spacer(Modifier.height(28.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { TvButton(stringResource(R.string.no), onNo, focusRequester = fr); TvButton(stringResource(R.string.yes), onYes, primary = true) }
@@ -210,8 +212,8 @@ private fun ManageList(title: String, hint: String, items: List<Pair<String, Str
                             Text(stringResource(if (on) R.string.shown else R.string.hidden), style = T.small.copy(color = if (on) C.accent else C.faint))
                         }
                     }
-                    Tv({ onMove(i, -1) }, Modifier.size(60.dp), RoundedCornerShape(12.dp), restColor = C.surface) { Text("▲", style = T.body, modifier = Modifier.align(Alignment.Center)) }
-                    Tv({ onMove(i, 1) }, Modifier.size(60.dp), RoundedCornerShape(12.dp), restColor = C.surface) { Text("▼", style = T.body, modifier = Modifier.align(Alignment.Center)) }
+                    Tv({ onMove(i, -1) }, Modifier.size(60.dp), Rd(12), restColor = C.surface) { Text("▲", style = T.body, modifier = Modifier.align(Alignment.Center)) }
+                    Tv({ onMove(i, 1) }, Modifier.size(60.dp), Rd(12), restColor = C.surface) { Text("▼", style = T.body, modifier = Modifier.align(Alignment.Center)) }
                 }
             }
         }

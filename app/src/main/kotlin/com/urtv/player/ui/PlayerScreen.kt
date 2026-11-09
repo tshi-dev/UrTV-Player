@@ -157,7 +157,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     ) {
         if (!blocked) VideoSurface(ctrl)
         val sub by ctrl.cue.collectAsState()
-        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 200.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 4.dp))
+        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 200.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
 
         // status
         val paused by ctrl.paused.collectAsState()
@@ -173,7 +173,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
 
         // number entry
         AnimatedVisibility(digits.isNotEmpty(), Modifier.align(Alignment.TopEnd).padding(80.dp), enter = fadeIn(), exit = fadeOut()) {
-            Text(digits, style = T.display.copy(fontSize = androidx.compose.ui.unit.TextUnit(72f, androidx.compose.ui.unit.TextUnitType.Sp)), modifier = Modifier.background(Color(0xAA000000), RoundedCornerShape(20.dp)).padding(horizontal = 28.dp, vertical = 8.dp))
+            Text(digits, style = T.display.copy(fontSize = androidx.compose.ui.unit.TextUnit(72f, androidx.compose.ui.unit.TextUnitType.Sp)), modifier = Modifier.background(Color(0xAA000000), Rd(20)).padding(horizontal = 28.dp, vertical = 8.dp))
         }
 
         // info banner: bottom scrim, logo + number + name + live pill, programme title, time bar, next
@@ -245,7 +245,7 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
         LazyColumn(Modifier.fillMaxSize(), state, contentPadding = PaddingValues(start = 40.dp, end = 100.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
-                Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), RoundedCornerShape(12.dp), selected = i == idx, focusRequester = if (i == idx) fr else null, lift = 1.02f) {
+                Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = if (i == idx) fr else null, lift = 1.02f) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${Browse.numberOf(all, c)}", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
                         Logo(c, 44); Spacer(Modifier.width(16.dp))
@@ -288,7 +288,7 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
 
 @Composable
 private fun OptRow(label: String, value: String, fr: FocusRequester? = null, onClick: () -> Unit) {
-    Tv(onClick, Modifier.fillMaxWidth().height(60.dp), RoundedCornerShape(12.dp), focusRequester = fr) {
+    Tv(onClick, Modifier.fillMaxWidth().height(60.dp), Rd(12), focusRequester = fr) {
         Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = T.body, modifier = Modifier.weight(1f))
             Text(value, style = T.bodyBold.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)

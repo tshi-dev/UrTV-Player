@@ -89,10 +89,22 @@ class Store(ctx: Context) {
     // ---- appearance
     private val _textScale = MutableStateFlow(sp.getInt("textScale", 0))
     val textScale: StateFlow<Int> = _textScale
-    private val _oled = MutableStateFlow(sp.getBoolean("oled", false))
-    val oled: StateFlow<Boolean> = _oled
+    private fun <E : Enum<E>> pref(key: String, all: Array<E>, def: E): E = all.firstOrNull { it.name == sp.getString(key, null) } ?: def
+    private val _appearance = MutableStateFlow(Appearance(
+        // "oled" is the old pure-black switch: keep it working for people who already turned it on.
+        theme = pref("theme", ThemeId.entries.toTypedArray(), if (sp.getBoolean("oled", false)) ThemeId.Oled else ThemeId.Default),
+        accent = pref("accent", AccentId.entries.toTypedArray(), AccentId.Blue),
+        focus = pref("focusStyle", FocusStyle.entries.toTypedArray(), FocusStyle.Solid),
+        corner = pref("cornerStyle", CornerStyle.entries.toTypedArray(), CornerStyle.Rounded),
+        background = pref("bgStyle", BgStyle.entries.toTypedArray(), BgStyle.Gradient),
+    ))
+    val appearance: StateFlow<Appearance> = _appearance
+    fun setAppearance(a: Appearance) {
+        _appearance.value = a
+        sp.edit().putString("theme", a.theme.name).putString("accent", a.accent.name).putString("focusStyle", a.focus.name)
+            .putString("cornerStyle", a.corner.name).putString("bgStyle", a.background.name).apply()
+    }
     fun setTextScale(v: Int) { _textScale.value = v; sp.edit().putInt("textScale", v).apply() }
-    fun setOled(v: Boolean) { _oled.value = v; sp.edit().putBoolean("oled", v).apply() }
 
     // ---- continue watching (movies and episodes), newest first, capped
     private val wFile = File(ctx.filesDir, "watching.json")

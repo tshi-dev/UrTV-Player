@@ -91,10 +91,13 @@ fun HomeScreen(
     val nowMs by rememberNow()
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
-    Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 72.dp, vertical = 36.dp)) {
+    LaunchedEffect(tab) { Backdrop.url = null }
+    Box(Modifier.fillMaxSize().background(C.bgBrush)) {
+    PosterBackdrop()
+    Column(Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 36.dp)) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 20) }
+                Box(Modifier.size(38.dp).clip(Rd(11)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 20) }
                 Spacer(Modifier.width(12.dp)); Text("UrTV", style = T.title.copy(fontSize = 28.sp))
             }
             Spacer(Modifier.weight(1f))
@@ -122,6 +125,7 @@ fun HomeScreen(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -129,7 +133,7 @@ fun EmptyPlaylists(onAdd: () -> Unit) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(88.dp).clip(RoundedCornerShape(26.dp)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 44) }
+        Box(Modifier.size(88.dp).clip(Rd(26)).background(C.text), contentAlignment = Alignment.Center) { Icon(Glyph.Play, C.bg, 44) }
         Spacer(Modifier.height(28.dp))
         Text(stringResource(R.string.no_playlists_title), style = T.display)
         Spacer(Modifier.height(12.dp))
@@ -167,7 +171,7 @@ private fun HomeRows(
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
-                Tv({ onPlay(list, c) }, Modifier.width(300.dp).height(88.dp), RoundedCornerShape(14.dp), restColor = C.surface, focusRequester = if (i == 0) fr else null) {
+                Tv({ onPlay(list, c) }, Modifier.width(300.dp).height(88.dp), Rd(14), restColor = C.surface, focusRequester = if (i == 0) fr else null) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Logo(c, 52); Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
@@ -234,7 +238,7 @@ private fun HomeRows(
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
                                 itemsIndexed(gl, key = { _, c -> c.url }) { i, c ->
                                     val (now, _) = epg.nowNext(c.epgId, nowMs)
-                                    Tv({ onPlay(gl, c) }, Modifier.width(300.dp).height(88.dp), RoundedCornerShape(14.dp), restColor = C.surface, focusRequester = if (i == 0) fr else null) {
+                                    Tv({ onPlay(gl, c) }, Modifier.width(300.dp).height(88.dp), Rd(14), restColor = C.surface, focusRequester = if (i == 0) fr else null) {
                                         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Logo(c, 52); Spacer(Modifier.width(14.dp))
                                             Column(Modifier.weight(1f)) {
@@ -260,7 +264,7 @@ private fun RowTitle(text: String) = Text(text, style = T.title.copy(fontSize = 
 @Composable
 private fun ContinueCard(w: WatchItem, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester?) {
     Column(Modifier.width(360.dp)) {
-        Tv(onClick, Modifier.fillMaxWidth().aspectRatio(16f / 9f), RoundedCornerShape(14.dp), ring = true, lift = 1.04f, restColor = C.surface, focusRequester = focusRequester, onLongClick = onLong) {
+        Tv(onClick, Modifier.fillMaxWidth().aspectRatio(16f / 9f), Rd(14), ring = true, lift = 1.04f, restColor = C.surface, focusRequester = focusRequester, onLongClick = onLong, onFocus = { if (it) Backdrop.url = w.image }) {
             PosterArt(w.image, w.title)
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color(0xCC000000))))
             ProgressBar(w.fraction, Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 12.dp))
@@ -384,7 +388,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
 @Composable
 fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester?, onFocus: (Boolean) -> Unit) {
     var f by remember { mutableStateOf(false) }
-    Tv(onClick, Modifier.fillMaxWidth().height(70.dp), RoundedCornerShape(12.dp), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
+    Tv(onClick, Modifier.fillMaxWidth().height(70.dp), Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("$number", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
             Logo(ch, 44); Spacer(Modifier.width(16.dp))
@@ -413,8 +417,8 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
         shownUrl = ch.url; ctrl.playPreview(ch)
     }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
-    Column(modifier.clip(RoundedCornerShape(18.dp)).background(C.surface).padding(16.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Color.Black)) {
+    Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(Color.Black)) {
             if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
             if (ch != null) Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color(0x80000000)).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }

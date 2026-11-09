@@ -28,8 +28,8 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val app = application as UrtvApp
         setContent {
-            val oled by app.store.oled.collectAsState(); val scale by app.store.textScale.collectAsState()
-            UrtvTheme(oled, scale) { AppRoot(app, onLanguageChanged = { recreate() }) }
+            val look by app.store.appearance.collectAsState(); val scale by app.store.textScale.collectAsState()
+            UrtvTheme(look, scale) { AppRoot(app, onLanguageChanged = { recreate() }) }
         }
     }
 }
