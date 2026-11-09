@@ -54,7 +54,15 @@ class ServerPlayer(private val ctx: Context) {
                 if (sameOrigin(dataSpec.uri, origin)) dataSpec.withAdditionalHeaders(plan.headers) else dataSpec
         }
         val factory = ResolvingDataSource.Factory(http, resolver)
+        // Large remuxes (tens of Mbit/s) need a byte budget bigger than the default, or the player re-buffers
+        // even on a fast LAN; start after 1.5 s of media so playback begins quickly.
+        val load = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(20_000, 60_000, 1_500, 3_000)
+            .setTargetBufferBytes(96 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .build()
         val p = ExoPlayer.Builder(ctx)
+            .setLoadControl(load)
             .setRenderersFactory(DefaultRenderersFactory(ctx).setEnableDecoderFallback(true))
             .setMediaSourceFactory(DefaultMediaSourceFactory(ctx).setDataSourceFactory(factory))
             .setHandleAudioBecomingNoisy(true).build()
