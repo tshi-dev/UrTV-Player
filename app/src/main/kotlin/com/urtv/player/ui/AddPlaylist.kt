@@ -65,7 +65,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         Spacer(Modifier.height(40.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             for (m in AddMode.entries) {
-                Tv({ mode = m }, Modifier.height(104.dp), RoundedCornerShape(52.dp), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = if (m == AddMode.Phone) first else null) {
+                Tv({ mode = m }, Modifier.height(104.dp), Rd(52), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = if (m == AddMode.Phone) first else null) {
                     Text(stringResource(when (m) { AddMode.Phone -> R.string.add_phone; AddMode.M3u -> R.string.kind_m3u; AddMode.Xtream -> R.string.kind_xtream }),
                         style = if (m == mode) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 48.dp))
                 }
@@ -128,7 +128,7 @@ fun Qr(text: String, modifier: Modifier) {
     val m = remember(text) {
         QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 1, 1, mapOf(EncodeHintType.MARGIN to 0, EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M))
     }
-    Canvas(modifier.background(Color.White, RoundedCornerShape(40.dp))) {
+    Canvas(modifier.background(Color.White, Rd(40))) {
         val quiet = size.minDimension * 0.07f
         val cell = (size.minDimension - 2 * quiet) / m.width
         for (y in 0 until m.height) for (x in 0 until m.width) if (m.get(x, y)) drawRect(Color.Black, Offset(quiet + x * cell, quiet + y * cell), Size(cell + 0.6f, cell + 0.6f))

@@ -104,7 +104,7 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
 
 @Composable
 fun PosterCard(p: Poster, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null, onClick: () -> Unit) {
-    Tv(onClick, modifier.aspectRatio(0.68f), RoundedCornerShape(14.dp), ring = true, lift = 1.05f, restColor = C.surface, focusRequester = focusRequester) {
+    Tv(onClick, modifier.aspectRatio(0.68f), Rd(14), ring = true, lift = 1.05f, restColor = C.surface, focusRequester = focusRequester, onFocus = { if (it) Backdrop.url = p.image }) {
         PosterArt(p.image, p.title)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color(0xE6000000))))
         Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
@@ -120,7 +120,7 @@ private fun hms(ms: Long): String { val s = ms / 1000; return if (s >= 3600) "%d
 @Composable
 private fun DetailHeader(poster: String?, title: String, chips: List<String>, plot: String, credits: String, buttons: @Composable () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-        Box(Modifier.width(220.dp).aspectRatio(0.68f).clip(RoundedCornerShape(16.dp))) { PosterArt(poster, title) }
+        Box(Modifier.width(220.dp).aspectRatio(0.68f).clip(Rd(16))) { PosterArt(poster, title) }
         Column(Modifier.weight(1f)) {
             Text(title, style = T.display.copy(fontSize = 46.sp, lineHeight = 60.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (chips.isNotEmpty()) Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { chips.forEach { Chip(it) } }
@@ -186,7 +186,7 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
             else -> {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
                     items(seasons) { n ->
-                        Tv({ season = n }, Modifier.height(48.dp), RoundedCornerShape(10.dp), selected = n == season, onFocus = { if (it) season = n }, lift = 1f) {
+                        Tv({ season = n }, Modifier.height(48.dp), Rd(10), selected = n == season, onFocus = { if (it) season = n }, lift = 1f) {
                             Text(stringResource(R.string.season_n, n), style = if (n == season) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp))
                         }
                     }
@@ -195,9 +195,9 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
                     items(list.size) { i ->
                         val e = list[i]; val k = epKey(e); val pos = app.store.position(k); val done = app.store.isWatched(k)
                         val dur = e.durationSec * 1000L
-                        Tv({ onPlay(playlist(list.drop(i)), 0, pos) }, Modifier.fillMaxWidth().height(96.dp), RoundedCornerShape(12.dp), focusRequester = if (i == target) fr else null) {
+                        Tv({ onPlay(playlist(list.drop(i)), 0, pos) }, Modifier.fillMaxWidth().height(96.dp), Rd(12), focusRequester = if (i == target) fr else null) {
                             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.width(150.dp).height(84.dp).clip(RoundedCornerShape(8.dp))) { PosterArt(e.image, e.title.ifBlank { s.name }) }
+                                Box(Modifier.width(150.dp).height(84.dp).clip(Rd(8))) { PosterArt(e.image, e.title.ifBlank { s.name }) }
                                 Text("${e.number}", style = T.title.copy(color = C.faint, fontSize = 26.sp), modifier = Modifier.width(64.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                 Column(Modifier.weight(1f)) {
                                     Text(e.title.ifBlank { stringResource(R.string.episode_n, e.number) }, style = T.row.copy(fontSize = 23.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
