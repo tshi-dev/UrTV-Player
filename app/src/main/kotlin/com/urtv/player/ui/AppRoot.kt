@@ -1,6 +1,7 @@
 package com.urtv.player.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -79,7 +80,9 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         }
     }
     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
-    when (screen) {
+    androidx.compose.animation.AnimatedContent(screen, transitionSpec = {
+        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200, easing = androidx.compose.animation.core.LinearOutSlowInEasing)).togetherWith(androidx.compose.animation.ExitTransition.None)
+    }, label = "screen") { scr -> when (scr) {
         Screen.Home -> HomeScreen(
             app, tab, { tab = it },
             onPlay = { list, ch -> queue = list; playing = ch; screen = Screen.Player },
@@ -105,7 +108,8 @@ fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Movie -> def?.let { d -> MovieDetail(app, d, detailId, onPlay = { v, at -> playVod(listOf(v), 0, at, Screen.Movie) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Series -> def?.let { d -> SeriesDetail(app, d, detailId, onPlay = { l, i, at -> playVod(l, i, at, Screen.Series) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Vod -> if (vodItems.isEmpty()) screen = Screen.Home else VodPlayerScreen(app, vodItems, vodIndex, vodStart, onExit = { screen = vodBack })
-    }
+    } }
+    if (!app.splashDone) LaunchSplash { app.splashDone = true }
     banner?.let { b ->
         androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 28.dp)
             .background(androidx.compose.ui.graphics.Color(0xF0141619), Rd(16)).padding(horizontal = 28.dp, vertical = 14.dp)) { Text(b, style = T.row) }

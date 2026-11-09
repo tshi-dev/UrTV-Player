@@ -157,6 +157,14 @@ class Store(ctx: Context) {
         return due
     }
 
+    // ---- playback dev/advanced switches
+    private val _tunnel = MutableStateFlow(sp.getBoolean("tunnel", false)); val tunneling: StateFlow<Boolean> = _tunnel
+    fun setTunneling(v: Boolean) { _tunnel.value = v; sp.edit().putBoolean("tunnel", v).apply() }
+    private val _stats = MutableStateFlow(sp.getBoolean("stats", false)); val statsOverlay: StateFlow<Boolean> = _stats
+    fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }
+    private val _prefetch = MutableStateFlow(sp.getBoolean("prefetch", false)); val prefetchNeighbours: StateFlow<Boolean> = _prefetch
+    fun setPrefetch(v: Boolean) { _prefetch.value = v; sp.edit().putBoolean("prefetch", v).apply() }
+
     // ---- start screen, home rows, live preview, watched marks
     private val _start = MutableStateFlow(sp.getString("start", "home")!!)
     val startScreen: StateFlow<String> = _start          // home | live | guide | movies | series | last

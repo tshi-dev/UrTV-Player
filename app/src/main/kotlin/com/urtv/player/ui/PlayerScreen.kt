@@ -112,6 +112,14 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
             pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gk; blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
         } else { blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
     }
+    // optional: warm the neighbouring channels' HLS manifests so the next zap starts faster
+    LaunchedEffect(shown.url) {
+        if (!store.prefetchNeighbours.value) return@LaunchedEffect
+        delay(700)
+        val q = if (queue.any { it.url == shown.url }) queue else all
+        val i = q.indexOfFirst { it.url == shown.url }
+        if (i >= 0 && q.size > 1) { com.urtv.player.player.Net.warmManifest(q[(i + 1) % q.size].url); com.urtv.player.player.Net.warmManifest(q[(i - 1 + q.size) % q.size].url) }
+    }
     LaunchedEffect(infoTick, overlay) { if (overlay == Overlay.Info) { delay(4500); if (overlay == Overlay.Info) overlay = Overlay.None } }
     LaunchedEffect(digits) {
         if (digits.isNotEmpty()) {
@@ -159,6 +167,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         val sub by ctrl.cue.collectAsState()
         if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 200.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
 
+        if (store.statsOverlay.collectAsState().value) StatsOverlay(ctrl, Modifier.align(Alignment.TopStart).padding(40.dp))
         // status
         val paused by ctrl.paused.collectAsState()
         Box(Modifier.align(Alignment.Center)) {

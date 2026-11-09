@@ -51,6 +51,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val refresh by store.refreshHours.collectAsState()
     val buffer by store.buffer.collectAsState()
     val preview by store.livePreview.collectAsState()
+    val tunnel by store.tunneling.collectAsState()
+    val statsOn by store.statsOverlay.collectAsState()
+    val prefetch by store.prefetchNeighbours.collectAsState()
     val resume by store.resumeLast.collectAsState()
     val hasPin by store.hasPin.collectAsState()
     val textScale by store.textScale.collectAsState()
@@ -105,6 +108,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.set_buffer), stringResource(when (buffer) { BufferMode.Low -> R.string.buf_low; BufferMode.Normal -> R.string.buf_normal; BufferMode.High -> R.string.buf_high }), stringResource(R.string.set_buffer_hint)) {
                         store.setBuffer(BufferMode.entries[(buffer.ordinal + 1) % BufferMode.entries.size]); app.player.buffer = store.buffer.value } }
                     item { Setting(stringResource(R.string.set_preview), stringResource(if (preview) R.string.on else R.string.off), stringResource(R.string.set_preview_hint)) { store.setLivePreview(!preview) } }
+                    item { Setting(stringResource(R.string.set_prefetch), stringResource(if (prefetch) R.string.on else R.string.off), stringResource(R.string.set_prefetch_hint)) { store.setPrefetch(!prefetch) } }
+                    item { Setting(stringResource(R.string.set_tunnel), stringResource(if (tunnel) R.string.on else R.string.off), stringResource(R.string.set_tunnel_hint)) { store.setTunneling(!tunnel) } }
+                    item { Setting(stringResource(R.string.set_stats), stringResource(if (statsOn) R.string.on else R.string.off), stringResource(R.string.set_stats_hint)) { store.setStatsOverlay(!statsOn) } }
                 }
                 Section.Appearance -> {
                     item { Setting(stringResource(R.string.set_text_size), stringResource(listOf(R.string.size_normal, R.string.size_large, R.string.size_xl)[textScale])) { store.setTextScale((textScale + 1) % 3) } }

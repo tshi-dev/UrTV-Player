@@ -196,4 +196,10 @@
     <string name="restore_done">Restored</string>
     <string name="reminder_hint">Hold OK to be reminded when it starts</string>
     <string name="reminder_now">Starting now: %1$s on %2$s</string>
+    <string name="set_prefetch">Prepare neighbouring channels</string>
+    <string name="set_prefetch_hint">Makes zapping faster. Turn off if your provider limits connections</string>
+    <string name="set_tunnel">Tunneled playback</string>
+    <string name="set_tunnel_hint">Smoother on some devices. Turn off if you see picture or audio problems</string>
+    <string name="set_stats">Playback stats</string>
+    <string name="set_stats_hint">Shows resolution, bitrate and buffer while playing</string>
 </resources>

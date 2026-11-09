@@ -422,7 +422,7 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
         delay(1200)                                  // only start the stream once the user rests on a channel
         shownUrl = ch.url; ctrl.playPreview(ch)
     }
-    DisposableEffect(Unit) { onDispose { ctrl.stop() } }
+    DisposableEffect(Unit) { onDispose { if (ctrl.isPreview) ctrl.stop() } }   // never kill a full-screen channel that just started
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && shownUrl == ch?.url) Color.Black else C.surfaceHi)) {
             if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
