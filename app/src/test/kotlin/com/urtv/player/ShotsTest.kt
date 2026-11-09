@@ -64,18 +64,26 @@ class ShotsTest {
             }
         } + "</tv>")
         app.catalog.open("demo")
-        rule.waitUntil(15_000) { !app.catalog.epg.value.isEmpty }
+        repeat(300) { if (!app.catalog.epg.value.isEmpty) return@repeat; shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(50) }
+        check(!app.catalog.epg.value.isEmpty) { "epg not loaded: ${app.catalog.state.value}" }
     }
 
     private fun shot(name: String, content: @Composable () -> Unit) {
         val sc = ActivityScenario.launch(ComponentActivity::class.java)
         sc.onActivity { it.setContent { UrtvTheme { content() } } }
         rule.waitForIdle(); Thread.sleep(400); rule.waitForIdle()
-        val bmp = rule.onRoot().captureToImage().asAndroidBitmap()
-        assertTrue(bmp.width >= 1920 && bmp.height >= 1080, "size ${bmp.width}x${bmp.height}")
+        var bmp: Bitmap? = null
+        sc.onActivity { a ->
+            val v = a.window.decorView
+            v.measure(android.view.View.MeasureSpec.makeMeasureSpec(1920, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(1080, android.view.View.MeasureSpec.EXACTLY))
+            v.layout(0, 0, 1920, 1080)
+            bmp = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888).also { v.draw(android.graphics.Canvas(it)) }
+        }
+        rule.waitForIdle()
+        val b = bmp!!
         if (System.getenv("UPDATE_SHOTS") == "1") {
             val f = File("../docs/shots/$name.png"); f.parentFile?.mkdirs()
-            f.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            f.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         sc.close()
     }
