@@ -47,15 +47,17 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
         store = Store(this)                                    // preferences only: cheap
         val sp = getSharedPreferences("urtv", MODE_PRIVATE)
         schemaTooNew = com.urtv.player.data.Schema.check(sp) == com.urtv.player.data.Schema.Status.TooNew
-        update = com.urtv.player.data.Update.load(sp, BuildConfig.VERSION_CODE)
+        update = com.urtv.player.data.Update.load(sp, BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME)
         Thread({
             store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this)
+            com.urtv.player.data.SelfUpdater.cleanup(this)
             // updates: only the official build, at most once a day, a few seconds after start, never while something plays
             if (integrity == com.urtv.player.data.Integrity.Status.Official && !schemaTooNew) {
                 Thread.sleep(5000)
                 val now = System.currentTimeMillis()
                 if (com.urtv.player.data.Update.due(sp.getLong("upd_last", 0), now) && !PlayerController.active) {
-                    val s = com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE)
+                    // UrTV answers: it is the authority. UrTV absent: the Player looks for its own update on GitHub's release host (same daily limit)
+                    val s = com.urtv.player.data.Update.decide(com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE), com.urtv.player.data.SelfUpdater.allowed(true)) { com.urtv.player.data.SelfUpdater.lookup(BuildConfig.VERSION_NAME) }
                     com.urtv.player.data.Update.save(sp, s, now); update = s
                 }
             }

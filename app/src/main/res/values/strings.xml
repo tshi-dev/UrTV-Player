@@ -92,7 +92,7 @@
     <string name="pin_wrong">الرمز غير صحيح</string>
     <string name="pin_mismatch">الرمزان غير متطابقين</string>
     <string name="set_about">عن التطبيق</string>
-    <string name="about_text">UrTV مشغّل فقط: لا يأتي بقنوات ولا قوائم ولا روابط، ولا يطلب إلا الإنترنت. لا تحليلات ولا إعلانات ولا تحديث ذاتي.</string>
+    <string name="about_text">UrTV مشغّل فقط: لا يأتي بقنوات ولا قوائم ولا روابط، ولا يطلب إلا الإنترنت. لا تحليلات ولا إعلانات. التحديث يتم بموافقتك فقط ولا يكون صامتًا أبدًا.</string>
     <string name="about_version">الإصدار %1$s</string>
     <string name="about_official">نسخة رسمية ✓</string>
     <string name="about_unofficial">نسخة غير رسمية: لم تُوقَّع بمفتاح UrTV</string>
@@ -261,4 +261,12 @@
     <string name="upd_handed">سُلّم التحديث إلى نظام أندرويد لإكماله</string>
     <string name="data_too_new_title">بيانات التطبيق أحدث من هذه النسخة</string>
     <string name="data_too_new_body">لم نغيّر شيئًا. ثبّت النسخة الأحدث من تلفزيونك.</string>
+    <string name="su_allow_title">السماح بالتثبيت مرة واحدة</string>
+    <string name="su_allow_body">لتحديث UrTV Player من داخله، يطلب أندرويد إذنًا واحدًا لهذا التطبيق وحده: «تثبيت التطبيقات غير المعروفة». لن يُثبَّت شيء بدون ضغطك، وبياناتك وقوائمك تبقى كما هي.</string>
+    <string name="su_open_settings">فتح الإعدادات</string>
+    <string name="su_downloading">جارٍ تنزيل التحديث %1$d٪</string>
+    <string name="su_verifying">نتأكد من سلامة الملف…</string>
+    <string name="su_handed">سلّمنا التحديث إلى أندرويد: اتبع شاشة التثبيت</string>
+    <string name="su_failed">تعذّر التحديث الآن. نسختك الحالية تعمل كما هي وسنحاول لاحقًا</string>
+    <string name="upd_hint_self">اضغط OK لتنزيل التحديث والتحقق منه. بياناتك وقوائمك تبقى كما هي</string>
 </resources>

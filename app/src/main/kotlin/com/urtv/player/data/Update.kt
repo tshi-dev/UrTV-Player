@@ -22,7 +22,9 @@ object Update {
     const val UPDATE_PACKAGE = "sa.urtv.home"
     const val INTERVAL_MS = 24L * 3_600_000L
 
-    data class Offer(val code: Int, val name: String, val notes: String)
+    enum class Via { Urtv, Self }
+    /** [code] is UrTV's versionCode (0 for a self-update: the APK's own code is checked after download). */
+    data class Offer(val code: Int, val name: String, val notes: String, val via: Via = Via.Urtv, val apkUrl: String = "", val shaUrl: String = "")
     enum class Kind { NoUrtv, UpToDate, Available }
     data class State(val kind: Kind, val offer: Offer? = null)
 
@@ -55,8 +57,25 @@ object Update {
         }.getOrDefault(State(Kind.NoUrtv))
     }
 
+    /**
+     * UrTV is the authority when it is installed and answers. Only when it is NOT there does the Player look for its own update, and
+     * only if this build may self-update (official, release-signed). [lookup] is never called otherwise. Pure, unit-tested.
+     */
+    fun decide(urtv: State, selfAllowed: Boolean, lookup: () -> com.urtv.player.core.SelfUpdate.Release?): State {
+        if (urtv.kind != Kind.NoUrtv) return urtv
+        if (!selfAllowed) return State(Kind.UpToDate)
+        val rel = lookup() ?: return State(Kind.UpToDate)
+        return State(Kind.Available, Offer(0, rel.version, "", Via.Self, rel.apkUrl, rel.shaUrl))
+    }
+
     // ---- what was last learned, so Home and About can show it without asking again
-    fun load(sp: SharedPreferences, currentCode: Int): State = when (sp.getString("upd_kind", null)) {
+    fun load(sp: SharedPreferences, currentCode: Int, currentName: String = ""): State = when (sp.getString("upd_kind", null)) {
+        "self" -> {
+            val name = sp.getString("upd_name", null).orEmpty(); val apk = sp.getString("upd_apk", null).orEmpty(); val sha = sp.getString("upd_sha", null).orEmpty()
+            // re-validated on every load: only a plausible, still newer version with pinned-host links is ever offered
+            if (name.isNotEmpty() && com.urtv.player.core.SelfUpdate.isNewer(name, currentName) && com.urtv.player.core.SelfUpdate.hostAllowed(apk) && com.urtv.player.core.SelfUpdate.hostAllowed(sha))
+                State(Kind.Available, Offer(0, name, "", Via.Self, apk, sha)) else State(Kind.UpToDate)
+        }
         "available" -> offerFrom(sp.getInt("upd_code", 0), sp.getString("upd_name", null), sp.getString("upd_notes", null), currentCode)?.let { State(Kind.Available, it) } ?: State(Kind.UpToDate)   // installed since: no longer newer
         "nourtv" -> State(Kind.NoUrtv)
         "uptodate" -> State(Kind.UpToDate)
@@ -64,7 +83,8 @@ object Update {
     }
 
     fun save(sp: SharedPreferences, s: State, now: Long) {
-        sp.edit().putLong("upd_last", now).putString("upd_kind", when (s.kind) { Kind.Available -> "available"; Kind.NoUrtv -> "nourtv"; Kind.UpToDate -> "uptodate" })
-            .apply { s.offer?.let { putInt("upd_code", it.code).putString("upd_name", it.name).putString("upd_notes", it.notes) } }.apply()
+        val self = s.kind == Kind.Available && s.offer?.via == Via.Self
+        sp.edit().putLong("upd_last", now).putString("upd_kind", when { self -> "self"; s.kind == Kind.Available -> "available"; s.kind == Kind.NoUrtv -> "nourtv"; else -> "uptodate" })
+            .apply { s.offer?.let { putInt("upd_code", it.code).putString("upd_name", it.name).putString("upd_notes", it.notes).putString("upd_apk", it.apkUrl).putString("upd_sha", it.shaUrl) } }.apply()
     }
 }

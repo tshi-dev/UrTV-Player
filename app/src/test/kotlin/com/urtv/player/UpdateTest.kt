@@ -81,4 +81,32 @@ class UpdateTest {
         assertEquals(Kind.UpToDate, Update.load(sp, currentCode = 70).kind, "after installing it, nothing is offered any more")
         Update.save(sp, Update.State(Kind.NoUrtv), 124); assertEquals(Kind.NoUrtv, Update.load(sp, 68).kind)
     }
+
+    // ---- the Player is fully usable without UrTV
+    @Test fun withoutUrtvTheLanguageFallsBackToTheSystemAndNothingCrashes() {
+        assertNull(com.urtv.player.data.Language.readUrtv(ctx), "no UrTV here: no answer, no exception")
+        val first = com.urtv.player.data.Language.resolveAtStart("auto", null, "en") { com.urtv.player.data.Language.readUrtv(ctx) }
+        assertEquals("en", first.lang, "first start without UrTV follows the TV's language"); assertNull(first.urtvToCache)
+        assertEquals("ar", com.urtv.player.data.Language.resolveAtStart("auto", null, "de") { null }.lang, "unknown system language: Arabic first")
+        assertEquals("en", com.urtv.player.data.Language.resolveAtStart("en", null, "ar") { null }.lang, "the own setting always wins")
+    }
+
+    @Test fun urtvIsTheAuthorityAndSelfUpdateRunsOnlyWithoutIt() {
+        val rel = com.urtv.player.core.SelfUpdate.Release("0.9.9", "https://github.com/a/b/urtv-player.apk", "https://github.com/a/b/urtv-player.apk.sha256")
+        var calls = 0; val look = { calls++; rel }
+        val offer = Update.State(Kind.Available, Update.Offer(70, "0.9.4", ""))
+        assertEquals(offer, Update.decide(offer, true, look)); assertEquals(Update.State(Kind.UpToDate), Update.decide(Update.State(Kind.UpToDate), true, look)); assertEquals(0, calls, "GitHub is not asked while UrTV answers")
+        val self = Update.decide(Update.State(Kind.NoUrtv), true, look)
+        assertEquals(Kind.Available, self.kind); assertEquals(Update.Via.Self, self.offer?.via); assertEquals("0.9.9", self.offer?.name); assertEquals(1, calls)
+        assertEquals(Update.State(Kind.UpToDate), Update.decide(Update.State(Kind.NoUrtv), false, look), "a debug or unofficial build never self-updates"); assertEquals(1, calls)
+        assertEquals(Update.State(Kind.UpToDate), Update.decide(Update.State(Kind.NoUrtv), true) { null }, "a failed lookup is quiet")
+    }
+
+    @Test fun aRememberedSelfUpdateOffersNothingOnceInstalledOrIfItsLinksAreNotGithub() {
+        val sp = ctx.getSharedPreferences("upd-test2", 0)
+        val good = Update.State(Kind.Available, Update.Offer(0, "0.9.9", "", Update.Via.Self, "https://github.com/a/b/urtv-player.apk", "https://github.com/a/b/urtv-player.apk.sha256"))
+        Update.save(sp, good, 1); assertEquals(good, Update.load(sp, 68, "0.9.3"))
+        assertEquals(Kind.UpToDate, Update.load(sp, 68, "0.9.9").kind, "installed since")
+        Update.save(sp, good.copy(offer = good.offer!!.copy(apkUrl = "https://evil.example/a.apk")), 2); assertEquals(Kind.UpToDate, Update.load(sp, 68, "0.9.3").kind, "tampered preferences")
+    }
 }

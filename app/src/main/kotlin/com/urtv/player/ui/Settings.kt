@@ -66,6 +66,8 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     if (appearance) { AppearanceScreen(store) { appearance = false }; return }
     var listTest by remember { mutableStateOf(false) }
     if (listTest) { ListTestScreen(app) { listTest = false }; return }
+    var selfOffer by remember { mutableStateOf<com.urtv.player.data.Update.Offer?>(null) }
+    selfOffer?.let { o -> SelfUpdateScreen(app, o) { selfOffer = null }; return }
     var share by remember { mutableStateOf(false) }
     if (share) { ShareScreen(app) { share = false }; return }
     val offsets by store.epgOffsetMin.collectAsState()
@@ -150,7 +152,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     Column(Modifier.padding(horizontal = 12.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted))
                         Text(stringResource(R.string.about_version, com.urtv.player.BuildConfig.VERSION_NAME), style = T.bodyBold)
-                        UpdateRow(app)
+                        UpdateRow(app) { selfOffer = it }
                         Setting(stringResource(R.string.share_row), "", stringResource(R.string.share_row_hint)) { share = true }
                         when (app.integrity) {
                             com.urtv.player.data.Integrity.Status.Official -> Text(stringResource(R.string.about_official), style = T.body.copy(color = C.accent))
@@ -262,7 +264,7 @@ private fun ManageList(title: String, hint: String, items: List<Pair<String, Str
 
 /** «Update available x» opens UrTV's installer screen (UrTV checks sha256 and certificate; Android shows its own prompt). Never asks to uninstall. */
 @Composable
-private fun UpdateRow(app: UrtvApp) {
+private fun UpdateRow(app: UrtvApp, onSelf: (com.urtv.player.data.Update.Offer) -> Unit) {
     val u = app.update
     var handed by remember { mutableStateOf(false) }
     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
@@ -272,11 +274,11 @@ private fun UpdateRow(app: UrtvApp) {
     when {
         handed -> Text(stringResource(R.string.upd_handed), style = T.body.copy(color = C.accent))
         u.kind == com.urtv.player.data.Update.Kind.Available && offer != null && app.integrity == com.urtv.player.data.Integrity.Status.Official ->
-            Setting(stringResource(R.string.upd_available, offer.name), "", offer.notes.ifBlank { stringResource(R.string.upd_hint) }) {
+            Setting(stringResource(R.string.upd_available, offer.name), "", offer.notes.ifBlank { stringResource(if (offer.via == com.urtv.player.data.Update.Via.Self) R.string.upd_hint_self else R.string.upd_hint) }) {
+                if (offer.via == com.urtv.player.data.Update.Via.Self) { onSelf(offer); return@Setting }
                 val i = android.content.Intent(com.urtv.player.data.Update.ACTION_INSTALL).setPackage(com.urtv.player.data.Update.UPDATE_PACKAGE).putExtra("version_code", offer.code)
                 try { launcher.launch(i) } catch (_: Exception) { app.update = com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.NoUrtv) }   // UrTV missing or too old to answer
             }
-        u.kind == com.urtv.player.data.Update.Kind.NoUrtv -> Text(stringResource(R.string.upd_from_tv), style = T.body.copy(color = C.muted))
         else -> Unit
     }
 }

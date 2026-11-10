@@ -10,8 +10,11 @@ Goal: the player cannot be used as an official build, or updated, without us.
    «نسخة غير رسمية / Unofficial build» and turns off the LAN pairing page and backup restore. It keeps working as a player, never
    crashes and never contacts anyone. (A determined person can still rebuild with their own pin; the real guard is that Android
    will not let such a build replace or update ours.)
-3. **No self-updater.** Updates come only through UrTV, which downloads the release asset, checks its `.sha256` and the signing
-   certificate, then installs.
+3. **Updates are verified, never silent.** With UrTV installed, UrTV downloads the release asset, checks its `.sha256` and the signing
+   certificate, then installs. Without UrTV (owner decision), the official build updates itself from the public «player-<version>»
+   release (`urtv-player.apk` + `.sha256`): only https to GitHub's own hosts, sha256 = published, package = ours, a higher
+   versionCode and a single signer equal to our pinned certificate, then Android's PackageInstaller asks the person. Debug and
+   unofficial builds never do this.
 4. **Debug builds are separate.** Debug builds use the id `com.urtv.player.debug` and are labelled «تجريبي / Debug», so they can
    never overwrite the official app.
 5. The repository stays private; R8 shrinking/obfuscation is on for release; nothing secret is logged.

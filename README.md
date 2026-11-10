@@ -13,7 +13,7 @@ the app only plays what you give it.
 - Fast zapping (Up/Down, number entry), now/next, TV guide grid, audio/subtitle tracks, aspect modes, auto-reconnect
 - Parental PIN for chosen groups
 - Arabic (RTL) and English, D-pad only
-- Minimal permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, and the normal `sa.urtv.permission.READ_LANG` (reads only UrTV's language, no prompt). No storage, overlay, install, analytics, ads or crash SDKs. No self-updater.
+- Minimal permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, the normal `sa.urtv.permission.READ_LANG` (reads only UrTV's language, no prompt) and `REQUEST_INSTALL_PACKAGES` (owner decision, used only when you tap «update» and UrTV is not installed: the Player downloads its own signed release from the public UrTV releases on GitHub, checks sha256, package name, version and our pinned certificate, and hands it to Android's installer; Android asks you to allow it once). No storage, overlay, analytics, ads or crash SDKs. Never updates silently, never on debug or unofficial builds.
 
 Build: `gradle :core:test` (parsers, no Android SDK needed) · `gradle :app:assembleDebug` (needs the Android SDK).
 Release signing happens only in CI from secrets; no keys are in this repository.
@@ -41,7 +41,7 @@ In lists, hold OK on a channel to add it to favourites, or on a group to lock it
 - تنقّل سريع بين القنوات، دليل البرامج، المسارات الصوتية والترجمة، أوضاع العرض، إعادة اتصال تلقائية
 - رمز PIN للرقابة الأبوية على مجموعات تختارها
 - عربي (RTL) وإنجليزي، بالريموت فقط
-- أقل الصلاحيات: `INTERNET` و`ACCESS_NETWORK_STATE` وصلاحية UrTV العادية `sa.urtv.permission.READ_LANG` (تقرأ لغة UrTV فقط، بلا نافذة طلب). بلا تخزين ولا تراكب ولا تثبيت ولا تحليلات ولا إعلانات. بلا تحديث ذاتي.
+- أقل الصلاحيات: `INTERNET` و`ACCESS_NETWORK_STATE` وصلاحية UrTV العادية `sa.urtv.permission.READ_LANG` (تقرأ لغة UrTV فقط، بلا نافذة طلب). و`REQUEST_INSTALL_PACKAGES` (قرار المالك: لا تُستخدم إلا عند ضغطك «تحديث» وعدم وجود UrTV؛ ينزّل المشغّل إصداره الموقّع من إصدارات UrTV العامة على GitHub، ويتحقق من الهاش واسم الحزمة والإصدار وشهادتنا المثبّتة، ثم يسلّمه إلى مثبّت أندرويد الذي يطلب إذنك مرة واحدة). بلا تخزين ولا تراكب ولا تحليلات ولا إعلانات. لا تحديث صامت أبدًا.
 
 ### أزرار الريموت (المشغّل)
 

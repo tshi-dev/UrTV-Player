@@ -20,7 +20,7 @@ The report holds the steps and your words. Do not paste secrets, keys, addresses
 - The phone pairing page (the small local web server): it must stay on the local network, be protected by its session token,
   and close after use.
 - Anything that stores or sends a user's playlist links, credentials or PIN somewhere it should not.
-- The build files and workflow: a signing key, a secret or a self-updater must never appear in the repository.
+- The build files and workflow: a signing key or a secret must never appear in the repository, and the in-app updater (`SelfUpdate`, `SelfUpdater`) must keep its pinned GitHub hosts, its sha256, package-name, version and certificate checks, and must never run silently or on a debug/unofficial build.
 
 ## Out of scope
 

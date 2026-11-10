@@ -3,6 +3,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Owner decision (self-update when UrTV is not installed): lets the Player hand a verified update to Android's installer. It is
+         used only after the person taps «update», never silently; the system asks the person to allow it once. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Only exception to "INTERNET only": a normal, app-defined permission declared by the UrTV home app. No user prompt, and it
          grants nothing beyond one value (UrTV's language, ar or en). The queries line is Android 11+ package visibility. -->
     <uses-permission android:name="sa.urtv.permission.READ_LANG" />
