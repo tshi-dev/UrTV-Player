@@ -51,6 +51,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
     BackHandler(onBack = onDone)
     var mode by remember { mutableStateOf(AddMode.Phone) }
     val first = remember { FocusRequester() }
+    val tabRequesters = remember { AddMode.entries.associateWith { if (it == AddMode.Phone) first else FocusRequester() } }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 
     fun save(p: PhoneInput) {
@@ -65,7 +66,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         Spacer(Modifier.height(40.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             for (m in AddMode.entries) {
-                Tv({ mode = m }, Modifier.height(104.dp), Rd(52), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = if (m == AddMode.Phone) first else null) {
+                Tv({ mode = m }, Modifier.height(104.dp), Rd(52), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = tabRequesters[m]) {
                     Text(stringResource(when (m) { AddMode.Phone -> R.string.add_phone; AddMode.M3u -> R.string.kind_m3u; AddMode.Xtream -> R.string.kind_xtream }),
                         style = if (m == mode) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 48.dp))
                 }
@@ -75,8 +76,8 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (mode) {
                 AddMode.Phone -> if (demo == null && app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) UnofficialNote() else PhonePane(demo, ::save)
-                AddMode.M3u -> FormPane(false, ::save)
-                AddMode.Xtream -> FormPane(true, ::save)
+                AddMode.M3u -> FormPane(false, ::save) { runCatching { tabRequesters[AddMode.M3u]!!.requestFocus() } }
+                AddMode.Xtream -> FormPane(true, ::save) { runCatching { tabRequesters[AddMode.Xtream]!!.requestFocus() } }
             }
         }
     }
@@ -136,13 +137,13 @@ fun Qr(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun FormPane(xtream: Boolean, onSave: (PhoneInput) -> Unit) {
+private fun FormPane(xtream: Boolean, onSave: (PhoneInput) -> Unit, toTabs: () -> Unit) {
     var name by remember { mutableStateOf("") }; var url by remember { mutableStateOf("") }
     var server by remember { mutableStateOf("") }; var user by remember { mutableStateOf("") }; var pass by remember { mutableStateOf("") }
     var epg by remember { mutableStateOf("") }
     var err by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 16.dp, horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-        FocusField(name, { name = it }, stringResource(R.string.f_name), Modifier.fillMaxWidth())
+        FocusField(name, { name = it }, stringResource(R.string.f_name), Modifier.fillMaxWidth(), onUp = toTabs)
         if (!xtream) FocusField(url, { url = it; err = false }, stringResource(R.string.f_url), Modifier.fillMaxWidth(), ltr = true)
         else {
             FocusField(server, { server = it; err = false }, stringResource(R.string.f_server), Modifier.fillMaxWidth(), ltr = true)

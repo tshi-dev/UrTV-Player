@@ -39,6 +39,9 @@
         <activity
             android:name=".FindMatchActivity"
             android:exported="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Urtv.Overlay"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density">
             <intent-filter>
                 <action android:name="sa.urtv.player.action.FIND_MATCH" />

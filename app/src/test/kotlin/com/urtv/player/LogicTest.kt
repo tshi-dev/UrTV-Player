@@ -4,6 +4,7 @@ import com.urtv.player.core.Channel
 import com.urtv.player.core.Programme
 import com.urtv.player.data.Browse
 import com.urtv.player.data.EpgIndex
+import com.urtv.player.data.Language
 import com.urtv.player.phone.Page
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,6 +74,26 @@ class WatchItemTest {
 }
 
 class LanguageTest {
+    @Test fun coldStartAsksUrtvFirstAndUsesTheCacheOnlyAsFallback() {
+        // first start ever: nothing cached, UrTV says ar, TV is English -> Arabic (not the TV's English)
+        assertEquals(Language.Start("ar", "ar"), Language.resolveAtStart("auto", null, "en") { "ar" })
+        // UrTV switched to en and the app was force-stopped: the fresh answer beats the stale cache
+        assertEquals(Language.Start("en", "en"), Language.resolveAtStart("auto", "ar", "ar") { "en" })
+        // provider silent/slow/throwing: fall back to the remembered answer, then to the system
+        assertEquals(Language.Start("en", null), Language.resolveAtStart("auto", "en", "ar") { null })
+        assertEquals(Language.Start("en", null), Language.resolveAtStart("auto", "en", "ar") { error("boom") })
+        assertEquals(Language.Start("ar", null), Language.resolveAtStart("auto", null, "fr") { null })
+        // a manual choice never even asks
+        assertEquals(Language.Start("ar", null), Language.resolveAtStart("ar", "en", "en") { error("must not be called") })
+    }
+
+    @Test fun slowProviderIsAbandonedAfterTheTimeout() {
+        val t0 = System.currentTimeMillis()
+        assertEquals(null, Language.within(150) { Thread.sleep(2000); "en" })
+        assertTrue(System.currentTimeMillis() - t0 < 1000)
+        assertEquals("ar", Language.within(1000) { "ar" })
+    }
+
     private val r = com.urtv.player.data.Language::resolve
     @Test fun manualChoiceAlwaysWins() {
         assertEquals("en", r("en", "ar", "ar")); assertEquals("ar", r("ar", "en", "en"))

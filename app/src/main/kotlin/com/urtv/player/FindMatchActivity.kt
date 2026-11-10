@@ -23,7 +23,7 @@ import com.urtv.player.ui.UrtvTheme
  * Extras: home_ar, home_en, away_ar, away_en, competition_ar, competition_en (String), kickoff (Long, epoch ms), channels (String[]).
  */
 class FindMatchActivity : ComponentActivity() {
-    override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base))
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base, fresh = false))
 
     private fun callerIsUrtv(): Boolean {
         val pkg = callingPackage ?: return false
@@ -33,7 +33,7 @@ class FindMatchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)
-        if (intent?.action != ACTION || !callerIsUrtv()) { finish(); return }
+        if (intent?.action != ACTION || !callerIsUrtv()) { finish(); overridePendingTransition(0, 0); return }   // ignored: show nothing, bring nothing forward
         val req = readRequest(intent, System.currentTimeMillis())
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

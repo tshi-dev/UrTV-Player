@@ -34,4 +34,25 @@ object Language {
         if (owner != "sa.urtv.home" || !Integrity.callerAllowed(owner, Integrity.certDigestsOf(ctx, owner))) return@runCatching null
         ctx.contentResolver.query(Uri.parse(URTV_URI), arrayOf("lang"), null, null, null)?.use { c -> if (c.moveToFirst()) normalize(c.getString(0)) else null }
     }.getOrNull()
+
+    /** Result of the cold-start decision: the language to show and what to remember of UrTV's answer. */
+    data class Start(val lang: String, val urtvToCache: String?)
+
+    /**
+     * Cold start (before the first frame): a manual choice wins without any lookup; in Auto, UrTV's provider is asked first
+     * ([read] may return null on failure/timeout) and the last remembered answer is only the fallback. Unit-tested with a fake provider.
+     */
+    fun resolveAtStart(choice: String, cachedUrtv: String?, system: String, read: () -> String?): Start {
+        if (choice == "ar" || choice == "en") return Start(choice, null)
+        val fresh = runCatching(read).getOrNull()
+        return Start(resolve(choice, fresh ?: cachedUrtv, system), fresh)
+    }
+
+    /** Runs [block] on a helper thread and waits at most [timeoutMs]; null when it is slower, throws or returns null. */
+    fun <T> within(timeoutMs: Long, block: () -> T?): T? {
+        var out: T? = null
+        val t = Thread({ out = runCatching(block).getOrNull() }, "lang-read").apply { isDaemon = true; start() }
+        t.join(timeoutMs)
+        return if (t.isAlive) null else out
+    }
 }

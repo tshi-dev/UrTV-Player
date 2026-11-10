@@ -140,7 +140,17 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.backup_to_phone), "") { onBackup(false) } }
                     item { Setting(stringResource(R.string.restore_from_phone), "") { onBackup(true) } }
                 }
-                Section.About -> item { Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted), modifier = Modifier.padding(horizontal = 12.dp).width(900.dp)) }
+                Section.About -> item {
+                    Column(Modifier.padding(horizontal = 12.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted))
+                        Text(stringResource(R.string.about_version, com.urtv.player.BuildConfig.VERSION_NAME), style = T.bodyBold)
+                        when (app.integrity) {
+                            com.urtv.player.data.Integrity.Status.Official -> Text(stringResource(R.string.about_official), style = T.body.copy(color = C.accent))
+                            com.urtv.player.data.Integrity.Status.Debug -> Text(stringResource(R.string.about_debug), style = T.body.copy(color = C.muted))
+                            else -> Text(stringResource(R.string.about_unofficial), style = T.body.copy(color = C.danger))
+                        }
+                    }
+                }
             }
         }
     }

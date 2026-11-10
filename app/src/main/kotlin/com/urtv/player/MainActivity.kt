@@ -36,10 +36,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** The app language (Auto/ar/en, Western digits) applied to a base context; shared by every activity. */
-fun localized(base: Context): Context {
+/**
+ * The app language (Auto/ar/en, Western digits) applied to a base context; shared by every activity. In Auto it asks the UrTV
+ * provider right here, before anything is drawn (cold start included), and keeps the last answer only as a fallback.
+ */
+fun localized(base: Context, fresh: Boolean = true): Context {
     val sp = base.getSharedPreferences("urtv", Context.MODE_PRIVATE)
-    val lang = sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: "auto", sp.getString("urtvLang", null), com.urtv.player.data.Language.systemLanguage())
+    val choice = sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: com.urtv.player.data.Language.AUTO
+    val cached = sp.getString("urtvLang", null)
+    val lang = if (fresh) {
+        val r = com.urtv.player.data.Language.resolveAtStart(choice, cached, com.urtv.player.data.Language.systemLanguage()) { com.urtv.player.data.Language.within(800) { com.urtv.player.data.Language.readUrtv(base) } }
+        sp.edit().apply { r.urtvToCache?.let { if (it != cached) putString("urtvLang", it) } }.putString("resolvedLang", r.lang).apply()
+        r.lang
+    } else sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(choice, cached, com.urtv.player.data.Language.systemLanguage())
     val loc = Locale.forLanguageTag("$lang-u-nu-latn")   // Western digits in Arabic: clearer for channel numbers and times
     Locale.setDefault(loc)
     val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }

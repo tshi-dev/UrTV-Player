@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -97,7 +98,15 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
             store.takeDueReminders(System.currentTimeMillis()).firstOrNull()?.let { r -> banner = soon.format(r.title, r.channel); kotlinx.coroutines.delay(20_000); banner = null }
         }
     }
-    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+    // Safety net: if nothing holds focus (after a language change/recreate, a list rebuild...) give it to the first focusable
+    // thing a moment later, so a TV remote never meets a dead screen. Not on the players, which manage their own keys.
+    var anyFocus by remember { mutableStateOf(true) }
+    val fm = androidx.compose.ui.platform.LocalFocusManager.current
+    val inPlayer = screen == Screen.Player || screen == Screen.Vod
+    LaunchedEffect(anyFocus, screen, tab, inPlayer) {
+        if (!anyFocus && !inPlayer) { kotlinx.coroutines.delay(450); if (!anyFocus) fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Next) }
+    }
+    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().onFocusChanged { anyFocus = it.hasFocus }) {
     androidx.compose.animation.AnimatedContent(if (homeOnly) Screen.Server else screen, transitionSpec = {
         androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200, easing = androidx.compose.animation.core.LinearOutSlowInEasing)).togetherWith(androidx.compose.animation.ExitTransition.None)
     }, label = "screen") { scr -> when (scr) {

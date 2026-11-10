@@ -17,6 +17,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.shadow
 import com.urtv.player.data.FocusStyle
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
@@ -159,9 +162,10 @@ fun FocusField(
     value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier,
     password: Boolean = false, ltr: Boolean = false, leading: @Composable (() -> Unit)? = null,
     imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Next,
-    focusRequester: FocusRequester? = null, compact: Boolean = false,
+    focusRequester: FocusRequester? = null, compact: Boolean = false, onUp: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val fm = androidx.compose.ui.platform.LocalFocusManager.current
     val shape = Rd(if (compact) 12 else 16)
     Row(
         modifier.height(if (compact) 52.dp else 60.dp).clip(shape).background(if (focused) LocalTheme.current.focusFill else C.surface)
@@ -180,8 +184,19 @@ fun FocusField(
                 visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = imeAction, autoCorrectEnabled = false,
-                    keyboardType = if (ltr) androidx.compose.ui.text.input.KeyboardType.Uri else androidx.compose.ui.text.input.KeyboardType.Text),
-                modifier = Modifier.fillMaxWidth().let { if (focusRequester != null) it.focusRequester(focusRequester) else it }.onFocusChanged { focused = it.isFocused },
+                    keyboardType = if (ltr) androidx.compose.ui.text.input.KeyboardType.Uri else androidx.compose.ui.text.input.KeyboardType.Text,
+                    // links and logins are Latin: ask the TV keyboard for English (an Arabic IME otherwise turns Latin keys into Arabic); Uri type already means no suggestions
+                    hintLocales = if (ltr) androidx.compose.ui.text.intl.LocaleList("en") else null),
+                modifier = Modifier.fillMaxWidth().let { if (focusRequester != null) it.focusRequester(focusRequester) else it }.onFocusChanged { focused = it.isFocused }
+                    // a text field must never be a trap: D-pad Up/Down leave it (to the nearest neighbour, or to [onUp] when there is none)
+                    .onPreviewKeyEvent { e: androidx.compose.ui.input.key.KeyEvent ->
+                        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) false
+                        else when (e.key) {
+                            androidx.compose.ui.input.key.Key.DirectionUp -> { if (!fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Up)) onUp?.invoke(); true }
+                            androidx.compose.ui.input.key.Key.DirectionDown -> fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Down)
+                            else -> false
+                        }
+                    },
             )
         }
     }

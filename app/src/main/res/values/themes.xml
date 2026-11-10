@@ -7,4 +7,10 @@
         <item name="android:windowContentTransitions">false</item>
     </style>
     <color name="bg">#0B0D12</color>
+    <!-- FIND_MATCH: translucent, so an ignored call (finishes in onCreate) never flashes or brings the app forward. -->
+    <style name="Theme.Urtv.Overlay" parent="Theme.Urtv">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
