@@ -103,4 +103,76 @@ class PhoneServerTest {
         val a = PhoneServer(lo, {}, {}); val b = PhoneServer(lo, {}, {})
         assertTrue(Regex("\\d{6}").matches(a.code)); assertNotNull(b.code)
     }
+
+    // ---- shaped like a real phone browser (Chrome): idle pre-opened sockets, keep-alive, Origin: null from a no-referrer page
+
+    private fun browserPost(port: Int, body: String, origin: String?, extra: String = "", closeAfter: Boolean = false): String = Socket(lo, port).use { s ->
+        s.soTimeout = 4000
+        val bytes = body.toByteArray()
+        val head = "POST /add HTTP/1.1\r\nHost: 127.0.0.1:$port\r\nConnection: keep-alive\r\nContent-Length: ${bytes.size}\r\nCache-Control: max-age=0\r\n" +
+            (origin?.let { "Origin: $it\r\n" } ?: "") + "Upgrade-Insecure-Requests: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n" +
+            "User-Agent: Mozilla/5.0 (Linux; Android 14) Chrome/130\r\nAccept: text/html\r\nAccept-Encoding: gzip, deflate\r\n$extra\r\n"
+        s.getOutputStream().write(head.toByteArray()); s.getOutputStream().flush()
+        if (extra.contains("Expect")) { Thread.sleep(50) }
+        s.getOutputStream().write(bytes); s.getOutputStream().flush()
+        // read just the response (Content-Length framed), as a keep-alive client does, not until close
+        val inp = s.getInputStream(); val sb = StringBuilder(); val t0 = System.currentTimeMillis()
+        while (System.currentTimeMillis() - t0 < 4000) {
+            val b = inp.read(); if (b < 0) break; sb.append(b.toChar())
+            if (sb.endsWith("</html>") || sb.endsWith("forbidden") || sb.endsWith("not found")) break
+        }
+        sb.toString()
+    }
+
+    @Test fun formPostSucceedsWhileBrowserIdleSocketsAreOpen() {
+        var got: PhoneInput? = null; val ran = CountDownLatch(1)
+        val s = start({ got = it; ran.countDown() })
+        // Chrome opens extra connections ahead of time and leaves them silent
+        val idle = List(3) { Socket(lo, s.port) }
+        try {
+            val t0 = System.currentTimeMillis()
+            val r = browserPost(s.port, "c=${s.code}&name=Mine&url=http%3A%2F%2Fexample.com%2Fl.m3u&server=&user=&pass=&epg=", origin = "http://127.0.0.1:${s.port}")
+            assertTrue(r.startsWith("HTTP/1.1 200"), r)
+            assertTrue(System.currentTimeMillis() - t0 < 2500, "idle sockets must not delay a real request")
+            assertTrue(ran.await(3, TimeUnit.SECONDS), "the playlist job must start")
+            assertEquals("http://example.com/l.m3u", got?.url); assertEquals("Mine", got?.name)
+        } finally { idle.forEach { runCatching { it.close() } }; s.close() }
+    }
+
+    @Test fun formPostWithOriginNullAndExpectContinueIsAccepted() {
+        var got: PhoneInput? = null; val ran = CountDownLatch(1)
+        val s = start({ got = it; ran.countDown() })
+        try {
+            val r = browserPost(s.port, "c=${s.code}&url=https%3A%2F%2Fx.example%2Fa.m3u", origin = "null", extra = "Expect: 100-continue\r\n")
+            assertTrue(r.contains("HTTP/1.1 200"), r)
+            assertTrue(ran.await(3, TimeUnit.SECONDS)); assertEquals("https://x.example/a.m3u", got?.url)
+        } finally { s.close() }
+    }
+
+    @Test fun foreignOriginStillRefusedAndMalformedEscapesGetAnAnswer() {
+        val s = start()
+        try {
+            assertTrue(browserPost(s.port, "c=${s.code}&url=http%3A%2F%2Fa", origin = "http://evil.example").startsWith("HTTP/1.1 403"))
+            val bad = browserPost(s.port, "c=${s.code}&url=%ZZ%", origin = "null")
+            assertTrue(bad.startsWith("HTTP/1.1 403") || bad.startsWith("HTTP/1.1 400"), "a malformed escape is answered, not dropped: $bad")
+        } finally { s.close() }
+    }
+
+    @Test fun concurrentSubmitsDeliverOnce() {
+        val n = java.util.concurrent.atomic.AtomicInteger(); val s = start({ n.incrementAndGet() })
+        val ts = List(4) { Thread { browserPost(s.port, "c=${s.code}&url=http%3A%2F%2Fa.example%2Fl", origin = "null") }.also { it.start() } }
+        ts.forEach { it.join(6000) }; Thread.sleep(200)
+        assertEquals(1, n.get()); s.close()
+    }
+
+    @Test fun logsOneLinePerRequestWithoutUrlsOrCodes() {
+        val lines = java.util.Collections.synchronizedList(ArrayList<String>())
+        PhoneServer.logger = { lines += it }
+        val s = start()
+        try {
+            browserPost(s.port, "c=${s.code}&url=http%3A%2F%2Fsecret.example%2Fl", origin = "null"); Thread.sleep(300)
+            assertTrue(lines.any { it.contains("POST /add -> 200") }, lines.toString())
+            assertTrue(lines.none { it.contains("secret.example") || it.contains(s.code) }, "no URLs or codes in the log")
+        } finally { PhoneServer.logger = {}; s.close() }
+    }
 }

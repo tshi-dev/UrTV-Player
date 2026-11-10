@@ -11,6 +11,8 @@ import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 data class PhoneInput(val name: String, val url: String, val server: String, val user: String, val pass: String, val epg: String)
 
@@ -35,7 +37,9 @@ class PhoneServer(
     @Volatile var port: Int = 0; private set
     @Volatile private var server: ServerSocket? = null
     @Volatile private var done = false
-    private var wrong = 0
+    private val wrong = AtomicInteger()
+    private val used = AtomicBoolean(false)     // exactly one successful submit/download per session
+    private val active = AtomicInteger()        // connections being served right now
 
     /** Host header values this server answers to (defends against DNS rebinding from a browser on the phone). */
     private var hosts: Set<String> = emptySet()
@@ -49,7 +53,13 @@ class PhoneServer(
             s.soTimeout = 1000
             val deadline = System.currentTimeMillis() + lifetimeMs
             while (!done && System.currentTimeMillis() < deadline) {
-                try { handle(s.accept()) } catch (_: SocketTimeoutException) { } catch (_: Exception) { if (done) break }
+                try {
+                    // One thread per connection: browsers open idle speculative sockets, and a single-threaded loop would sit on
+                    // each of them (4 s apiece) while the real request waits, which looks like a server that stopped answering.
+                    val c = s.accept()
+                    if (active.incrementAndGet() > MAX_CONNECTIONS) { active.decrementAndGet(); runCatching { c.close() }; log("busy: connection refused"); continue }
+                    Thread({ try { serve(c) } finally { active.decrementAndGet() } }, "phone-conn").apply { isDaemon = true }.start()
+                } catch (_: SocketTimeoutException) { } catch (_: Exception) { if (done) break }
             }
             close()
         }, "phone-add").apply { isDaemon = true }.start()
@@ -63,6 +73,18 @@ class PhoneServer(
         onClosed()
     }
 
+    /** Runs [handle] and records one line per request (method, path without query, status, ms); never URLs or secrets. */
+    private fun serve(sock: Socket) {
+        val t0 = System.currentTimeMillis()
+        try { handle(sock) }
+        catch (e: SocketTimeoutException) { log("idle connection closed (no request)") }
+        catch (e: Exception) { log("request failed: ${e.javaClass.simpleName}") }
+        finally { runCatching { sock.close() } }
+        line.get()?.let { log("$it ${System.currentTimeMillis() - t0}ms") }; line.remove()
+    }
+    /** "METHOD /path -> status" of the request this connection's thread is serving (one thread per connection). */
+    private val line = ThreadLocal<String?>()
+
     private fun handle(sock: Socket) = sock.use { s ->
         s.soTimeout = 4000
         val addr = s.inetAddress
@@ -74,13 +96,17 @@ class PhoneServer(
         val parts = lines[0].split(' ')
         if (parts.size < 2) return
         val method = parts[0]; val target = parts[1]
+        line.set("$method ${target.substringBefore('?').take(40)}")
         fun header(n: String) = lines.firstOrNull { it.startsWith("$n:", true) }?.substringAfter(':')?.trim()
         if (header("host") !in hosts) { respond(out, 403, "text/plain", "forbidden"); return }
-        header("origin")?.let { if (it != "http://${header("host")}") { respond(out, 403, "text/plain", "forbidden"); return } }
+        // Browsers send "Origin: null" on a form POST when the page sets Referrer-Policy: no-referrer; the Host check and the
+        // session code still protect the page, so "null" is accepted and any other foreign origin is not.
+        header("origin")?.let { if (it != "null" && it != "http://${header("host")}") { respond(out, 403, "text/plain", "forbidden"); return } }
         if (method != "GET" && method != "POST") { respond(out, 405, "text/plain", "method not allowed"); return }
         val path = target.substringBefore('?')
         val query = parseForm(target.substringAfter('?', ""))
         val len = header("content-length")?.toIntOrNull() ?: 0
+        if (header("expect")?.contains("100-continue", true) == true) { out.write("HTTP/1.1 100 Continue\r\n\r\n".toByteArray()); out.flush() }
         val maxBody = if (mode == PhoneMode.Restore && path == "/restore") MAX_BLOB else 8192
         if (len < 0 || len > maxBody) { respond(out, 413, "text/plain", "too large"); return }
         val raw = if (method == "POST" && len > 0) readN(inp, len) else ByteArray(0)
@@ -95,6 +121,7 @@ class PhoneServer(
             mode == PhoneMode.Backup && method == "GET" && path == "/backup" -> {
                 if (!checkCode(query["c"] ?: "")) { respond(out, 403, "text/html", Page.codeForm(true)); return }
                 val blob = backupBlob ?: run { respond(out, 404, "text/plain", "not found"); return }
+                if (!used.compareAndSet(false, true)) { respond(out, 403, "text/plain", "forbidden"); return }
                 respondBytes(out, "application/octet-stream", blob, "attachment; filename=\"urtv-backup.urb\"")
                 done = true
             }
@@ -102,6 +129,7 @@ class PhoneServer(
                 if (!checkCode(query["c"] ?: "")) { respond(out, 403, "text/html", Page.codeForm(true)); return }
                 val file = multipartFile(header("content-type").orEmpty(), raw)
                 if (file == null || file.isEmpty()) { respond(out, 400, "text/html", Page.restore(query["c"].orEmpty(), error = true)); return }
+                if (!used.compareAndSet(false, true)) { respond(out, 403, "text/plain", "forbidden"); return }
                 respond(out, 200, "text/html", Page.done())
                 onBlob(file); done = true
             }
@@ -111,6 +139,7 @@ class PhoneServer(
                 val input = PhoneInput(f["name"].orEmpty().trim().take(60), f["url"].orEmpty().trim(), f["server"].orEmpty().trim(), f["user"].orEmpty().trim(), f["pass"].orEmpty(), f["epg"].orEmpty().trim())
                 val ok = input.url.isNotEmpty() || (input.server.isNotEmpty() && input.user.isNotEmpty())
                 if (!ok) { respond(out, 400, "text/html", Page.form(f["c"].orEmpty(), error = true)); return }
+                if (!used.compareAndSet(false, true)) { respond(out, 403, "text/plain", "forbidden"); return }
                 respond(out, 200, "text/html", Page.done())
                 onInput(input); done = true
             }
@@ -135,20 +164,23 @@ class PhoneServer(
     }
 
     private fun respondBytes(o: java.io.OutputStream, type: String, b: ByteArray, disposition: String) {
+        line.set(line.get()?.substringBefore(" ->")?.let { "$it -> 200" })
         val h = "HTTP/1.1 200 OK\r\nContent-Type: $type\r\nContent-Length: ${b.size}\r\nContent-Disposition: $disposition\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n"
         o.write(h.toByteArray(Charsets.ISO_8859_1)); o.write(b); o.flush()
     }
 
     private fun checkCode(c: String): Boolean {
         val ok = MessageDigest.isEqual(c.toByteArray(), code.toByteArray())
-        if (!ok) { Thread.sleep(300); if (++wrong >= 5) done = true }   // slow down guessing, then shut the door
+        if (!ok) { Thread.sleep(300); if (wrong.incrementAndGet() >= 5) done = true }   // slow down guessing, then shut the door
         return ok
     }
 
     private fun readHead(i: InputStream): String? {
         val b = ByteArrayOutputStream()
         var last = 0
+        val until = System.currentTimeMillis() + 8000      // total budget: a client trickling bytes cannot hold a connection
         while (b.size() < 8192) {
+            if (System.currentTimeMillis() > until) return null
             val x = i.read(); if (x < 0) return null
             b.write(x); last = (last shl 8) or x
             if (last == 0x0d0a0d0a) return b.toString("ISO-8859-1").removeSuffix("\r\n\r\n")
@@ -162,11 +194,14 @@ class PhoneServer(
         return a.copyOf(o)
     }
 
-    private fun parseForm(s: String): Map<String, String> = s.split('&').filter { it.contains('=') }.associate {
-        URLDecoder.decode(it.substringBefore('='), "UTF-8") to URLDecoder.decode(it.substringAfter('='), "UTF-8")
-    }
+    private fun parseForm(s: String): Map<String, String> = runCatching {
+        s.split('&').filter { it.contains('=') }.associate {
+            URLDecoder.decode(it.substringBefore('='), "UTF-8") to URLDecoder.decode(it.substringAfter('='), "UTF-8")
+        }
+    }.getOrDefault(emptyMap())   // a malformed % escape gives an empty form (answered 400/403), never a dropped connection
 
     private fun respond(o: java.io.OutputStream, status: Int, type: String, body: String) {
+        line.set(line.get()?.substringBefore(" ->")?.let { "$it -> $status" })
         val b = body.toByteArray(Charsets.UTF_8)
         val reason = when (status) { 200 -> "OK"; 400 -> "Bad Request"; 403 -> "Forbidden"; 404 -> "Not Found"; 405 -> "Method Not Allowed"; 413 -> "Payload Too Large"; else -> "Error" }
         val h = "HTTP/1.1 $status $reason\r\nContent-Type: $type; charset=utf-8\r\nContent-Length: ${b.size}\r\nCache-Control: no-store\r\n" +
@@ -175,8 +210,13 @@ class PhoneServer(
         o.write(h.toByteArray(Charsets.ISO_8859_1)); o.write(b); o.flush()
     }
 
+    private fun log(m: String) = logger("phone: $m")
+
     companion object {
         const val MAX_BLOB = 1_000_000
+        const val MAX_CONNECTIONS = 8
+        /** One line per request result; set by the app to Logcat. Never receives URLs, codes or credentials. */
+        @Volatile var logger: (String) -> Unit = {}
         private fun isLocal(a: InetAddress) = a.isSiteLocalAddress || a.isLinkLocalAddress || a.isLoopbackAddress ||
             (a.address.size == 16 && (a.address[0].toInt() and 0xfe) == 0xfc)
 

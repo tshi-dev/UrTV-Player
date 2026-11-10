@@ -38,6 +38,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        com.urtv.player.phone.PhoneServer.logger = { android.util.Log.i("UrtvPhone", it) }
         store = Store(this)                                    // preferences only: cheap
         Thread({ store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this) }, "load-store").start()     // Keystore, encrypted files and the certificate check, off the main thread
     }
