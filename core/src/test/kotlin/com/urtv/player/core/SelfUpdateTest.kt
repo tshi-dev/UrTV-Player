@@ -6,26 +6,24 @@ import kotlin.test.*
 class SelfUpdateTest {
     private val cert = "13ade7d009a07f5ba5bab0b7734bd449df10dd47b53868dfa28e44cd8069dfea"
     private val sha = "a".repeat(64)
-    private fun rel(tag: String, draft: Boolean = false, apk: String = "https://github.com/tshi-dev/UrTV/releases/download/$tag/urtv-player.apk", shaUrl: String = "https://github.com/tshi-dev/UrTV/releases/download/$tag/urtv-player.apk.sha256", extra: String = "") =
-        """{"tag_name":"$tag","draft":$draft,"prerelease":false$extra,"assets":[{"name":"urtv-player.apk","browser_download_url":"$apk"},{"name":"urtv-player.apk.sha256","browser_download_url":"$shaUrl"},{"name":"notes.txt","browser_download_url":"https://evil.example/x"}]}"""
-
-    @Test fun picksTheNewestPlayerReleaseAndIgnoresOtherTagsAndDrafts() {
-        val body = "[" + listOf(rel("home-3.0.0"), rel("player-0.9.10", draft = true), rel("player-0.9.9"), rel("player-0.9.10x"), rel("player-0.9.4")).joinToString(",") + "]"
-        assertEquals("0.9.9", SelfUpdate.newest(body, installed = "0.9.3")?.version)
-        assertNull(SelfUpdate.newest(body, installed = "0.9.9"), "same version: nothing")
-        assertNull(SelfUpdate.newest(body, installed = "1.0.0"), "installed is newer (downgrade is never offered)")
-        assertEquals("0.9.11", SelfUpdate.newest("[" + rel("player-0.9.9") + "," + rel("player-0.9.11") + "]", "0.9.10")?.version, "numeric, not text, comparison")
+    @Test fun versionAssetNewerThanInstalledIsOfferedAndEverythingElseIsNot() {
+        val r = SelfUpdate.parseVersion("70 0.9.4\n", installedCode = 68, installedName = "0.9.3")
+        assertEquals("0.9.4", r?.version); assertEquals(70L, r?.code); assertEquals(SelfUpdate.APK_URL, r?.apkUrl); assertEquals(SelfUpdate.SHA_URL, r?.shaUrl)
+        assertEquals("0.9.11", SelfUpdate.parseVersion("90 0.9.11", 80, "0.9.10")?.version, "numeric, not text, comparison")
+        assertNull(SelfUpdate.parseVersion("68 0.9.3", 68, "0.9.3"), "same version")
+        assertNull(SelfUpdate.parseVersion("60 0.9.0", 68, "0.9.3"), "downgrade")
+        assertNull(SelfUpdate.parseVersion("70 0.9.2", 68, "0.9.3"), "code up but name not newer: inconsistent, refused")
+        assertNull(SelfUpdate.parseVersion("99 0.9.9", 99, "0.9.3"), "name newer but code not higher: refused")
     }
 
-    @Test fun hostileReleaseJsonIsIgnoredNeverThrows() {
-        for (b in listOf("", "null", "{}", "[1,2,3]", "[{\"tag_name\":5}]", "[{\"tag_name\":\"player-9.9.9\"}]", "[{\"tag_name\":\"player-9.9.9\",\"assets\":\"x\"}]", "<html>", "[".repeat(5000), "\u0000".repeat(10)))
-            assertNull(SelfUpdate.newest(b, "0.9.3"), b.take(20))
-        // right shape but the download points elsewhere: skipped
-        for (u in listOf("http://github.com/x/urtv-player.apk", "https://evil.example/urtv-player.apk", "https://github.com.evil.example/a", "https://github.com@evil.example/a", "https://github.com:8443/a", "file:///sdcard/a.apk", "javascript:alert(1)"))
-            assertNull(SelfUpdate.newest("[" + rel("player-9.9.9", apk = u) + "]", "0.9.3"), u)
-        assertNull(SelfUpdate.newest("[" + rel("player-9.9.9", shaUrl = "https://evil.example/s") + "]", "0.9.3"))
-        assertNull(SelfUpdate.newest("[" + rel("player-9.9.9; rm -rf") + "]", "0.9.3"))
-        assertNull(SelfUpdate.newest("[" + rel("player-../../9") + "]", "0.9.3"))
+    @Test fun hostileVersionAssetsAreIgnoredNeverThrow() {
+        for (b in listOf("", "null", "{}", "<html>404</html>", "70", "70 ", "70 0.9.4 extra", "70 0.9.4\n71 0.9.5", "70  0.9.4", "-70 0.9.4", "99999999999 0.9.4", "70 0.9.4; rm -rf /", "70 http://evil.example", "70 0.9.4\u0000", "7\u0660 0.9.4", "70 9".repeat(200), "\u0000".repeat(10)))
+            assertNull(SelfUpdate.parseVersion(b, 68, "0.9.3"), b.take(30))
+    }
+
+    @Test fun stableLinksAreOnPinnedHostsAndTheCdnTheyRedirectToToo() {
+        for (u in listOf(SelfUpdate.VERSION_URL, SelfUpdate.APK_URL, SelfUpdate.SHA_URL, "https://objects.githubusercontent.com/github-production-release-asset/1?X=2", "https://release-assets.githubusercontent.com/github-production-release-asset/2")) assertTrue(SelfUpdate.hostAllowed(u), u)
+        assertTrue(SelfUpdate.LATEST.endsWith("/releases/latest/download/"))
     }
 
     @Test fun onlyPinnedGithubHostsOverHttpsAreAllowed() {
@@ -48,6 +46,8 @@ class SelfUpdateTest {
         assertEquals(Check.BadHash, c(pub = null))
         assertEquals(Check.WrongPackage, c(pkg = "com.evil.app")); assertEquals(Check.WrongPackage, c(pkg = null))
         assertEquals(Check.NotNewer, c(code = 68)); assertEquals(Check.NotNewer, c(code = 3), "downgrade")
+        assertEquals(Check.Ok, SelfUpdate.check(sha, sha, "com.urtv.player", "com.urtv.player", 70, 68, listOf(cert), cert, expectedCode = 70))
+        assertEquals(Check.WrongVersion, SelfUpdate.check(sha, sha, "com.urtv.player", "com.urtv.player", 71, 68, listOf(cert), cert, expectedCode = 70), "latest moved or file swapped")
         assertEquals(Check.WrongSigner, c(signers = listOf("00".repeat(32))))
         assertEquals(Check.MultipleSigners, c(signers = listOf(cert, cert)))
         assertEquals(Check.NoSigner, c(signers = emptyList()))

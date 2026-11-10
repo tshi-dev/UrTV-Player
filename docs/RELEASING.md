@@ -11,8 +11,7 @@ Goal: the player cannot be used as an official build, or updated, without us.
    crashes and never contacts anyone. (A determined person can still rebuild with their own pin; the real guard is that Android
    will not let such a build replace or update ours.)
 3. **Updates are verified, never silent.** With UrTV installed, UrTV downloads the release asset, checks its `.sha256` and the signing
-   certificate, then installs. Without UrTV (owner decision), the official build updates itself from the public «player-<version>»
-   release (`urtv-player.apk` + `.sha256`): only https to GitHub's own hosts, sha256 = published, package = ours, a higher
+   certificate, then installs. Without UrTV (owner decision), the official build updates itself from the repository's «latest» release (`urtv-player.apk`, `urtv-player.apk.sha256`, `urtv-player.version`): only https to GitHub's own hosts, sha256 = published, package = ours, a higher
    versionCode and a single signer equal to our pinned certificate, then Android's PackageInstaller asks the person. Debug and
    unofficial builds never do this.
 4. **Debug builds are separate.** Debug builds use the id `com.urtv.player.debug` and are labelled «تجريبي / Debug», so they can
@@ -48,3 +47,9 @@ certificate SHA-256. The version code is the CI run number (always increasing). 
 asset needs a token; if UrTV must fetch it anonymously, publish the asset to a public place (decision for the owner).
 
 Verify by hand: `sha256sum -c urtv-player-0.2.0.apk.sha256` and `apksigner verify --print-certs urtv-player-0.2.0.apk`.
+
+## Release assets (one source of truth)
+Every release of this repository carries the stable names `urtv-player.apk`, `urtv-player.apk.sha256` (checksum of that file) and
+`urtv-player.version` (one line: versionCode, a space, versionName) next to the versioned `urtv-player-<version>.apk[.sha256]`.
+The Player's self-update, UrTV and the direct link `.../releases/latest/download/urtv-player.apk` all read "latest". Plain versions
+(0.x included) are normal releases; a tag with a suffix such as `v1.2.0-beta1` is a pre-release and GitHub never serves it as "latest".

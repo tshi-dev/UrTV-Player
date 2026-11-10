@@ -4,15 +4,11 @@
 
 Do not open a public GitHub issue, discussion or pull request for a security problem.
 
-Use the same anonymous report form as UrTV (it needs no account), from the UrTV repository:
+Use one of these:
 
-    optimize/share.sh --preview --problem --owner "<what you found, in your words>" "<what you checked>"
-
-Read what it prints (it is exactly what would be sent), then:
-
-    optimize/share.sh --send
-
-The report holds the steps and your words. Do not paste secrets, keys, addresses, playlist links or Wi-Fi names into it.
+- **GitHub private vulnerability reporting**: the "Security" tab of this repository, "Report a vulnerability" (only the owner sees it).
+- **Inside the app**: Settings > About > «Report or suggestion» > «Send a report» shows a QR code; scan it with your phone, describe the problem in your own words and
+  press send. It sends the app version, Android version and error class names only. Do not paste secrets, keys, addresses, playlist links or Wi-Fi names.
 
 ## In scope
 
@@ -41,15 +37,17 @@ A reply is not promised on a fixed day; this is a small project. A fix goes into
 
 لا تفتح issue ولا نقاشًا ولا طلب دمج علنيًا لمشكلة أمنية.
 
-استخدم نفس نموذج البلاغ المجهول في UrTV (بلا حساب) من مستودع UrTV: `optimize/share.sh --preview --problem ...` ثم اقرأ ما سيُرسل وبعدها `optimize/share.sh --send`.
-لا تضع في البلاغ أسرارًا ولا مفاتيح ولا عناوين ولا روابط قوائم ولا أسماء واي فاي.
+استخدم أحد الطريقين:
+
+- **الإبلاغ الخاص عن الثغرات في GitHub**: تبويب Security في هذا المستودع ثم "Report a vulnerability" (يراه المالك فقط).
+- **من داخل التطبيق**: الإعدادات ثم «عن التطبيق» ثم «تقرير أو اقتراح» ثم «أرسل تقرير»: يظهر رمز QR، امسحه بجوالك، اكتب المشكلة بكلماتك واضغط إرسال. يُرسل رقم النسخة ونسخة أندرويد وأسماء أنواع الأخطاء فقط. لا تضع أسرارًا ولا مفاتيح ولا عناوين ولا روابط قوائم ولا أسماء واي فاي.
 
 ## داخل النطاق
 
 - التطبيق في `app/` والمحللات في `core/`: قراءة القوائم والأدلة من الشبكة والتعامل مع المدخلات التالفة.
 - صفحة الإقران من الهاتف (الخادم المحلي الصغير): تبقى على الشبكة المحلية، محمية برمز الجلسة، وتُغلق بعد الاستخدام.
 - أي مكان يحفظ أو يرسل روابط القوائم أو بيانات الدخول أو رمز PIN إلى جهة لا يجب أن تصلها.
-- ملفات البناء وسير العمل: لا مفتاح توقيع ولا سر ولا تحديث ذاتي في المستودع.
+- ملفات البناء وسير العمل: لا مفتاح توقيع ولا سر في المستودع، والمحدّث الداخلي (`SelfUpdate`) يحافظ على فحوصاته ولا يعمل بصمت.
 
 ## خارج النطاق
 

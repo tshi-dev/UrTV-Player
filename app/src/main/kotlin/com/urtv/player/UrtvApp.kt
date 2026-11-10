@@ -57,7 +57,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
                 val now = System.currentTimeMillis()
                 if (com.urtv.player.data.Update.due(sp.getLong("upd_last", 0), now) && !PlayerController.active) {
                     // UrTV answers: it is the authority. UrTV absent: the Player looks for its own update on GitHub's release host (same daily limit)
-                    val s = com.urtv.player.data.Update.decide(com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE), com.urtv.player.data.SelfUpdater.allowed(true)) { com.urtv.player.data.SelfUpdater.lookup(BuildConfig.VERSION_NAME) }
+                    val s = com.urtv.player.data.Update.decide(com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE), com.urtv.player.data.SelfUpdater.allowed(true)) { com.urtv.player.data.SelfUpdater.lookup(BuildConfig.VERSION_CODE.toLong(), BuildConfig.VERSION_NAME) }
                     com.urtv.player.data.Update.save(sp, s, now); update = s
                 }
             }

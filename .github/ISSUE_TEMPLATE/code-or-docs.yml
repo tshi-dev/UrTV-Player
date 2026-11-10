@@ -1,0 +1,15 @@
+name: Code or documentation fix
+description: For contributors. Problems with a TV or a playlist go through the in-app report instead.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste playlist links, logins, IP addresses, Wi-Fi names or any personal data here. This is a public repository.
+        Problems on your TV: use **Settings > About > Report or suggestion** in the app.
+        / للمشاكل على جهازك: الإعدادات ثم عن التطبيق ثم تقرير أو اقتراح.
+  - type: textarea
+    id: what
+    attributes:
+      label: What should change in the code or the docs, and why?
+    validations:
+      required: true

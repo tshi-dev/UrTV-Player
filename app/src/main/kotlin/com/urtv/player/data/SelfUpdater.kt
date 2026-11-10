@@ -107,9 +107,9 @@ object SelfUpdater {
     /** Leftovers of an interrupted update (call at start, off the main thread). */
     fun cleanup(ctx: Context) { runCatching { dir(ctx).listFiles()?.forEach { it.delete() } } }
 
-    /** The daily question: newest release newer than this build, or null (also on any failure: quiet, asked again tomorrow). Blocking. */
-    fun lookup(installedName: String, dl: SelfDownloader = SelfDownloader()): SelfUpdate.Release? = runCatching {
-        SelfUpdate.newest(dl.text(SelfUpdate.RELEASES_URL, SelfUpdate.MAX_JSON_BYTES, "application/vnd.github+json"), installedName)
+    /** The daily question: the version asset of the latest release says something newer, or null (also on any failure: quiet, asked again tomorrow). Blocking. */
+    fun lookup(installedCode: Long, installedName: String, dl: SelfDownloader = SelfDownloader()): SelfUpdate.Release? = runCatching {
+        SelfUpdate.parseVersion(dl.text(SelfUpdate.VERSION_URL, SelfUpdate.MAX_VERSION_BYTES), installedCode, installedName)
     }.getOrNull()
 
     sealed interface Outcome {
@@ -130,7 +130,7 @@ object SelfUpdater {
             val signers = signerDigests(info)
             val code = if (info == null) 0L else if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
             val installed = if (Build.VERSION.SDK_INT >= 28) ctx.packageManager.getPackageInfo(ctx.packageName, 0).longVersionCode else @Suppress("DEPRECATION") ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionCode.toLong()
-            val c = SelfUpdate.check(actual, published, info?.packageName, ctx.packageName, code, installed, signers, com.urtv.player.BuildConfig.OFFICIAL_CERT_SHA256)
+            val c = SelfUpdate.check(actual, published, info?.packageName, ctx.packageName, code, installed, signers, com.urtv.player.BuildConfig.OFFICIAL_CERT_SHA256, rel.code)
             if (c != SelfUpdate.Check.Ok) return Outcome.Failed("check $c")
             install(ctx, apk)
             return Outcome.Handed

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a problem or ask for a feature (in the app)
+    url: https://github.com/tshi-dev/UrTV-Player#install
+    about: "Use Settings > About > Report or suggestion on the TV: it shows a QR code, you describe it on your phone. Arabic: الإعدادات ثم عن التطبيق ثم تقرير أو اقتراح"
+  - name: Security problem
+    url: https://github.com/tshi-dev/UrTV-Player/security/advisories/new
+    about: Report it privately here, never as a public issue.

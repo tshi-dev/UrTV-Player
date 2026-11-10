@@ -53,7 +53,7 @@ fun SelfUpdateScreen(app: UrtvApp, offer: Update.Offer, onDone: () -> Unit) {
     }
     LaunchedEffect(phase) {
         if (phase != Phase.Working) return@LaunchedEffect
-        val rel = SelfUpdate.Release(offer.name, offer.apkUrl, offer.shaUrl)
+        val rel = SelfUpdate.Release(offer.name, offer.code.toLong(), offer.apkUrl, offer.shaUrl)
         val r = withContext(Dispatchers.IO) { SelfUpdater.run(ctx.applicationContext, rel, { d, t -> if (t > 0) pct = (d * 100 / t).toInt().coerceIn(0, 100); if (d == t) verifying = true }) }
         phase = if (r is SelfUpdater.Outcome.Handed) Phase.Handed else Phase.Failed
         if (phase == Phase.Failed) { app.update = Update.State(Update.Kind.UpToDate) }     // quiet: tried again tomorrow

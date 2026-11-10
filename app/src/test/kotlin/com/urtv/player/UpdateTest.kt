@@ -92,7 +92,7 @@ class UpdateTest {
     }
 
     @Test fun urtvIsTheAuthorityAndSelfUpdateRunsOnlyWithoutIt() {
-        val rel = com.urtv.player.core.SelfUpdate.Release("0.9.9", "https://github.com/a/b/urtv-player.apk", "https://github.com/a/b/urtv-player.apk.sha256")
+        val rel = com.urtv.player.core.SelfUpdate.Release("0.9.9", 99, "https://github.com/a/b/urtv-player.apk", "https://github.com/a/b/urtv-player.apk.sha256")
         var calls = 0; val look = { calls++; rel }
         val offer = Update.State(Kind.Available, Update.Offer(70, "0.9.4", ""))
         assertEquals(offer, Update.decide(offer, true, look)); assertEquals(Update.State(Kind.UpToDate), Update.decide(Update.State(Kind.UpToDate), true, look)); assertEquals(0, calls, "GitHub is not asked while UrTV answers")
@@ -104,7 +104,7 @@ class UpdateTest {
 
     @Test fun aRememberedSelfUpdateOffersNothingOnceInstalledOrIfItsLinksAreNotGithub() {
         val sp = ctx.getSharedPreferences("upd-test2", 0)
-        val good = Update.State(Kind.Available, Update.Offer(0, "0.9.9", "", Update.Via.Self, "https://github.com/a/b/urtv-player.apk", "https://github.com/a/b/urtv-player.apk.sha256"))
+        val good = Update.State(Kind.Available, Update.Offer(99, "0.9.9", "", Update.Via.Self, "https://github.com/a/b/urtv-player.apk", "https://github.com/a/b/urtv-player.apk.sha256"))
         Update.save(sp, good, 1); assertEquals(good, Update.load(sp, 68, "0.9.3"))
         assertEquals(Kind.UpToDate, Update.load(sp, 68, "0.9.9").kind, "installed since")
         Update.save(sp, good.copy(offer = good.offer!!.copy(apkUrl = "https://evil.example/a.apk")), 2); assertEquals(Kind.UpToDate, Update.load(sp, 68, "0.9.3").kind, "tampered preferences")

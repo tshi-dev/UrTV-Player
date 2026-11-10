@@ -18,13 +18,15 @@ Thank you. Small, safe changes are the best ones: a fix, a test, a clearer line 
   (not even as an example or a default). The user adds their own sources.
 - Never build or publish a release APK from your own machine, never add a signing key (`*.jks`, `*.keystore`, `local.properties`)
   to the repository, and never weaken the in-app updater (pinned GitHub hosts, sha256, package, version and certificate checks; never silent). Release signing happens in CI from secrets only.
+- Never `git add` font files other than the open IBM Plex ones: the Thmanyah files come from a private repository in CI (`.gitignore` blocks `app/src/main/assets/fonts/`).
 - Never skip, disable or quarantine a test to make it pass.
-- Permissions stay at `INTERNET`, `ACCESS_NETWORK_STATE` the normal `sa.urtv.permission.READ_LANG` and `REQUEST_INSTALL_PACKAGES` (only for the verified in-app update). No storage, overlay, analytics, ads or crash SDKs. `ManifestSurfaceTest` pins the list.
+- Permissions stay at `INTERNET`, `ACCESS_NETWORK_STATE`, the normal `sa.urtv.permission.READ_LANG` and `REQUEST_INSTALL_PACKAGES` (only for the verified in-app update). No storage, overlay, analytics, ads or crash SDKs. `ManifestSurfaceTest` pins the list.
 - No personal data anywhere (code, docs, tests, reports): no IP address, serial, Wi-Fi name, user name or file path.
   Tests use obvious placeholders (`2001:db8::`, `192.0.2.x`, `Example Name`, `example.com`).
 - Country lists never include Israel or Western Sahara.
 - Commits are authored by the project owner and carry no AI or assistant lines.
 - Defaults stay as they are unless it is a bug.
+- Pull requests from forks run the tests only (CI gives them no secrets); releases are cut by the owner.
 - A security problem is reported privately, not as an issue: see [SECURITY.md](SECURITY.md).
 
 ## Arabic text
@@ -47,7 +49,7 @@ Every Arabic string has an English one beside it, and the layout must work right
 ## القواعد
 
 - هذا مشغّل فقط: **لا قنوات ولا قوائم ولا روابط** داخله، ولا يُقبل طلب دمج يضيف شيئًا منها (ولا كمثال ولا كقيمة افتراضية). المستخدم يضيف مصادره بنفسه.
-- لا تبنِ نسخة إصدار من جهازك، ولا تضف مفتاح توقيع إلى المستودع، ولا تضف تحديثًا ذاتيًا: التحديثات تأتي من UrTV. التوقيع يتم في CI بالأسرار فقط.
+- لا تبنِ نسخة إصدار من جهازك، ولا تضف مفتاح توقيع إلى المستودع، ولا تُضعف المحدّث الداخلي (مضيفو GitHub المثبّتون، التحقق من الهاش والحزمة والإصدار والشهادة، ولا يعمل بصمت). التوقيع يتم في CI بالأسرار فقط.
 - لا تتجاوز اختبارًا ولا تعطّله ولا تعزله لتنجح النتيجة.
 - الصلاحيات تبقى `INTERNET` و`ACCESS_NETWORK_STATE` و`sa.urtv.permission.READ_LANG` العادية و`REQUEST_INSTALL_PACKAGES` (للتحديث الموثّق من داخل التطبيق فقط). بلا تخزين ولا تراكب ولا تحليلات ولا إعلانات.
 - لا بيانات شخصية في أي مكان (الكود، الوثائق، الاختبارات): لا عنوان IP ولا رقم تسلسلي ولا اسم واي فاي ولا اسم مستخدم ولا مسار ملف.
