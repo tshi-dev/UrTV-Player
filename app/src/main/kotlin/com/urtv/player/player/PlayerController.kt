@@ -174,6 +174,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         override fun onCues(cueGroup: CueGroup) { _cue.value = cueGroup.cues.mapNotNull { it.text?.toString() }.joinToString("\n") }
         override fun onVideoSizeChanged(v: VideoSize) { _video.value = if (v.width > 0 && v.height > 0) v.width * v.pixelWidthHeightRatio / v.height else 0f }
         override fun onPlayerError(e: PlaybackException) {
+            com.urtv.player.data.Diag.playerError(e.errorCodeName, e)
             // Playlists often serve HLS from extension-less URLs: retry once as HLS before treating it as an outage.
             val c = current
             if (c != null && !forceHls && e.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) { forceHls = true; load(c); return }

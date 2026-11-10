@@ -220,4 +220,17 @@
     <string name="fm_why_named">Broadcaster channel</string>
     <string name="fm_why_group">Sports channels</string>
     <string name="fm_last_pick">Your last pick</string>
+    <string name="share_row">Report or suggestion</string>
+    <string name="share_row_hint">A short summary from your phone: no links, no playlist names</string>
+    <string name="share_report">Send a report</string>
+    <string name="share_request">Request a feature</string>
+    <string name="share_topic_title">What is the report about?</string>
+    <string name="share_topic_playback">Playback</string>
+    <string name="share_topic_lists">Playlists</string>
+    <string name="share_topic_guide">Guide</string>
+    <string name="share_topic_server">Home server</string>
+    <string name="share_topic_ui">Interface</string>
+    <string name="share_topic_other">Other</string>
+    <string name="share_scan">Scan the code with your phone, write your words, then press send. The TV itself sends nothing.</string>
+    <string name="share_contains">The summary: version, system, and the number and types of playlists only.</string>
 </resources>

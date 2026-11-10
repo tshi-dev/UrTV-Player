@@ -56,7 +56,7 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
                 }
             }
             r.onSuccess { (mv, sr) -> _state.value = VodState(def.id, mv, sr) }
-                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; _state.value = _state.value.copy(loading = false, failed = m.isEmpty() && s.isEmpty()) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it); _state.value = _state.value.copy(loading = false, failed = m.isEmpty() && s.isEmpty()) }
         }
     }
 

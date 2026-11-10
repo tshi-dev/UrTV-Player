@@ -64,6 +64,8 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val look by store.appearance.collectAsState()
     var appearance by remember { mutableStateOf(false) }
     if (appearance) { AppearanceScreen(store) { appearance = false }; return }
+    var share by remember { mutableStateOf(false) }
+    if (share) { ShareScreen(app) { share = false }; return }
     val offsets by store.epgOffsetMin.collectAsState()
     val start by store.startScreen.collectAsState()
     val isXtream = playlists.firstOrNull { it.id == active }?.isXtream == true
@@ -144,6 +146,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     Column(Modifier.padding(horizontal = 12.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted))
                         Text(stringResource(R.string.about_version, com.urtv.player.BuildConfig.VERSION_NAME), style = T.bodyBold)
+                        Setting(stringResource(R.string.share_row), "", stringResource(R.string.share_row_hint)) { share = true }
                         when (app.integrity) {
                             com.urtv.player.data.Integrity.Status.Official -> Text(stringResource(R.string.about_official), style = T.body.copy(color = C.accent))
                             com.urtv.player.data.Integrity.Status.Debug -> Text(stringResource(R.string.about_debug), style = T.body.copy(color = C.muted))

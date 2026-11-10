@@ -56,6 +56,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                     else { withContext(Dispatchers.IO) { writeCache(cacheFile, list) }; _state.value = _state.value.copy(channels = list, loading = false, settled = true, error = null) }
                 }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
+                    Diag.record(it)
                     _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Network else null)
                 }
             } else _state.value = _state.value.copy(loading = false, settled = true)

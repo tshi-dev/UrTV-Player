@@ -220,4 +220,17 @@
     <string name="fm_why_named">قناة ناقلة</string>
     <string name="fm_why_group">من القنوات الرياضية</string>
     <string name="fm_last_pick">اختيارك السابق</string>
+    <string name="share_row">تقرير أو اقتراح</string>
+    <string name="share_row_hint">ملخص قصير من جوالك: بلا روابط ولا أسماء قوائم</string>
+    <string name="share_report">أرسل تقرير</string>
+    <string name="share_request">اطلب ميزة</string>
+    <string name="share_topic_title">عن ماذا التقرير؟</string>
+    <string name="share_topic_playback">التشغيل</string>
+    <string name="share_topic_lists">القوائم</string>
+    <string name="share_topic_guide">الدليل</string>
+    <string name="share_topic_server">خادم المنزل</string>
+    <string name="share_topic_ui">الواجهة</string>
+    <string name="share_topic_other">غير ذلك</string>
+    <string name="share_scan">امسح الكود بجوالك، اكتب كلماتك، ثم اضغط أرسل. التلفاز نفسه لا يرسل شيئًا.</string>
+    <string name="share_contains">الملخص: النسخة والنظام وعدد القوائم وأنواعها فقط.</string>
 </resources>
