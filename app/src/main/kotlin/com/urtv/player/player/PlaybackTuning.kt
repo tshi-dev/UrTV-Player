@@ -44,4 +44,8 @@ object PlaybackTuning {
         fun record(now: Long): Boolean { times.addLast(now); while (times.isNotEmpty() && now - times.first() > windowMs) times.removeFirst(); return times.size >= limit }
         fun reset() = times.clear()
     }
+
+    /** Live playback that has drifted this far behind the live edge (after a stall) is brought back to it. */
+    const val LIVE_BEHIND_MAX_MS = 25_000L
+    fun shouldSeekToLive(offsetMs: Long, sinceLastSeekMs: Long): Boolean = offsetMs > LIVE_BEHIND_MAX_MS && sinceLastSeekMs > 15_000L
 }

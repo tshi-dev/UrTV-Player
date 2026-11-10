@@ -40,4 +40,9 @@ class PlaybackTuningTest {
         t.reset(); assertFalse(t.record(0)); assertFalse(t.record(50_000)); assertFalse(t.record(110_000), "old stalls fall out of the window")
         assertEquals(3_500_000L, PlaybackTuning.downgradeCap(5_000_000)); assertEquals(500_000L, PlaybackTuning.downgradeCap(100_000))
     }
+
+    @Test fun liveEdgeCatchUpOnlyWhenFarBehindAndNotTooOften() {
+        assertFalse(PlaybackTuning.shouldSeekToLive(8_000, 60_000)); assertFalse(PlaybackTuning.shouldSeekToLive(40_000, 5_000))
+        assertTrue(PlaybackTuning.shouldSeekToLive(40_000, 60_000))
+    }
 }

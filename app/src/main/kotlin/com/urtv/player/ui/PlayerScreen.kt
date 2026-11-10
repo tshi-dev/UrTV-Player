@@ -82,6 +82,8 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     val nowMs by rememberNow()
 
     var shown by remember { mutableStateOf(start) }
+    androidx.compose.runtime.DisposableEffect(all) { ctrl.alternates = { c -> com.urtv.player.core.Alternates.find(c, all) }; onDispose { ctrl.alternates = null } }
+    val cause by ctrl.cause.collectAsState(); val altNote by ctrl.altNote.collectAsState()
     var previous by remember { mutableStateOf<Channel?>(null) }
     var overlay by remember { mutableStateOf(Overlay.Info) }
     var infoTick by remember { mutableStateOf(0) }
@@ -173,9 +175,9 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         Box(Modifier.align(Alignment.Center)) {
             when {
                 blocked -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Glyph.Lock, C.muted, 72); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.group_locked), style = T.title); Text(stringResource(R.string.press_ok_unlock), style = T.small) }
-                status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); Text(stringResource(R.string.press_ok_retry), style = T.small) }
-                status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(10.dp)); Text(stringResource(R.string.reconnecting, attempt, PlayerController.MAX_ATTEMPTS), style = T.body) }
-                status == PlayStatus.Loading -> Spinner()
+                status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); WhyLine(cause, ctrl.lastHttpStatus); Text(stringResource(R.string.press_ok_retry), style = T.small) }
+                status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(10.dp)); Text(stringResource(R.string.reconnecting, attempt, PlayerController.MAX_ATTEMPTS), style = T.body); WhyLine(cause, ctrl.lastHttpStatus) }
+                status == PlayStatus.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); WhyLine(cause, ctrl.lastHttpStatus) }
                 paused -> Text("❚❚", style = T.display)
             }
         }
@@ -206,6 +208,8 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
                         Spacer(Modifier.height(12.dp))
                         ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1))
                     } else Text(shown.name, style = T.display.copy(fontSize = 40.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    altNote?.let { Spacer(Modifier.height(8.dp)); Text(stringResource(R.string.alt_playing, it), style = T.small.copy(color = C.accent), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    if (cause != com.urtv.player.core.Diagnosis.Cause.None) { Spacer(Modifier.height(8.dp)); Row { Text(stringResource(R.string.why_title) + ": ", style = T.small.copy(color = C.text)); WhyLine(cause, ctrl.lastHttpStatus, inline = true) } }
                     if (next != null) { Spacer(Modifier.height(12.dp)); Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text(stringResource(R.string.next), style = T.small.copy(color = C.text)); Text("${fmtTime(next.startMs)}  ${next.title}", style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
                 }
             }
@@ -331,4 +335,14 @@ private fun ListsPicker(app: UrtvApp, pid: String, key: String, onBack: () -> Un
             val n = store.createList(pid, "$base $i"); store.toggleInList(pid, n, key)
         }
     }
+}
+
+/** One careful sentence naming the likely cause of choppy playback (nothing when there is none). */
+@Composable
+fun WhyLine(cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, inline: Boolean = false) {
+    val t = when (cause) {
+        com.urtv.player.core.Diagnosis.Cause.Source -> stringResource(R.string.why_source); com.urtv.player.core.Diagnosis.Cause.HomeNetwork -> stringResource(R.string.why_network); com.urtv.player.core.Diagnosis.Cause.Decoder -> stringResource(R.string.why_decoder)
+        com.urtv.player.core.Diagnosis.Cause.DeadChannel -> stringResource(R.string.why_dead, if (httpStatus > 0) "HTTP $httpStatus" else "—"); com.urtv.player.core.Diagnosis.Cause.Unknown -> stringResource(R.string.why_unknown); com.urtv.player.core.Diagnosis.Cause.None -> return
+    }
+    Text(t, Modifier.let { if (inline) it else it.padding(top = 14.dp, start = 120.dp, end = 120.dp) }, style = T.small.copy(color = if (inline) C.muted else C.text), textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
 }

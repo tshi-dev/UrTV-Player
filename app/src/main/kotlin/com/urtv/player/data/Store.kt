@@ -177,6 +177,8 @@ class Store(ctx: Context) {
     private val _tunnel = MutableStateFlow(sp.getBoolean("tunnel", false)); val tunneling: StateFlow<Boolean> = _tunnel
     fun setTunneling(v: Boolean) { _tunnel.value = v; sp.edit().putBoolean("tunnel", v).apply() }
     private val _stats = MutableStateFlow(sp.getBoolean("stats", false)); val statsOverlay: StateFlow<Boolean> = _stats
+    private val _autoAlt = MutableStateFlow(sp.getBoolean("autoalt", false)); val autoAlt: StateFlow<Boolean> = _autoAlt
+    fun setAutoAlt(v: Boolean) { _autoAlt.value = v; sp.edit().putBoolean("autoalt", v).apply() }
     fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }
     private val _prefetch = MutableStateFlow(sp.getBoolean("prefetch", false)); val prefetchNeighbours: StateFlow<Boolean> = _prefetch
     fun setPrefetch(v: Boolean) { _prefetch.value = v; sp.edit().putBoolean("prefetch", v).apply() }

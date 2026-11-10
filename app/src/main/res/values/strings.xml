@@ -233,4 +233,13 @@
     <string name="share_topic_other">غير ذلك</string>
     <string name="share_scan">امسح الكود بجوالك، اكتب كلماتك، ثم اضغط أرسل. التلفاز نفسه لا يرسل شيئًا.</string>
     <string name="share_contains">الملخص: النسخة والنظام وعدد القوائم وأنواعها فقط.</string>
+    <string name="why_title">ليش يقطّع؟</string>
+    <string name="why_source">غالبًا من مصدر القناة: البث يصل أبطأ مما تحتاجه</string>
+    <string name="why_network">غالبًا من شبكة البيت: الإشارة أو السرعة ضعيفة، والمشكلة تظهر في أكثر من قناة</string>
+    <string name="why_decoder">التلفاز لا يلحق بعرض هذه الجودة. جرّب جودة أقل</string>
+    <string name="why_dead">القناة نفسها لا تستجيب (%1$s). غالبًا من مصدر القناة</string>
+    <string name="why_unknown">التقطيع متكرر والسبب غير واضح</string>
+    <string name="alt_playing">تشغيل نسخة بديلة: %1$s</string>
+    <string name="set_autoalt">قناة بديلة تلقائيًا</string>
+    <string name="set_autoalt_hint">إذا تعذّر تشغيل قناة، جرّب قناة بنفس الاسم في قائمتك</string>
 </resources>

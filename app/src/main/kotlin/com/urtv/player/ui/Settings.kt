@@ -119,6 +119,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.set_preview), stringResource(if (preview) R.string.on else R.string.off), stringResource(R.string.set_preview_hint)) { store.setLivePreview(!preview) } }
                     item { Setting(stringResource(R.string.set_prefetch), stringResource(if (prefetch) R.string.on else R.string.off), stringResource(R.string.set_prefetch_hint)) { store.setPrefetch(!prefetch) } }
                     item { Setting(stringResource(R.string.set_tunnel), stringResource(if (tunnel) R.string.on else R.string.off), stringResource(R.string.set_tunnel_hint)) { store.setTunneling(!tunnel) } }
+                    item { val alt by store.autoAlt.collectAsState(); Setting(stringResource(R.string.set_autoalt), stringResource(if (alt) R.string.on else R.string.off), stringResource(R.string.set_autoalt_hint)) { store.setAutoAlt(!alt) } }
                     item { Setting(stringResource(R.string.set_stats), stringResource(if (statsOn) R.string.on else R.string.off), stringResource(R.string.set_stats_hint)) { store.setStatsOverlay(!statsOn) } }
                 }
                 Section.Appearance -> {

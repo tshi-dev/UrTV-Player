@@ -233,4 +233,13 @@
     <string name="share_topic_other">Other</string>
     <string name="share_scan">Scan the code with your phone, write your words, then press send. The TV itself sends nothing.</string>
     <string name="share_contains">The summary: version, system, and the number and types of playlists only.</string>
+    <string name="why_title">Why is it choppy?</string>
+    <string name="why_source">Likely the channel\'s source: the stream arrives slower than it needs</string>
+    <string name="why_network">Likely your home network: weak signal or speed, and it shows on more than one channel</string>
+    <string name="why_decoder">The TV can\'t keep up with this quality. Try a lower one</string>
+    <string name="why_dead">The channel itself isn\'t answering (%1$s). Likely the channel\'s source</string>
+    <string name="why_unknown">It keeps stalling and the cause isn\'t clear</string>
+    <string name="alt_playing">Playing a backup copy: %1$s</string>
+    <string name="set_autoalt">Automatic backup channel</string>
+    <string name="set_autoalt_hint">If a channel won\'t play, try one with the same name in your list</string>
 </resources>

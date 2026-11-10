@@ -30,6 +30,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.urtv.player.core.Alternates
+import com.urtv.player.core.Diagnosis
 import java.util.Locale
 
 enum class PlayStatus { Idle, Loading, Playing, Reconnecting, Failed }
@@ -88,6 +90,67 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats
     private var ttffAvg = 0L; private var ttffN = 0
+
+    // ---- «ليش يقطّع؟»: likely cause from what is measured; opt-in backup channels
+    private val _cause = MutableStateFlow(Diagnosis.Cause.None)
+    val cause: StateFlow<Diagnosis.Cause> = _cause
+    /** HTTP status of the last failure (0 if none), shown next to a dead channel. */
+    @Volatile var lastHttpStatus = 0; private set
+    private val tracker = Diagnosis.Tracker()
+    private var errorKind = Diagnosis.ErrorKind.None
+    private var lastDropped = 0; private var droppedPerSec = 0f
+    private var linkAt = 0L; private var link = NetInfo.Link(0, null, false)
+    private var lastLiveSeek = 0L
+    /** Set by the player screen: same-name backups for a channel (from the user's own list). */
+    var alternates: ((Channel) -> List<Channel>)? = null
+    private val triedAlt = HashSet<String>()
+    private val _altNote = MutableStateFlow<String?>(null)
+    /** Name of the backup entry being played instead of the chosen channel, or null. */
+    val altNote: StateFlow<String?> = _altNote
+
+    private fun chanKey(c: Channel?) = c?.url?.hashCode()?.toString() ?: ""
+
+    private fun errorKindOf(e: PlaybackException): Diagnosis.ErrorKind {
+        var t: Throwable? = e; var n = 0
+        while (t != null && n < 6) {
+            if (t is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) { lastHttpStatus = t.responseCode; return Diagnosis.ErrorKind.Http }
+            t = t.cause; n++
+        }
+        lastHttpStatus = 0
+        return when (e.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> Diagnosis.ErrorKind.Timeout
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> Diagnosis.ErrorKind.Connection
+            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> { lastHttpStatus = 404; Diagnosis.ErrorKind.Http }
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED, PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED, PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> Diagnosis.ErrorKind.Format
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED, PlaybackException.ERROR_CODE_DECODING_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED, PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES -> Diagnosis.ErrorKind.Decoder
+            else -> Diagnosis.ErrorKind.Connection
+        }
+    }
+
+    /** Called once a second by the watchdog (live only): measures, classifies, and brings a drifted live stream back to the edge. */
+    private fun diagnose(p: ExoPlayer, now: Long) {
+        if (vod || preview || serverMode) { if (_cause.value != Diagnosis.Cause.None) _cause.value = Diagnosis.Cause.None; return }
+        val buffering = p.playbackState == Player.STATE_BUFFERING && readySince
+        if (buffering) tracker.bufferingSecond(now)
+        val dropped = p.videoDecoderCounters?.droppedBufferCount ?: 0
+        droppedPerSec = (dropped - lastDropped).coerceAtLeast(0).toFloat(); lastDropped = dropped
+        if (now - linkAt > 5000) { link = NetInfo.read(ctx); linkAt = now }
+        val f = p.videoFormat
+        val s = Diagnosis.Sample(
+            buffering = buffering, stallsInWindow = tracker.stallsIn(now), stallMsInWindow = tracker.stallMs(now), bufferedMs = p.totalBufferedDuration,
+            droppedPerSec = droppedPerSec, receivedKbps = ((meter?.bitrateEstimate ?: 0L) / 1000).toInt(), streamKbps = ((f?.bitrate ?: 0) / 1000).coerceAtLeast(0),
+            linkKbps = link.kbps, signalDbm = link.signalDbm, stalledChannels = tracker.stalledChannels(now), error = errorKind, httpStatus = lastHttpStatus, attempts = _attempt.value,
+        )
+        val c = Diagnosis.classify(s)
+        if (c != _cause.value) _cause.value = c
+        // resume at the live edge: a stream that fell far behind after a stall jumps back instead of staying late
+        if (p.isCurrentMediaItemLive && p.playbackState == Player.STATE_READY && p.isPlaying) {
+            val off = p.currentLiveOffset
+            if (off != C.TIME_UNSET && PlaybackTuning.shouldSeekToLive(off, now - lastLiveSeek)) { lastLiveSeek = now; p.seekToDefaultPosition() }
+        }
+    }
 
     data class Stats(val width: Int = 0, val height: Int = 0, val videoKbps: Int = 0, val estimateKbps: Int = 0, val bufferedMs: Long = 0,
                      val dropped: Int = 0, val codec: String = "", val fps: Float = 0f, val ttffMs: Long = 0, val ttffAvgMs: Long = 0, val capped: Boolean = false)
@@ -159,6 +222,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         override fun onPlaybackStateChanged(state: Int) {
             // a stall after playback had started: after 3 in a minute, switch to a lower variant
             if (state == Player.STATE_BUFFERING && readySince && !vod) {
+                if (!preview && !serverMode) tracker.stall(System.currentTimeMillis(), chanKey(current))
                 if (rebuffers.record(System.currentTimeMillis())) downgrade()
             }
             if (state == Player.STATE_READY) readySince = true
@@ -175,6 +239,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         override fun onVideoSizeChanged(v: VideoSize) { _video.value = if (v.width > 0 && v.height > 0) v.width * v.pixelWidthHeightRatio / v.height else 0f }
         override fun onPlayerError(e: PlaybackException) {
             com.urtv.player.data.Diag.playerError(e.errorCodeName, e)
+            errorKind = errorKindOf(e)
             // Playlists often serve HLS from extension-less URLs: retry once as HLS before treating it as an outage.
             val c = current
             if (c != null && !forceHls && e.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) { forceHls = true; load(c); return }
@@ -254,6 +319,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private fun startPlay(ch: Channel, startMs: Long, isVod: Boolean) {
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
+        triedAlt.clear(); _altNote.value = null; errorKind = Diagnosis.ErrorKind.None; lastHttpStatus = 0; _cause.value = Diagnosis.Cause.None; if (!preview) tracker.clear()
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f
         load(ch)
     }
@@ -302,7 +368,13 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         if (n > (if (preview) 1 else MAX_ATTEMPTS)) { _status.value = PlayStatus.Failed; player?.stop(); return }
         _status.value = PlayStatus.Reconnecting
         retryJob?.cancel()
-        retryJob = scope.launch { delay(minOf(1000L shl (n - 1), 12_000L)); load(c) }
+        // opt-in: after the first failed retry, try a same-name entry of the user's own list
+        var target = c
+        if (n >= 2 && !preview && !vod && !serverMode && store.autoAlt.value) {
+            triedAlt += c.url
+            alternates?.invoke(c)?.firstOrNull { it.url !in triedAlt }?.let { alt -> target = alt; current = alt; _altNote.value = alt.name; _attempt.value = 1; errorKind = Diagnosis.ErrorKind.None }
+        }
+        retryJob = scope.launch { delay(minOf(1000L shl (n - 1), 12_000L)); load(target) }
     }
 
     private fun startWatchdog() {
@@ -312,6 +384,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
                 delay(1000)
                 if (store.statsOverlay.value) sampleStats()
                 val p = player ?: continue
+                diagnose(p, System.currentTimeMillis())
                 if (current == null || _paused.value || _status.value == PlayStatus.Failed || retryJob?.isActive == true) continue
                 when (p.playbackState) {
                     Player.STATE_BUFFERING -> { frozenSec = 0; stableSec = 0; if (++stallSec >= STALL_LIMIT_SEC) { stallSec = 0; scheduleReconnect() } }
@@ -319,7 +392,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
                         stallSec = 0
                         val pos = p.currentPosition
                         if (p.isPlaying && pos == lastPos) { if (++frozenSec >= FROZEN_LIMIT_SEC) { frozenSec = 0; scheduleReconnect() } }
-                        else { frozenSec = 0; if (p.isPlaying && ++stableSec >= 15) _attempt.value = 0 }
+                        else { frozenSec = 0; if (p.isPlaying && ++stableSec >= 15) { _attempt.value = 0; errorKind = Diagnosis.ErrorKind.None } }
                         lastPos = pos
                     }
                     else -> Unit
