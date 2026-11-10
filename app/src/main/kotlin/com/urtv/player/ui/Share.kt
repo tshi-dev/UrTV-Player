@@ -68,7 +68,7 @@ fun ShareScreen(app: UrtvApp, onDone: () -> Unit) {
         Spacer(Modifier.height(40.dp))
         when (val s = step) {
             ShareStep.Choice -> Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                TvButton(stringResource(R.string.share_report), { kind = Report.Kind.Problem; step = ShareStep.Topic }, primary = true, focusRequester = first)
+                TvButton(stringResource(R.string.share_report), { kind = Report.Kind.Problem; step = ShareStep.Topic }, focusRequester = first)
                 TvButton(stringResource(R.string.share_request), { kind = Report.Kind.Request; show("other") })
             }
             ShareStep.Topic -> {
@@ -78,7 +78,7 @@ fun ShareScreen(app: UrtvApp, onDone: () -> Unit) {
                     "playback" to R.string.share_topic_playback, "lists" to R.string.share_topic_lists, "guide" to R.string.share_topic_guide,
                     "home server" to R.string.share_topic_server, "interface" to R.string.share_topic_ui, "other" to R.string.share_topic_other)
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for ((i, t) in topics.withIndex()) TvButton(stringResource(t.second), { show(t.first) }, primary = i == 0, focusRequester = if (i == 0) first else null, modifier = Modifier.width(520.dp))
+                    for ((i, t) in topics.withIndex()) TvButton(stringResource(t.second), { show(t.first) }, focusRequester = if (i == 0) first else null, modifier = Modifier.width(520.dp))
                 }
             }
             is ShareStep.Code -> Row(horizontalArrangement = Arrangement.spacedBy(96.dp), verticalAlignment = Alignment.CenterVertically) {

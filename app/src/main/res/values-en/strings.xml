@@ -269,4 +269,13 @@
     <string name="su_handed">Handed to Android: follow the install screen</string>
     <string name="su_failed">The update couldn\'t be done now. Your current version keeps working and we\'ll try later</string>
     <string name="upd_hint_self">Press OK to download and check the update. Your data and playlists stay as they are</string>
+    <string name="menu_fav">Add to favourites</string>
+    <string name="menu_unfav">Remove from favourites</string>
+    <string name="menu_hide">Hide channel</string>
+    <string name="menu_info">Channel info</string>
+    <string name="menu_has_guide">Has a programme guide</string>
+    <string name="menu_no_guide">No programme guide</string>
+    <string name="menu_hidden_row">Show hidden channels</string>
+    <string name="loading_n">Loading the playlist… %1$d channels</string>
+    <string name="opening_channel">Opening…</string>
 </resources>

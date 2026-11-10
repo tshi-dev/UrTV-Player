@@ -34,3 +34,12 @@ declared failed after about 3 minutes (8 attempts, back-off up to 12 s, 15 s sta
 Frame time and jank while scrolling a 20 000-channel list, real memory pressure on a 1 GB TV, time to first frame and zap time on
 real streams, the decoder limits of a given model, Wi-Fi behaviour. The playback stats overlay (Settings > Playback) and a
 Macrobenchmark run on the device are the tools for these. First TV test (TCL): cold start 0.69 to 0.77 s, 39 MB idle.
+
+## First real-TV findings (TCL, v0.9.2 to v0.9.3) and what v0.9.6 changed
+| Finding | Change | Re-measure on the TV |
+|---|---|---|
+| 29 % janky frames scrolling 360 rows (p50 38 / p90 69 / p99 109 ms) | Preview starts only after the focus rests 500 ms and stops decoding the moment it moves; rows are flat (no scale or shadow); the preview pane is the only thing that recomposes on a focus move; channel numbers come from a map, not a scan; guide lookups are remembered | scroll the list alone (preview off) and with it on; budget at most 5 % janky |
+| Old picture stays when changing channel, tiny spinner | Black-out at once, banner with number, name, logo and «جارٍ الفتح…»; reconnect text sits in the banner | change channel on a slow one |
+| Zap 1.5 to 3.6 s, first picture 3.7 to 5.9 s | Stats show dns, connect, manifest, media bytes and decode per channel; DNS answers cached 10 min; zap debounce 250 to 180 ms | read the new line in the stats overlay |
+| 360-channel playlist took 35 to 90 s | The list is shown as soon as it is parsed (cache is written after), "N channels" progress, fetch+parse and cache-write times in the stats; the Keystore write is no longer on the critical path | stats line "list N ch: fetch+parse X ms, cache Y ms" tells network from our own time |
+| PSS 127 MB then 86 | Stats show current PSS | watch it during and right after a load |

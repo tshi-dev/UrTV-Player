@@ -65,6 +65,9 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     val aspect: StateFlow<AspectMode> = _aspect
     private val _paused = MutableStateFlow(false)
     val paused: StateFlow<Boolean> = _paused
+    private val _firstFrame = MutableStateFlow(false)
+    /** True once the CURRENT channel has drawn its first picture (false from the moment a new channel is asked for). */
+    val firstFrame: StateFlow<Boolean> = _firstFrame
 
     private val _ended = MutableStateFlow(false)
     val ended: StateFlow<Boolean> = _ended
@@ -153,7 +156,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     }
 
     data class Stats(val width: Int = 0, val height: Int = 0, val videoKbps: Int = 0, val estimateKbps: Int = 0, val bufferedMs: Long = 0,
-                     val dropped: Int = 0, val codec: String = "", val fps: Float = 0f, val ttffMs: Long = 0, val ttffAvgMs: Long = 0, val capped: Boolean = false)
+                     val dropped: Int = 0, val codec: String = "", val fps: Float = 0f, val ttffMs: Long = 0, val ttffAvgMs: Long = 0, val capped: Boolean = false, val trace: String = "")
 
     /** Display size in pixels (physical mode), used to cap the video resolution. */
     private fun displaySize(): Pair<Int, Int> = runCatching {
@@ -216,6 +219,8 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
 
     private val listener = object : Player.Listener {
         override fun onRenderedFirstFrame() {
+            _firstFrame.value = true
+            LoadTrace.finish()?.let { b -> _stats.value = _stats.value.copy(trace = b.line) }
             val t = System.currentTimeMillis() - loadStartMs
             if (loadStartMs > 0 && t in 1..60_000) { ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
         }
@@ -319,6 +324,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private fun startPlay(ch: Channel, startMs: Long, isVod: Boolean) {
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
+        _firstFrame.value = false; LoadTrace.begin()
         triedAlt.clear(); _altNote.value = null; errorKind = Diagnosis.ErrorKind.None; lastHttpStatus = 0; _cause.value = Diagnosis.Cause.None; if (!preview) tracker.clear()
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f
         load(ch)
@@ -415,6 +421,14 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     }
 
     fun stop() { release(); current = null }
+
+    /** The list focus moved: stop decoding the preview right away but keep the player, so the next preview starts quickly. */
+    fun idlePreview() {
+        if (!preview) return
+        retryJob?.cancel(); current = null
+        player?.let { it.stop(); it.clearMediaItems() }
+        _status.value = PlayStatus.Idle
+    }
 
     companion object { @Volatile var active = false; const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 15; const val FROZEN_LIMIT_SEC = 8 }
 }

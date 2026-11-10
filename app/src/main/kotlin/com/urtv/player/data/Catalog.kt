@@ -23,10 +23,16 @@ data class CatalogState(
     val epgLoading: Boolean = false,
     /** True once the first answer is in (cache read or network try finished). Until then the UI shows skeleton rows, never an empty-state flash. */
     val settled: Boolean = false,
+    /** Channels read so far while a playlist is downloading/parsing (0 when not loading). */
+    val progress: Int = 0,
 )
 
 /** Loads the active playlist (cache first, then network) and its XMLTV guide. */
+/** Where the time of the last playlist load went, in ms (shown in the stats and kept in memory only). */
+data class LoadTimings(val fetchParseMs: Long = 0, val cacheWriteMs: Long = 0, val channels: Int = 0)
+
 class Catalog(ctx: Context, private val store: Store, private val scope: CoroutineScope) {
+    @Volatile var timings = LoadTimings(); private set
     private val dir = File(ctx.filesDir, "cache").apply { mkdirs() }
     private val _state = MutableStateFlow(CatalogState())
     val state: StateFlow<CatalogState> = _state
@@ -49,11 +55,18 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
             var epgUrls = emptyList<String>()
             if (force || stale) {
                 _state.value = _state.value.copy(loading = true, error = null)
+                val t0 = System.currentTimeMillis()
                 val r = withContext(Dispatchers.IO) { runCatching { fetch(def) } }
                 r.onSuccess { (list, urls) ->
                     epgUrls = urls
                     if (list.isEmpty()) _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Empty else null)
-                    else { withContext(Dispatchers.IO) { writeCache(cacheFile, list) }; _state.value = _state.value.copy(channels = list, loading = false, settled = true, error = null) }
+                    else {
+                        // the list is on screen first; the (encrypted) cache is written afterwards, off the critical path
+                        _state.value = _state.value.copy(channels = list, loading = false, settled = true, error = null, progress = 0)
+                        val t1 = System.currentTimeMillis()
+                        withContext(Dispatchers.IO) { writeCache(cacheFile, list) }
+                        timings = LoadTimings(t1 - t0, System.currentTimeMillis() - t1, list.size)
+                    }
                 }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     Diag.record(it)
@@ -78,7 +91,11 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
             val parsed = XtreamParser.parseStreams(Http.text(acc.streamsUrl()), acc, cats)
             return parsed.channels to parsed.epgUrls
         }
-        val parsed = Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r -> M3uParser.parse(r.lineSequence()) }
+        var seen = 0
+        val parsed = Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r ->
+            // count entries as they stream in so the screen can say "N channels" instead of an empty wait
+            M3uParser.parse(r.lineSequence().onEach { l -> if (l.startsWith("#EXTINF")) { seen++; if (seen % 25 == 0) _state.value = _state.value.copy(progress = seen) } })
+        }
         return parsed.channels to parsed.epgUrls
     }
 

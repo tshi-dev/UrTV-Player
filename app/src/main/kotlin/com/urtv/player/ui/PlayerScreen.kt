@@ -106,9 +106,9 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
 
     // Debounced start so holding Up/Down never thrashes the decoder; parental lock is checked here.
     LaunchedEffect(shown.url) {
-        if (!firstPlay) delay(250)
+        if (!firstPlay) delay(180)     // holding a key never starts a stream per channel; short enough not to be felt
         firstPlay = false
-        val gk = groupKey(pid, Browse.groupOf(shown))
+        val gk = Browse.groupsOf(shown).map { groupKey(pid, it) }.firstOrNull { it in locked && it !in app.unlocked } ?: groupKey(pid, Browse.groupOf(shown))
         if (gk in locked && gk !in app.unlocked) {
             blocked = true; ctrl.stop()
             pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gk; blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
@@ -150,7 +150,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
                 KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_CHANNEL_UP -> { step(1); true }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                     if (digits.isNotEmpty()) { val n = digits.toIntOrNull(); digits = ""; if (n != null) Browse.byNumber(all, n)?.let { goTo(it) } }
-                    else if (blocked) pinReq = PinRequest.Verify { val gk = groupKey(pid, Browse.groupOf(shown)); app.unlocked = app.unlocked + gk; blocked = false; ctrl.play(shown) }
+                    else if (blocked) pinReq = PinRequest.Verify { app.unlocked = app.unlocked + Browse.groupsOf(shown).map { groupKey(pid, it) }; blocked = false; ctrl.play(shown) }
                     else if (status == PlayStatus.Failed) ctrl.retryNow()
                     else overlay = Overlay.Guide
                     true
@@ -169,14 +169,18 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         val sub by ctrl.cue.collectAsState()
         if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 200.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
 
-        if (store.statsOverlay.collectAsState().value) StatsOverlay(ctrl, Modifier.align(Alignment.TopStart).padding(40.dp))
+        if (store.statsOverlay.collectAsState().value) StatsOverlay(ctrl, Modifier.align(Alignment.TopStart).padding(40.dp), extra = app.catalog.timings.let { "list ${it.channels} ch: fetch+parse ${it.fetchParseMs} ms, cache ${it.cacheWriteMs} ms" })
         // status
         val paused by ctrl.paused.collectAsState()
+        val firstFrame by ctrl.firstFrame.collectAsState()
+        // A new channel (or a reconnect) must never look like the old picture froze: black it out at once; the banner below names the new channel.
+        val opening = !blocked && (status == PlayStatus.Reconnecting || (status == PlayStatus.Loading && !firstFrame))
+        if (opening) Box(Modifier.fillMaxSize().background(Color(0xF2000000)))
         Box(Modifier.align(Alignment.Center)) {
             when {
                 blocked -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Glyph.Lock, C.muted, 72); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.group_locked), style = T.title); Text(stringResource(R.string.press_ok_unlock), style = T.small) }
                 status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); WhyLine(cause, ctrl.lastHttpStatus); Text(stringResource(R.string.press_ok_retry), style = T.small) }
-                status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(10.dp)); Text(stringResource(R.string.reconnecting, attempt, PlayerController.MAX_ATTEMPTS), style = T.body); WhyLine(cause, ctrl.lastHttpStatus) }
+                status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(10.dp)); WhyLine(cause, ctrl.lastHttpStatus) }
                 status == PlayStatus.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); WhyLine(cause, ctrl.lastHttpStatus) }
                 paused -> Text("❚❚", style = T.display)
             }
@@ -188,7 +192,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         }
 
         // info banner: bottom scrim, logo + number + name + live pill, programme title, time bar, next
-        AnimatedVisibility(overlay == Overlay.Info, Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 4 }, exit = fadeOut() + slideOutVertically { it / 4 }) {
+        AnimatedVisibility(overlay == Overlay.Info || opening, Modifier.align(Alignment.BottomCenter), enter = fadeIn() + slideInVertically { it / 4 }, exit = fadeOut() + slideOutVertically { it / 4 }) {
             val (now, next) = epg.nowNext(shown.epgId, nowMs)
             Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF0000000)))).padding(horizontal = 84.dp).padding(top = 90.dp, bottom = 56.dp), verticalAlignment = Alignment.Bottom) {
                 Logo(shown, 96)
@@ -202,6 +206,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
                         }
                         if (chKey(pid, shown) in favs) Icon(Glyph.Heart, C.accent, 24, filled = true)
                     }
+                    if (opening) Text(stringResource(if (status == PlayStatus.Reconnecting) R.string.reconnecting else R.string.opening_channel, *(if (status == PlayStatus.Reconnecting) arrayOf<Any>(attempt, PlayerController.MAX_ATTEMPTS) else emptyArray())), style = T.body.copy(color = Color.White), modifier = Modifier.padding(top = 4.dp))
                     if (now != null) {
                         Text(now.title, style = T.display.copy(fontSize = 40.sp, lineHeight = 54.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { Text("${fmtTime(now.startMs)} – ${fmtTime(now.stopMs)}", style = T.small); Text(leftText(now, nowMs), style = T.small) }
@@ -218,7 +223,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         // mini guide
         AnimatedVisibility(overlay == Overlay.Guide, Modifier.align(Alignment.CenterStart), enter = fadeIn() + slideInVertically { 0 }, exit = fadeOut()) {
             val list = if (queue.any { it.url == shown.url }) queue else all
-            MiniGuide(list, shown, epg, nowMs, all) { goTo(it); overlay = Overlay.None }
+            MiniGuide(list, shown, epg, nowMs, all, fav = chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, statsOn = store.statsOverlay.collectAsState().value, onStats = { store.setStatsOverlay(!store.statsOverlay.value) }) { goTo(it); overlay = Overlay.None }
         }
         // my lists picker
         AnimatedVisibility(overlay == Overlay.Lists, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
@@ -252,14 +257,28 @@ internal fun VideoSurface(ctrl: PlayerController) {
 }
 
 @Composable
-private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, onPick: (Channel) -> Unit) {
+private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, onPick: (Channel) -> Unit) {
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     val fr = remember { FocusRequester() }
-    LaunchedEffect(Unit) { state.scrollToItem((idx - 3).coerceAtLeast(0)); runCatching { fr.requestFocus() } }
+    LaunchedEffect(Unit) { state.scrollToItem((idx - 2).coerceAtLeast(0)); runCatching { fr.requestFocus() } }
     // scrim fades toward the video from the start side
     Box(Modifier.fillMaxHeight().width(660.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE0080909), Color.Transparent)))) {
         LazyColumn(Modifier.fillMaxSize(), state, contentPadding = PaddingValues(start = 40.dp, end = 100.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            // quick actions for the channel on screen: a star (favourite) and the playback stats
+            item(key = "actions") {
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Tv(onFav, Modifier.height(56.dp), Rd(14), selected = fav, lift = 1f) {
+                        Row(Modifier.padding(horizontal = 20.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Glyph.Heart, if (fav) C.accent else C.muted, 24, filled = fav); Spacer(Modifier.width(10.dp))
+                            Text(stringResource(if (fav) R.string.menu_unfav else R.string.menu_fav), style = T.body, maxLines = 1)
+                        }
+                    }
+                    Tv(onStats, Modifier.height(56.dp), Rd(14), selected = statsOn, lift = 1f) {
+                        Text(stringResource(R.string.set_stats), style = T.body, maxLines = 1, modifier = Modifier.align(Alignment.Center).padding(horizontal = 20.dp))
+                    }
+                }
+            }
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
                 Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = if (i == idx) fr else null, lift = 1.02f) {

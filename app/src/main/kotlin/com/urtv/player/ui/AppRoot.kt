@@ -92,6 +92,9 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)
     }
 
+    // Back from a tab goes to the Home tab first; Back on the Home tab leaves the app
+    androidx.activity.compose.BackHandler(enabled = screen == Screen.Home && tab != Tab.Home && !homeOnly) { tab = Tab.Home }
+
     // programme reminders: a quiet banner at the top while the app is open
     var banner by remember { mutableStateOf<String?>(null) }
     val soon = androidx.compose.ui.res.stringResource(com.urtv.player.R.string.reminder_now)
@@ -132,7 +135,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Player -> playing?.let { ch ->
             PlayerScreen(app, queue, ch, onExit = { last -> restoreKey = chKey(cat.playlistId.orEmpty(), last); playing = null; screen = Screen.Home })
         } ?: run { screen = Screen.Home }
-        Screen.Add -> AddPlaylistScreen(app) { screen = Screen.Home }
+        Screen.Add -> AddPlaylistScreen(app) { added -> if (added) tab = Tab.Live; screen = Screen.Home }     // after adding, land on the new playlist's channels
         Screen.Groups -> GroupsManage(app) { tab = Tab.Settings; screen = Screen.Home }
         Screen.Backup -> BackupScreen(app, backupRestore) { restored -> tab = Tab.Settings; screen = Screen.Home; if (restored) onLanguageChanged() }
         Screen.HomeRows -> HomeManage(app) { tab = Tab.Settings; screen = Screen.Home }

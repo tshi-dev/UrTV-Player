@@ -47,8 +47,8 @@ import com.urtv.player.phone.PhoneServer
 private enum class AddMode { Phone, M3u, Xtream }
 
 @Composable
-fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null, onDone: () -> Unit) {
-    BackHandler(onBack = onDone)
+fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null, onDone: (added: Boolean) -> Unit) {
+    BackHandler { onDone(false) }
     var mode by remember { mutableStateOf(AddMode.Phone) }
     val first = remember { FocusRequester() }
     val tabRequesters = remember { AddMode.entries.associateWith { if (it == AddMode.Phone) first else FocusRequester() } }
@@ -58,7 +58,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         val xt = p.server.isNotEmpty() && p.user.isNotEmpty()
         val host = (if (xt) p.server else p.url).substringAfter("://").substringBefore('/').substringBefore(':').ifBlank { "Playlist" }
         val def = PlaylistDef(app.store.newId(), p.name.ifBlank { host }, if (xt) PlaylistDef.KIND_XTREAM else PlaylistDef.KIND_M3U, p.url, p.server, p.user, p.pass, p.epg)
-        app.store.addPlaylist(def); app.catalog.open(def.id); onDone()
+        app.store.addPlaylist(def); app.catalog.open(def.id); onDone(true)
     }
 
     Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 128.dp, vertical = 72.dp)) {
@@ -90,6 +90,9 @@ private fun PhonePane(demo: Triple<String, String, String>?, onInput: (PhoneInpu
     var failed by remember { mutableStateOf(false) }
     var closed by remember { mutableStateOf(false) }
     var round by remember { mutableStateOf(0) }
+    val retryFr = remember { FocusRequester() }
+    // when the session ends the retry button takes the focus (it used to stay on a tab, so OK did nothing useful); it opens a new address and code
+    LaunchedEffect(closed) { if (closed) { kotlinx.coroutines.delay(50); runCatching { retryFr.requestFocus() } } }
     DisposableEffect(round) {
         if (demo != null) { info = demo; return@DisposableEffect onDispose { } }
         closed = false; failed = false
@@ -105,7 +108,7 @@ private fun PhonePane(demo: Triple<String, String, String>?, onInput: (PhoneInpu
         Column(Modifier.weight(1f)) {
             when {
                 failed -> { Text(stringResource(R.string.phone_no_lan), style = T.title); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.phone_no_lan_hint), style = T.body.copy(color = C.muted)) }
-                closed -> { Text(stringResource(R.string.phone_closed), style = T.title); Spacer(Modifier.height(40.dp)); TvButton(stringResource(R.string.retry), { round++ }, primary = true) }
+                closed -> { Text(stringResource(R.string.phone_closed), style = T.title); Spacer(Modifier.height(40.dp)); TvButton(stringResource(R.string.retry), { round++ }, primary = true, focusRequester = retryFr) }
                 i != null -> {
                     Text(stringResource(R.string.phone_step1), style = T.title)
                     Spacer(Modifier.height(16.dp))

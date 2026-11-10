@@ -10,12 +10,15 @@ object Browse {
     const val RECENT = "\u0000recent"
     const val LIST = "\u0000list:"
 
-    fun groupOf(c: Channel) = c.group.ifBlank { OTHER }
+    fun groupOf(c: Channel) = groupsOf(c).first()
+
+    /** «Documentary;News» is two groups; a channel without any group is in OTHER. */
+    fun groupsOf(c: Channel): List<String> = com.urtv.player.core.GroupNames.split(c.group).ifEmpty { listOf(OTHER) }
 
     /** Distinct groups in first-seen order. */
     fun groups(channels: List<Channel>): List<String> {
         val s = LinkedHashSet<String>()
-        for (c in channels) s += groupOf(c)
+        for (c in channels) s += groupsOf(c)
         return s.toList()
     }
 
@@ -28,8 +31,8 @@ object Browse {
 
     fun filter(channels: List<Channel>, group: String, query: String): List<Channel> {
         val q = query.trim()
-        var l = if (group == ALL) channels else channels.filter { groupOf(it) == group }
-        if (q.isNotEmpty()) l = l.filter { it.name.contains(q, ignoreCase = true) }
+        var l = if (group == ALL) channels else channels.filter { group in groupsOf(it) }
+        if (q.isNotEmpty()) { val m = com.urtv.player.core.SearchFold.Query(q); l = l.filter { m.matches(it.name) } }     // Arabic/Latin names and keyboard-layout slips
         return l
     }
 

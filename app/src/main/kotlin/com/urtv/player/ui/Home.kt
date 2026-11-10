@@ -1,6 +1,9 @@
 package com.urtv.player.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +63,9 @@ import java.util.Locale
 
 enum class Tab { Home, Live, Movies, Series, Guide, Settings }
 
+/** The focus requester of the tab you are in, so Up from the first field of a page lands on it. */
+val LocalTabFocus = androidx.compose.runtime.staticCompositionLocalOf<FocusRequester?> { null }
+
 private val keyMemo = java.util.concurrent.ConcurrentHashMap<String, String>()
 /** Favourite/recent key: playlist id + a hash of the stream URL, so credentials in URLs never land in preferences. */
 fun chKey(pid: String, c: Channel): String = keyMemo.getOrPut(c.url) {
@@ -89,6 +95,7 @@ fun HomeScreen(
     val active = playlists.firstOrNull { it.id == cat.playlistId }
     val tabFocus = remember { FocusRequester() }
     val nowMs by rememberNow()
+    androidx.compose.runtime.CompositionLocalProvider(LocalTabFocus provides tabFocus) {
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
     LaunchedEffect(tab) { Backdrop.url = null }
@@ -129,6 +136,7 @@ fun HomeScreen(
                 Tab.Settings -> SettingsScreen(app, onAdd, onLanguage, onManageGroups, onManageHome, onBackup)
             }
         }
+    }
     }
     }
 }
@@ -242,7 +250,7 @@ private fun HomeRows(
                     id == "series" -> posterRow(R.string.tab_series, vod.series.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenSeries)
                     id.startsWith("group:") -> {
                         val g = id.removePrefix("group:")
-                        val gl = cat.channels.filter { Browse.groupOf(it) == g }.take(24)
+                        val gl = cat.channels.filter { g in Browse.groupsOf(it) }.take(24)
                         if (gl.isNotEmpty()) {
                             val fr = if (!firstTaken) { firstTaken = true; first } else null
                             Text(if (g == Browse.OTHER) stringResource(R.string.group_other) else g, style = T.title.copy(fontSize = 26.sp), modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
@@ -314,7 +322,9 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     LaunchedEffect(groups) { if (group !in groups && group != Browse.ALL && group != Browse.FAV && group != Browse.RECENT && !group.startsWith(Browse.LIST)) group = Browse.ALL }
     val gKey = groupKey(pid, group)
     val isLocked = group != Browse.ALL && gKey in locked && gKey !in app.unlocked
-    val visibleChannels = remember(cat.channels, groups) { val g = groups.toSet(); cat.channels.filter { Browse.groupOf(it) in g } }
+    val hiddenCh by store.hiddenChannels.collectAsState()
+    val visibleChannels = remember(cat.channels, groups, hiddenCh) { val g = groups.toSet(); cat.channels.filter { c -> Browse.groupsOf(c).any { it in g } && chKey(pid, c) !in hiddenCh } }
+    val numbers = remember(cat.channels) { HashMap<String, Int>(cat.channels.size * 2).also { m -> cat.channels.forEachIndexed { i, c -> m[c.url] = c.number ?: (i + 1) } } }
     val byKey = remember(cat.channels) { cat.channels.associateBy { chKey(pid, it) } }
     val list = remember(cat.channels, visibleChannels, group, query, favs, recents) {
         when {
@@ -323,10 +333,11 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
             group == Browse.FAV -> cat.channels.filter { chKey(pid, it) in favs }
             group == Browse.RECENT -> recents.mapNotNull { byKey[it] }
             group.startsWith(Browse.LIST) -> (lists["$pid|${group.removePrefix(Browse.LIST)}"] ?: emptySet()).let { ks -> cat.channels.filter { chKey(pid, it) in ks } }
-            else -> Browse.filter(cat.channels, group, "")
+            else -> Browse.filter(visibleChannels, group, "")
         }
     }
-    val counts = remember(cat.channels) { cat.channels.groupingBy { Browse.groupOf(it) }.eachCount() }
+    val counts = remember(cat.channels) { HashMap<String, Int>().also { m -> for (c in cat.channels) for (g in Browse.groupsOf(c)) m[g] = (m[g] ?: 0) + 1 } }
+    val arabicUi = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language == "ar"
 
     // focus bookkeeping: remember the focused row; put focus on the nearest row when it disappears or after the player
     val listState = rememberLazyListState()
@@ -337,7 +348,10 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val fr = remember { FocusRequester() }
     LaunchedEffect(focusIdx, list.size) { if (focusIdx in list.indices) { listState.scrollToItem(focusIdx); runCatching { fr.requestFocus() }; lastIdx = focusIdx; focusIdx = -1 } }
 
-    var focused by remember(pid) { mutableStateOf<Channel?>(null) }
+    val focusedState = remember(pid) { mutableStateOf<Channel?>(null) }     // read only inside the preview pane, so moving the focus does not recompose the whole tab
+    var menuFor by remember { mutableStateOf<Channel?>(null) }
+    var searchLatin by remember { mutableStateOf(false) }
+    val tabFocusRq = LocalTabFocus.current
     val showPreview by store.livePreview.collectAsState()
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
@@ -347,7 +361,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
             val entries = listOf(Browse.ALL, Browse.FAV, Browse.RECENT) + myLists + groups
             items(entries, key = { it }) { g ->
                 val gk = groupKey(pid, g)
-                val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.FAV -> stringResource(R.string.tab_favs); Browse.RECENT -> stringResource(R.string.tab_recents); Browse.OTHER -> stringResource(R.string.group_other); else -> if (g.startsWith(Browse.LIST)) g.removePrefix(Browse.LIST) else g }
+                val label = when (g) { Browse.ALL -> stringResource(R.string.all_channels); Browse.FAV -> stringResource(R.string.tab_favs); Browse.RECENT -> stringResource(R.string.tab_recents); Browse.OTHER -> stringResource(R.string.group_other); else -> if (g.startsWith(Browse.LIST)) g.removePrefix(Browse.LIST) else com.urtv.player.core.GroupNames.display(g, arabicUi) }
                 val n = when (g) { Browse.ALL -> cat.channels.size; Browse.FAV -> favs.count { it.startsWith("$pid|") }; Browse.RECENT -> recents.count { it.startsWith("$pid|") }; else -> if (g.startsWith(Browse.LIST)) (lists["$pid|${g.removePrefix(Browse.LIST)}"]?.size ?: 0) else counts[g] ?: 0 }
                 val special = g == Browse.ALL || g == Browse.FAV || g == Browse.RECENT
                 val isList = g.startsWith(Browse.LIST)
@@ -363,7 +377,12 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         }
         // ---- dense channel list
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.fillMaxWidth(), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.weight(1f), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true,
+                    onUp = { tabFocusRq?.let { runCatching { it.requestFocus() } } }, hintLocale = if (searchLatin) "en" else null)
+                // one press switches the keyboard to Latin / back, for channel names typed in the other script
+                Tv({ searchLatin = !searchLatin }, Modifier.height(52.dp), Rd(12), selected = searchLatin, lift = 1f) { Text(if (searchLatin) "EN" else "ع", style = T.bodyBold, modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp)) }
+            }
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxSize()) {
                 when {
@@ -375,7 +394,10 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                             TvButton(stringResource(R.string.unlock), { pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gKey } }, primary = true, focusRequester = ufr)
                         }
                     }
-                    list.isEmpty() && (!cat.settled || (cat.loading && cat.channels.isEmpty())) -> SkeletonRows(10)
+                    list.isEmpty() && (!cat.settled || (cat.loading && cat.channels.isEmpty())) -> Box(Modifier.fillMaxSize()) {
+                        SkeletonRows(10)
+                        if (cat.progress > 0) Text(stringResource(R.string.loading_n, cat.progress), style = T.bodyBold, modifier = Modifier.align(Alignment.TopCenter).background(C.surfaceHi, Rd(12)).padding(horizontal = 20.dp, vertical = 8.dp))
+                    }
                     list.isEmpty() -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (false) { }
                         else if (cat.error != null && cat.channels.isEmpty()) {
@@ -386,17 +408,18 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                     else -> LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         itemsIndexed(list, key = { _, c -> c.url }) { i, ch ->
                             val k = chKey(pid, ch)
-                            ChannelRow(ch, Browse.numberOf(cat.channels, ch), epg.nowNext(ch.epgId, nowMs).first, nowMs, k in favs,
-                                onClick = { onPlay(list, ch) }, onLong = { store.toggleFav(k) },
-                                focusRequester = if (i == focusIdx) fr else null, onFocus = { if (it) { lastIdx = i; focused = ch } })
+                            ChannelRow(ch, numbers[ch.url] ?: (i + 1), epg.nowNext(ch.epgId, nowMs).first, nowMs, k in favs,
+                                onClick = { onPlay(list, ch) }, onLong = { menuFor = ch },
+                                focusRequester = if (i == focusIdx) fr else null, onFocus = { if (it) { lastIdx = i; focusedState.value = ch } })
                         }
                     }
                 }
             }
         }
         // ---- preview pane
-        PreviewPane(app, focused ?: list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
+        PreviewPane(app, focusedState, list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
     }
+    menuFor?.let { c -> ChannelMenu(app, pid, c, numbers[c.url] ?: 0, epg.nowNext(c.epgId, nowMs).first) { menuFor = null } }
     PinHost(pinReq, store) { pinReq = null }
     deleteList?.let { n -> ConfirmDialog(stringResource(R.string.delete_list_confirm, n), onYes = { store.deleteList(pid, n); group = Browse.ALL; deleteList = null }, onNo = { deleteList = null }) }
 }
@@ -406,7 +429,9 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
 @Composable
 fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester?, onFocus: (Boolean) -> Unit) {
     var f by remember { mutableStateOf(false) }
-    Tv(onClick, Modifier.fillMaxWidth().height(76.dp), Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1.02f) {
+    // dense list rows are flat (no scale, no shadow): cheap to draw while scrolling on a weak TV GPU; long OK, Menu and Info open the channel menu
+    Tv(onClick, Modifier.fillMaxWidth().height(76.dp).onKeyEvent { e -> if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && (e.key == androidx.compose.ui.input.key.Key.Menu || e.key == androidx.compose.ui.input.key.Key.Info)) { onLong(); true } else false },
+        Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1f, flat = true) {
         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("$number", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
             Logo(ch, 44); Spacer(Modifier.width(16.dp))
@@ -425,13 +450,18 @@ fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Bool
     }
 }
 
+/** Starts the preview only when the focus has RESTED on a channel (not while a key repeats); stops decoding the moment it moves again. */
+const val PREVIEW_REST_MS = 500L
+
 @Composable
-private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.EpgIndex, nowMs: Long, enabled: Boolean, modifier: Modifier) {
+private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Channel?, epg: com.urtv.player.data.EpgIndex, nowMs: Long, enabled: Boolean, modifier: Modifier) {
     val ctrl = app.player
+    val ch = focusedState.value ?: first
     var shownUrl by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(ch?.url, enabled) {
         if (ch == null || !enabled) { return@LaunchedEffect }
-        delay(1200)                                  // only start the stream once the user rests on a channel
+        if (shownUrl != null && shownUrl != ch.url) { shownUrl = null; ctrl.idlePreview() }   // focus moved: stop decoding the old one at once (keeps the player)
+        delay(PREVIEW_REST_MS)                                                                 // a key held down moves faster than this, so nothing starts
         shownUrl = ch.url; ctrl.playPreview(ch)
     }
     DisposableEffect(Unit) { onDispose { if (ctrl.isPreview) ctrl.stop() } }   // never kill a full-screen channel that just started
@@ -444,7 +474,7 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
             if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 132) }
         }
         if (ch != null) {
-            val (now, _) = epg.nowNext(ch.epgId, nowMs)
+            val (now, _) = remember(ch.epgId, epg, nowMs / 60_000) { epg.nowNext(ch.epgId, nowMs) }
             Text(ch.name, style = T.title.copy(fontSize = 30.sp), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp))
             if (now != null) {
                 Text(now.title, style = T.row.copy(fontSize = 22.sp), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
@@ -452,13 +482,43 @@ private fun PreviewPane(app: UrtvApp, ch: Channel?, epg: com.urtv.player.data.Ep
                 ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1), Modifier.padding(horizontal = 4.dp))
                 if (now.description.isNotBlank()) Text(now.description, style = T.small, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, top = 12.dp, end = 4.dp))
             }
-            val upcoming = epg.forChannel(ch.epgId).filter { it.startMs >= (now?.stopMs ?: nowMs) }.take(3)
+            val upcoming = remember(ch.epgId, epg, now?.stopMs) { epg.forChannel(ch.epgId).filter { it.startMs >= (now?.stopMs ?: nowMs) }.take(3) }
             if (upcoming.isNotEmpty()) Column(Modifier.padding(start = 4.dp, top = 18.dp, end = 4.dp)) {
                 Text(stringResource(R.string.next), style = T.tiny)
                 for (u in upcoming) Row(Modifier.padding(top = 6.dp)) {
                     Text(fmtTime(u.startMs), style = T.small, modifier = Modifier.width(72.dp))
                     Text(u.title, style = T.small.copy(color = C.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+            }
+        }
+    }
+}
+
+/** Long OK / Menu / Info on a channel: favourite, hide, information. Back or No closes it. */
+@Composable
+fun ChannelMenu(app: UrtvApp, pid: String, ch: Channel, number: Int, now: Programme?, onClose: () -> Unit) {
+    val store = app.store
+    val favs by store.favs.collectAsState()
+    val key = chKey(pid, ch)
+    var info by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler { if (info) info = false else onClose() }
+    val fr = remember { FocusRequester() }
+    LaunchedEffect(info) { runCatching { fr.requestFocus() } }
+    Box(Modifier.fillMaxSize().background(C.scrim), contentAlignment = Alignment.Center) {
+        Column(Modifier.width(620.dp).background(C.surface, Rd(22)).padding(32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(ch.name, style = T.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!info) {
+                TvButton(stringResource(if (key in favs) R.string.menu_unfav else R.string.menu_fav), { store.toggleFav(key); onClose() }, primary = false, focusRequester = fr, modifier = Modifier.fillMaxWidth())
+                TvButton(stringResource(R.string.menu_hide), { store.toggleHiddenChannel(key); onClose() }, modifier = Modifier.fillMaxWidth())
+                TvButton(stringResource(R.string.menu_info), { info = true }, modifier = Modifier.fillMaxWidth())
+            } else {
+                val q = com.urtv.player.core.MatchFinder.quality(ch.name)
+                Text("# $number", style = T.body)
+                Text(com.urtv.player.core.GroupNames.split(ch.group).joinToString(" · ").ifBlank { stringResource(R.string.group_other) }, style = T.body.copy(color = C.muted))
+                if (q != 1) Text(when (q) { 4 -> "4K"; 3 -> "FHD"; 2 -> "HD"; else -> "SD" }, style = T.body.copy(color = C.muted))
+                Text(stringResource(if (ch.epgId != null) R.string.menu_has_guide else R.string.menu_no_guide), style = T.body.copy(color = C.muted))
+                if (now != null) Text(now.title, style = T.small, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                TvButton(stringResource(R.string.fm_back), { info = false }, primary = false, focusRequester = fr, modifier = Modifier.fillMaxWidth())
             }
         }
     }

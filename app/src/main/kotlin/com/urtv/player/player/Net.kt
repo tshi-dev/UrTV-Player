@@ -8,12 +8,14 @@ import java.util.concurrent.TimeUnit
 
 /** One shared OkHttp client for media: HTTP/2 where offered, pooled connections, no gzip on media (identity), tuned timeouts. */
 object Net {
+    val dns = CachingDns()
     val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
             .connectionPool(ConnectionPool(6, 5, TimeUnit.MINUTES))
             .connectTimeout(8, TimeUnit.SECONDS).readTimeout(12, TimeUnit.SECONDS).callTimeout(0, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .dns(dns).eventListenerFactory(LoadTrace.listenerFactory)
             .followRedirects(true).followSslRedirects(true)
             .build()
     }

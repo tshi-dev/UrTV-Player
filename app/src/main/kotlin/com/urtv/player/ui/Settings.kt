@@ -116,6 +116,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                         }
                         item { Setting(stringResource(R.string.set_groups), "", stringResource(R.string.set_groups_hint)) { onManageGroups() } }
                         item { Setting(stringResource(R.string.lt_row), "", stringResource(R.string.lt_row_hint)) { listTest = true } }
+                        item { val hid by store.hiddenChannels.collectAsState(); val n = hid.count { it.startsWith("$active|") }; if (n > 0) Setting(stringResource(R.string.menu_hidden_row), "$n") { store.clearHiddenChannels(active!!) } }
                     }
                 }
                 Section.Playback -> {

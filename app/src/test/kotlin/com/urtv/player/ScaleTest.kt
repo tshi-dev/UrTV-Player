@@ -44,6 +44,8 @@ class ScaleTest {
         assertEquals(120, groups.size); assertTrue(gMs < 300, "groups $gMs ms")
         val (hits, fMs) = timed("search 'channel 19'") { Browse.filter(ch, Browse.ALL, "channel 19") }
         assertTrue(hits.size > 1000); assertTrue(fMs < 300, "search $fMs ms")
+        val (arabicHits, aMs) = timed("search with the Arabic keyboard slip (ضعقشى)") { Browse.filter(ch, Browse.ALL, "ضعقشى") }
+        assertTrue(aMs < 600, "folded search $aMs ms"); assertEquals(0, arabicHits.size)
         val (_, gf) = timed("filter one group") { Browse.filter(ch, "Group 7", "") }; assertTrue(gf < 300)
         // one screen of rows asks for each channel's number: must not scan the whole list per row
         val (_, nMs) = timed("40 visible row numbers (numberOf)") { for (i in 0 until 40) Browse.numberOf(ch, ch[19_900 + i].copy(number = null)) }

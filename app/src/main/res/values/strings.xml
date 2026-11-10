@@ -269,4 +269,13 @@
     <string name="su_handed">سلّمنا التحديث إلى أندرويد: اتبع شاشة التثبيت</string>
     <string name="su_failed">تعذّر التحديث الآن. نسختك الحالية تعمل كما هي وسنحاول لاحقًا</string>
     <string name="upd_hint_self">اضغط OK لتنزيل التحديث والتحقق منه. بياناتك وقوائمك تبقى كما هي</string>
+    <string name="menu_fav">إضافة إلى المفضّلة</string>
+    <string name="menu_unfav">إزالة من المفضّلة</string>
+    <string name="menu_hide">إخفاء القناة</string>
+    <string name="menu_info">معلومات القناة</string>
+    <string name="menu_has_guide">لها دليل برامج</string>
+    <string name="menu_no_guide">بلا دليل برامج</string>
+    <string name="menu_hidden_row">إظهار القنوات المخفية</string>
+    <string name="loading_n">جارٍ تحميل القائمة… %1$d قناة</string>
+    <string name="opening_channel">جارٍ الفتح…</string>
 </resources>

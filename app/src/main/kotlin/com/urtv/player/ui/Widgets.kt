@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.shadow
 import com.urtv.player.data.FocusStyle
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
@@ -70,6 +71,8 @@ fun Tv(
     restColor: Color = Color.Transparent,
     ring: Boolean = false,
     lift: Float = 1.03f,
+    /** No shadow: for long, fast-scrolling lists. */
+    flat: Boolean = false,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val th = LocalTheme.current
@@ -87,7 +90,7 @@ fun Tv(
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .let { if (focused && th.focus == FocusStyle.Glow && !ring) it.shadow(18.dp, shape, ambientColor = th.accent, spotColor = th.accent) else if (focused) it.shadow(14.dp, shape) else it }
+            .let { if (flat) it else if (focused && th.focus == FocusStyle.Glow && !ring) it.shadow(18.dp, shape, ambientColor = th.accent, spotColor = th.accent) else if (focused) it.shadow(14.dp, shape) else it }
             .clip(shape)
             .background(fill)
             .let { if (border != null) it.border(border, shape) else it }
@@ -156,51 +159,76 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 fun Row2(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) =
     Row(modifier, verticalAlignment = Alignment.CenterVertically, content = content)
 
-/** Text input that is itself the focus target (D-pad OK opens the TV keyboard); ring shows focus. */
+/**
+ * Text input for a TV remote. Focus alone never opens the keyboard (D-pad users would type stray letters): the field is a plain focus
+ * target until OK is pressed, then the real editor and the keyboard open; Back, or the keyboard's own action key, closes them again.
+ * Up/Down never trap: they move to the neighbour, or Up goes to [onUp] when given. Link and login fields ask for a Latin keyboard.
+ */
 @Composable
 fun FocusField(
     value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier,
     password: Boolean = false, ltr: Boolean = false, leading: @Composable (() -> Unit)? = null,
     imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Next,
-    focusRequester: FocusRequester? = null, compact: Boolean = false, onUp: (() -> Unit)? = null,
+    focusRequester: FocusRequester? = null, compact: Boolean = false, onUp: (() -> Unit)? = null, hintLocale: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
     val fm = androidx.compose.ui.platform.LocalFocusManager.current
+    val kb = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val outer = focusRequester ?: remember { FocusRequester() }
+    val inner = remember { FocusRequester() }
+    val latin = ltr || hintLocale == "en"
+    fun finish(moveDown: Boolean = false) {
+        editing = false; kb?.hide()
+        runCatching { outer.requestFocus() }
+        if (moveDown) fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Down)
+    }
+    androidx.activity.compose.BackHandler(enabled = editing) { finish() }
+    androidx.compose.runtime.LaunchedEffect(editing) { if (editing) { kotlinx.coroutines.delay(30); runCatching { inner.requestFocus() }; kb?.show() } }
     val shape = Rd(if (compact) 12 else 16)
+    val solid = LocalTheme.current.solidFocus
+    val ink = if (focused && solid) C.onFocus else C.text
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         modifier.height(if (compact) 52.dp else 60.dp).clip(shape).background(if (focused) LocalTheme.current.focusFill else C.surface)
             .let { if (focused && LocalTheme.current.focus != FocusStyle.Solid) it.border(3.dp, C.ring, shape) else it }
+            .focusRequester(outer).onFocusChanged { focused = it.hasFocus }
+            .onPreviewKeyEvent { e: androidx.compose.ui.input.key.KeyEvent ->
+                if (editing || e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) false
+                else if (e.key == androidx.compose.ui.input.key.Key.DirectionUp && onUp != null) { onUp(); true } else false
+            }
+            .androidx_clickable(interaction) { editing = true }
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) { leading(); androidx.compose.foundation.layout.Spacer(Modifier.size(14.dp)) }
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text(label, style = T.body.copy(color = if (focused && LocalTheme.current.solidFocus) C.onFocus.copy(alpha = 0.55f) else C.faint), maxLines = 1)
-            androidx.compose.foundation.text.BasicTextField(
+            if (value.isEmpty() && !editing) Text(label, style = T.body.copy(color = if (focused && solid) C.onFocus.copy(alpha = 0.55f) else C.faint), maxLines = 1)
+            if (!editing) {
+                if (value.isNotEmpty()) Text(if (password) "•".repeat(value.length.coerceAtMost(40)) else value, style = T.body.copy(color = ink, textAlign = if (latin) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
+                    textDirection = if (latin) androidx.compose.ui.text.style.TextDirection.Ltr else androidx.compose.ui.text.style.TextDirection.Content), maxLines = 1, softWrap = false, modifier = Modifier.fillMaxWidth())
+            } else androidx.compose.foundation.text.BasicTextField(
                 value, onChange, singleLine = true,
-                textStyle = T.body.copy(color = if (focused && LocalTheme.current.solidFocus) C.onFocus else C.text, textAlign = if (ltr) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
-                    textDirection = if (ltr) androidx.compose.ui.text.style.TextDirection.Ltr else androidx.compose.ui.text.style.TextDirection.Content),
+                textStyle = T.body.copy(color = ink, textAlign = if (latin) androidx.compose.ui.text.style.TextAlign.Left else androidx.compose.ui.text.style.TextAlign.Start,
+                    textDirection = if (latin) androidx.compose.ui.text.style.TextDirection.Ltr else androidx.compose.ui.text.style.TextDirection.Content),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(C.accent2),
                 visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = imeAction, autoCorrectEnabled = false,
-                    keyboardType = if (ltr) androidx.compose.ui.text.input.KeyboardType.Uri else androidx.compose.ui.text.input.KeyboardType.Text,
-                    // links and logins are Latin: ask the TV keyboard for English (an Arabic IME otherwise turns Latin keys into Arabic); Uri type already means no suggestions
-                    hintLocales = if (ltr) androidx.compose.ui.text.intl.LocaleList("en") else null),
-                modifier = Modifier.fillMaxWidth().let { if (focusRequester != null) it.focusRequester(focusRequester) else it }.onFocusChanged { focused = it.isFocused }
-                    // a text field must never be a trap: D-pad Up/Down leave it (to the nearest neighbour, or to [onUp] when there is none)
-                    .onPreviewKeyEvent { e: androidx.compose.ui.input.key.KeyEvent ->
-                        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) false
-                        else when (e.key) {
-                            androidx.compose.ui.input.key.Key.DirectionUp -> { if (!fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Up)) onUp?.invoke(); true }
-                            androidx.compose.ui.input.key.Key.DirectionDown -> fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Down)
-                            else -> false
-                        }
-                    },
+                    imeAction = imeAction, autoCorrectEnabled = false, capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
+                    keyboardType = if (password) androidx.compose.ui.text.input.KeyboardType.Password else if (ltr) androidx.compose.ui.text.input.KeyboardType.Uri else androidx.compose.ui.text.input.KeyboardType.Text,
+                    // links and logins are Latin: ask for an English keyboard (an Arabic one turns Latin keys into Arabic); no suggestions, no auto-correct
+                    hintLocales = if (latin) androidx.compose.ui.text.intl.LocaleList("en") else if (hintLocale != null) androidx.compose.ui.text.intl.LocaleList(hintLocale) else null),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onNext = { finish(moveDown = true) }, onDone = { finish() }, onSearch = { finish() }, onGo = { finish() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(inner),
             )
         }
     }
 }
+
+/** clickable without ripple; D-pad centre / Enter also click it. */
+private fun Modifier.androidx_clickable(source: androidx.compose.foundation.interaction.MutableInteractionSource, onClick: () -> Unit): Modifier =
+    this.clickable(interactionSource = source, indication = null, onClick = onClick)
 
 
 /** Quiet placeholder block with a slow pulse; uses theme tokens so it fits every theme. */

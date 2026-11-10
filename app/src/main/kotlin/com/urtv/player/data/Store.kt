@@ -177,6 +177,11 @@ class Store(ctx: Context) {
     private val _tunnel = MutableStateFlow(sp.getBoolean("tunnel", false)); val tunneling: StateFlow<Boolean> = _tunnel
     fun setTunneling(v: Boolean) { _tunnel.value = v; sp.edit().putBoolean("tunnel", v).apply() }
     private val _stats = MutableStateFlow(sp.getBoolean("stats", false)); val statsOverlay: StateFlow<Boolean> = _stats
+    // ---- channels the person hid from the lists (key = playlist id + hashed url); shown again from Settings
+    private val _hiddenCh = MutableStateFlow(sp.getStringSet("hiddenCh", emptySet())!!.toSet()); val hiddenChannels: StateFlow<Set<String>> = _hiddenCh
+    fun toggleHiddenChannel(key: String) { val s = _hiddenCh.value.toMutableSet(); if (!s.add(key)) s.remove(key); _hiddenCh.value = s; sp.edit().putStringSet("hiddenCh", s).apply() }
+    fun clearHiddenChannels(pid: String) { val s = _hiddenCh.value.filterNot { it.startsWith("$pid|") }.toSet(); _hiddenCh.value = s; sp.edit().putStringSet("hiddenCh", s).apply() }
+
     private val _autoAlt = MutableStateFlow(sp.getBoolean("autoalt", false)); val autoAlt: StateFlow<Boolean> = _autoAlt
     fun setAutoAlt(v: Boolean) { _autoAlt.value = v; sp.edit().putBoolean("autoalt", v).apply() }
     fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }
