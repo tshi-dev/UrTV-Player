@@ -33,10 +33,10 @@ class ReportTest {
 
     @Test fun everyLineStartsWithAnAllowedPrefixAndFirstLineIsAccepted() {
         val p = Report.build(Report.Kind.Problem, "guide", info()).trim().lines()
-        assertTrue(p.first().startsWith("UrTV problem report, "), p.first()); assertTrue(p.first().endsWith("topic: guide"))
+        assertTrue(p.first().startsWith("UrTV Player problem report, "), p.first()); assertTrue(p.first().endsWith("topic: guide"))
         val r = Report.build(Report.Kind.Request, "other", info()).trim().lines()
-        assertTrue(r.first().startsWith("UrTV setup report, ")); assertTrue(r.first().endsWith("feature request"))
-        for (l in p + r) assertTrue(Regex("UrTV (problem|setup) report, |Versions:|Device:|Extras:").find(l)?.range?.first == 0, l)
+        assertTrue(r.first().startsWith("UrTV Player feature request, ")); assertEquals("UrTV Player feature request, 0.9.3", r.first())
+        for (l in p + r) assertTrue(Regex("UrTV Player (problem report|feature request), |Versions:|Device:|Extras:").find(l)?.range?.first == 0, l)
         assertEquals(2, r.count { it.startsWith("Extras:") } + 0, "a request has no error lines"); 
     }
 

@@ -36,7 +36,7 @@ object Report {
         val t = if (topic in TOPICS) topic else "other"
         val m3u = i.playlists.count { !it.isXtream }; val xt = i.playlists.count { it.isXtream }   // counts only: names, links, hosts and logins never leave the Playlist objects
         val lines = buildList {
-            add(if (kind == Kind.Problem) "UrTV problem report, Player ${tok(i.version)}, topic: $t" else "UrTV setup report, Player ${tok(i.version)}, feature request")
+            add(if (kind == Kind.Problem) "UrTV Player problem report, ${tok(i.version)}, topic: $t" else "UrTV Player feature request, ${tok(i.version)}")
             add("Versions: Player ${tok(i.version)} ${tok(i.official, 12)}, Android ${tok(i.androidRelease, 10)} (API ${i.sdk.coerceIn(0, 99)})")
             add("Device: ${tok(i.brand, 20)}, tv, ram ${tok(i.ram, 8)}")
             add("Extras: language ${tok(i.language, 3)}, theme ${tok(i.theme)}, accent ${tok(i.accent)}")
@@ -50,7 +50,7 @@ object Report {
         return sanitize(lines.joinToString("\n") + "\n")
     }
 
-    private val ALLOWED = Regex("UrTV (problem|setup) report, |Versions:|Device:|Extras:")
+    private val ALLOWED = Regex("UrTV Player (problem report|feature request), |Versions:|Device:|Extras:")
     private val IPV4 = Regex("\\d{1,3}(\\.\\d{1,3}){3}")
 
     /** The last net (the same allowlist idea as UrTV's own share): drops unknown lines, drops any word that looks like a link, address or credential. */
