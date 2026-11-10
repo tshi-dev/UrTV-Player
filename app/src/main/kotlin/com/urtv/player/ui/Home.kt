@@ -353,6 +353,16 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     var searchLatin by remember { mutableStateOf(false) }
     val tabFocusRq = LocalTabFocus.current
     val showPreview by store.livePreview.collectAsState()
+    // fill the image cache a screen ahead, off the UI thread, at the exact size the rows use (debounced: nothing while keys repeat)
+    val logoCtx = androidx.compose.ui.platform.LocalContext.current
+    val logoPx = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.roundToPx() }
+    LaunchedEffect(listState.firstVisibleItemIndex, list) {
+        delay(200)
+        val from = listState.firstVisibleItemIndex + listState.layoutInfo.visibleItemsInfo.size
+        val loader = coil3.SingletonImageLoader.get(logoCtx)
+        for (i in from until minOf(from + 14, list.size)) list[i].logo?.takeIf { it.isNotBlank() }?.let { loader.enqueue(coil3.request.ImageRequest.Builder(logoCtx).data(it).size(logoPx, logoPx).build()) }
+    }
+    LaunchedEffect(app.pendingSearch) { app.pendingSearch?.let { query = it; group = Browse.ALL; app.pendingSearch = null } }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         // ---- groups rail: plain text rows with counts
@@ -377,12 +387,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         }
         // ---- dense channel list
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.weight(1f), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true,
-                    onUp = { tabFocusRq?.let { runCatching { it.requestFocus() } } }, hintLocale = if (searchLatin) "en" else null)
-                // one press switches the keyboard to Latin / back, for channel names typed in the other script
-                Tv({ searchLatin = !searchLatin }, Modifier.height(52.dp), Rd(12), selected = searchLatin, lift = 1f) { Text(if (searchLatin) "EN" else "ع", style = T.bodyBold, modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp)) }
-            }
+            SearchRow(query, { query = it }, searchLatin, { searchLatin = it }, onUp = { tabFocusRq?.let { runCatching { it.requestFocus() } } })
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxSize()) {
                 when {
@@ -410,7 +415,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                             val k = chKey(pid, ch)
                             ChannelRow(ch, numbers[ch.url] ?: (i + 1), epg.nowNext(ch.epgId, nowMs).first, nowMs, k in favs,
                                 onClick = { onPlay(list, ch) }, onLong = { menuFor = ch },
-                                focusRequester = if (i == focusIdx) fr else null, onFocus = { if (it) { lastIdx = i; focusedState.value = ch } })
+                                focusRequester = if (i == focusIdx) fr else null, onFocus = { if (it) { lastIdx = i; focusedState.value = ch; com.urtv.player.player.Net.preResolve(ch.url) } })
                         }
                     }
                 }
@@ -419,9 +424,20 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         // ---- preview pane
         PreviewPane(app, focusedState, list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
     }
-    menuFor?.let { c -> ChannelMenu(app, pid, c, numbers[c.url] ?: 0, epg.nowNext(c.epgId, nowMs).first) { menuFor = null } }
+    menuFor?.let { c -> ChannelMenu(app, pid, c, numbers[c.url] ?: 0, epg.nowNext(c.epgId, nowMs).first) { menuFor = null; focusIdx = lastIdx.coerceAtLeast(0) } }
     PinHost(pinReq, store) { pinReq = null }
     deleteList?.let { n -> ConfirmDialog(stringResource(R.string.delete_list_confirm, n), onYes = { store.deleteList(pid, n); group = Browse.ALL; deleteList = null }, onNo = { deleteList = null }) }
+}
+
+/** The search box and its keyboard-language chip: D-pad Left/Right move between them (the chip is not inside the text field). */
+@Composable
+fun SearchRow(query: String, onQuery: (String) -> Unit, latin: Boolean, onLatin: (Boolean) -> Unit, onUp: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FocusField(query, onQuery, stringResource(R.string.search_hint), Modifier.weight(1f), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true,
+            onUp = onUp, hintLocale = if (latin) "en" else null)
+        // one press switches the keyboard to Latin / back, for channel names typed in the other script
+        Tv({ onLatin(!latin) }, Modifier.height(52.dp), Rd(12), selected = latin, lift = 1f) { Text(if (latin) "EN" else "ع", style = T.bodyBold, modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp)) }
+    }
 }
 
 /** One dense row: number, logo, name over programme (with time left at the end) and a thin progress bar. */
@@ -467,7 +483,8 @@ private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Chan
     DisposableEffect(Unit) { onDispose { if (ctrl.isPreview) ctrl.stop() } }   // never kill a full-screen channel that just started
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && ch != null && shownUrl == ch.url) Color.Black else C.surfaceHi)) {
-            if (enabled) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
+            // the video surface exists only while a preview is actually running: scrolling past channels composes no surface at all
+            if (enabled && ch != null && shownUrl == ch.url) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
             if (ch != null) Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color(0x80000000)).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }
             }
@@ -524,14 +541,21 @@ fun ChannelMenu(app: UrtvApp, pid: String, ch: Channel, number: Int, now: Progra
     }
 }
 
+/** Channel logo: decoded at its fixed on-screen size (cache hits while scrolling), monogram only until the picture is there. No subcomposition. */
 @Composable
 fun Logo(ch: Channel, size: Int) {
     val url = ch.logo
-    if (url.isNullOrBlank()) Monogram(ch.name, size)
-    else SubcomposeAsyncImage(
-        model = url, contentDescription = null, modifier = Modifier.size(size.dp), contentScale = ContentScale.Fit,
-        error = { Monogram(ch.name, size) }, loading = { Monogram(ch.name, size) },
-    )
+    if (url.isNullOrBlank()) { Monogram(ch.name, size); return }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.dp.roundToPx() }
+    var shown by remember(url) { mutableStateOf(false) }
+    Box(Modifier.size(size.dp)) {
+        if (!shown) Monogram(ch.name, size)
+        coil3.compose.AsyncImage(
+            model = remember(url, px) { coil3.request.ImageRequest.Builder(ctx).data(url).size(px, px).build() },
+            contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit, onSuccess = { shown = true },
+        )
+    }
 }
 
 /** Poster/still with a stable tinted placeholder underneath (no flash while loading, nothing broken when it fails). */

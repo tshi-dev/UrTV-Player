@@ -33,7 +33,7 @@ class PhoneServer(
     /** Restore mode: receives the uploaded (still encrypted) file. */
     private val onBlob: (ByteArray) -> Unit = {},
 ) {
-    val code: String = "%06d".format(SecureRandom().nextInt(1_000_000))
+    val code: String = "%06d".format(java.util.Locale.US, SecureRandom().nextInt(1_000_000))     // always ASCII digits, whatever the UI language
     @Volatile var port: Int = 0; private set
     @Volatile private var server: ServerSocket? = null
     @Volatile private var done = false

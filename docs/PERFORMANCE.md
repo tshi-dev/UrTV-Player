@@ -43,3 +43,8 @@ Macrobenchmark run on the device are the tools for these. First TV test (TCL): c
 | Zap 1.5 to 3.6 s, first picture 3.7 to 5.9 s | Stats show dns, connect, manifest, media bytes and decode per channel; DNS answers cached 10 min; zap debounce 250 to 180 ms | read the new line in the stats overlay |
 | 360-channel playlist took 35 to 90 s | The list is shown as soon as it is parsed (cache is written after), "N channels" progress, fetch+parse and cache-write times in the stats; the Keystore write is no longer on the critical path | stats line "list N ch: fetch+parse X ms, cache Y ms" tells network from our own time |
 | PSS 127 MB then 86 | Stats show current PSS | watch it during and right after a load |
+
+## v0.9.7 (second TV round: list still 12.6 % janky, zap 3.1 s up)
+- List rows: logos decoded at their fixed on-screen size without subcomposition and prefetched a screen ahead off the UI thread; the preview's video surface exists only while a preview is actually playing (scrolling composes no surface); DNS of the focused channel is resolved immediately, so the 500 ms rest hides it.
+- Zap: DNS of the next two channels each way is resolved when a channel starts; the two nearest neighbours' manifests are fetched ahead and served once from memory (20 s, 256 KB, off on low-RAM TVs and metered links, on by default).
+- The stats overlay now carries a UI frame meter per screen (janky share above 25 ms, p50/p90/p99) and a real frames-per-second reading (rendered frame count over time).

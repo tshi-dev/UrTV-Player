@@ -114,13 +114,18 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
             pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gk; blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
         } else { blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
     }
-    // optional: warm the neighbouring channels' HLS manifests so the next zap starts faster
+    // Zap ahead: resolve the host names of the next two channels each way (cheap), and, unless the TV is low on memory or the link is
+    // metered, fetch the manifests of the two nearest neighbours (at most 2 requests) so the next zap skips DNS, connect and manifest.
+    val lowRamTv = remember { (app.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice }
     LaunchedEffect(shown.url) {
-        if (!store.prefetchNeighbours.value) return@LaunchedEffect
         delay(700)
         val q = if (queue.any { it.url == shown.url }) queue else all
         val i = q.indexOfFirst { it.url == shown.url }
-        if (i >= 0 && q.size > 1) { com.urtv.player.player.Net.warmManifest(q[(i + 1) % q.size].url); com.urtv.player.player.Net.warmManifest(q[(i - 1 + q.size) % q.size].url) }
+        if (i < 0 || q.size < 2) return@LaunchedEffect
+        fun at(d: Int) = q[((i + d) % q.size + q.size) % q.size]
+        for (d in intArrayOf(1, -1, 2, -2)) com.urtv.player.player.Net.preResolve(at(d).url)
+        val metered = runCatching { (app.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).isActiveNetworkMetered }.getOrDefault(false)
+        if (store.prefetchNeighbours.value && !lowRamTv && !metered) { com.urtv.player.player.Net.prefetchManifest(at(1).url); com.urtv.player.player.Net.prefetchManifest(at(-1).url) }
     }
     LaunchedEffect(infoTick, overlay) { if (overlay == Overlay.Info) { delay(4500); if (overlay == Overlay.Info) overlay = Overlay.None } }
     LaunchedEffect(digits) {
@@ -175,7 +180,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         val firstFrame by ctrl.firstFrame.collectAsState()
         // A new channel (or a reconnect) must never look like the old picture froze: black it out at once; the banner below names the new channel.
         val opening = !blocked && (status == PlayStatus.Reconnecting || (status == PlayStatus.Loading && !firstFrame))
-        if (opening) Box(Modifier.fillMaxSize().background(Color(0xF2000000)))
+        if (opening) Box(Modifier.fillMaxSize().background(Color.Black))
         Box(Modifier.align(Alignment.Center)) {
             when {
                 blocked -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Glyph.Lock, C.muted, 72); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.group_locked), style = T.title); Text(stringResource(R.string.press_ok_unlock), style = T.small) }
@@ -223,7 +228,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         // mini guide
         AnimatedVisibility(overlay == Overlay.Guide, Modifier.align(Alignment.CenterStart), enter = fadeIn() + slideInVertically { 0 }, exit = fadeOut()) {
             val list = if (queue.any { it.url == shown.url }) queue else all
-            MiniGuide(list, shown, epg, nowMs, all, fav = chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, statsOn = store.statsOverlay.collectAsState().value, onStats = { store.setStatsOverlay(!store.statsOverlay.value) }) { goTo(it); overlay = Overlay.None }
+            MiniGuide(list, shown, epg, nowMs, all, fav = chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, statsOn = store.statsOverlay.collectAsState().value, onStats = { store.setStatsOverlay(!store.statsOverlay.value) }, cause = cause, httpStatus = ctrl.lastHttpStatus) { goTo(it); overlay = Overlay.None }
         }
         // my lists picker
         AnimatedVisibility(overlay == Overlay.Lists, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
@@ -257,7 +262,7 @@ internal fun VideoSurface(ctrl: PlayerController) {
 }
 
 @Composable
-private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, onPick: (Channel) -> Unit) {
+private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, onPick: (Channel) -> Unit) {
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     val fr = remember { FocusRequester() }
@@ -277,6 +282,13 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
                     Tv(onStats, Modifier.height(56.dp), Rd(14), selected = statsOn, lift = 1f) {
                         Text(stringResource(R.string.set_stats), style = T.body, maxLines = 1, modifier = Modifier.align(Alignment.Center).padding(horizontal = 20.dp))
                     }
+                }
+            }
+            // «why is it choppy?» is always answered here, also when nothing is wrong
+            item(key = "why") {
+                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.why_title) + ": ", style = T.small.copy(color = C.text))
+                    if (cause == com.urtv.player.core.Diagnosis.Cause.None) Text(stringResource(R.string.why_ok), style = T.small.copy(color = C.accent), maxLines = 2) else WhyLine(cause, httpStatus, inline = true)
                 }
             }
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->

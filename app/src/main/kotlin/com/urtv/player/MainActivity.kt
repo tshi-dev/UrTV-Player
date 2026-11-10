@@ -45,7 +45,7 @@ fun localized(base: Context, fresh: Boolean = true): Context {
     val choice = sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: com.urtv.player.data.Language.AUTO
     val cached = sp.getString("urtvLang", null)
     val lang = if (fresh) {
-        val r = com.urtv.player.data.Language.resolveAtStart(choice, cached, com.urtv.player.data.Language.systemLanguage()) { com.urtv.player.data.Language.within(800) { com.urtv.player.data.Language.readUrtv(base) } }
+        val r = com.urtv.player.data.Language.resolveAtStart(choice, cached, com.urtv.player.data.Language.systemLanguage()) { com.urtv.player.data.Language.within(if (cached == null) 800 else 250) { com.urtv.player.data.Language.readUrtv(base) } }     // first ever start waits longer; later starts use the remembered answer if UrTV is slow to wake
         sp.edit().apply { r.urtvToCache?.let { if (it != cached) putString("urtvLang", it) } }.putString("resolvedLang", r.lang).apply()
         r.lang
     } else sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(choice, cached, com.urtv.player.data.Language.systemLanguage())

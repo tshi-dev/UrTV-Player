@@ -185,7 +185,7 @@ class Store(ctx: Context) {
     private val _autoAlt = MutableStateFlow(sp.getBoolean("autoalt", false)); val autoAlt: StateFlow<Boolean> = _autoAlt
     fun setAutoAlt(v: Boolean) { _autoAlt.value = v; sp.edit().putBoolean("autoalt", v).apply() }
     fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }
-    private val _prefetch = MutableStateFlow(sp.getBoolean("prefetch", false)); val prefetchNeighbours: StateFlow<Boolean> = _prefetch
+    private val _prefetch = MutableStateFlow(sp.getBoolean("prefetch", true)); val prefetchNeighbours: StateFlow<Boolean> = _prefetch
     fun setPrefetch(v: Boolean) { _prefetch.value = v; sp.edit().putBoolean("prefetch", v).apply() }
 
     // ---- start screen, home rows, live preview, watched marks

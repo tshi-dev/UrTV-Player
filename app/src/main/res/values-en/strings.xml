@@ -234,6 +234,7 @@
     <string name="share_scan">Scan the code with your phone, write your words, then press send. The TV itself sends nothing.</string>
     <string name="share_contains">The summary: version, system, and the number and types of playlists only.</string>
     <string name="why_title">Why is it choppy?</string>
+    <string name="why_ok">The stream is healthy</string>
     <string name="why_source">Likely the channel\'s source: the stream arrives slower than it needs</string>
     <string name="why_network">Likely your home network: weak signal or speed, and it shows on more than one channel</string>
     <string name="why_decoder">The TV can\'t keep up with this quality. Try a lower one</string>

@@ -184,6 +184,22 @@ fun FocusField(
         if (moveDown) fm.moveFocus(androidx.compose.ui.focus.FocusDirection.Down)
     }
     androidx.activity.compose.BackHandler(enabled = editing) { finish() }
+    // Back on a visible keyboard only hides it: while editing, notice when the keyboard has been shown and then disappeared, and leave edit mode too
+    // (no second Back needed). Driven by layout passes (the keyboard changes the window insets), not by a timer.
+    val view = androidx.compose.ui.platform.LocalView.current
+    val autoLeave = LocalAutoLeaveEdit.current
+    androidx.compose.runtime.DisposableEffect(editing) {
+        var seen = false; var fired = false
+        lateinit var l: android.view.ViewTreeObserver.OnGlobalLayoutListener
+        l = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            if (fired) return@OnGlobalLayoutListener
+            val vis = androidx.core.view.ViewCompat.getRootWindowInsets(view)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            if (vis) seen = true
+            else if (seen) { fired = true; if (view.viewTreeObserver.isAlive) view.viewTreeObserver.removeOnGlobalLayoutListener(l); view.post { finish() } }     // once per edit session, never from inside the layout pass
+        }
+        if (editing && autoLeave) view.viewTreeObserver.addOnGlobalLayoutListener(l)
+        onDispose { if (view.viewTreeObserver.isAlive) view.viewTreeObserver.removeOnGlobalLayoutListener(l) }
+    }
     androidx.compose.runtime.LaunchedEffect(editing) { if (editing) { kotlinx.coroutines.delay(30); runCatching { inner.requestFocus() }; kb?.show() } }
     val shape = Rd(if (compact) 12 else 16)
     val solid = LocalTheme.current.solidFocus
@@ -225,6 +241,9 @@ fun FocusField(
         }
     }
 }
+
+/** Off in Robolectric tests: reading window insets from a layout callback makes the test environment re-layout forever. Always on in the app. */
+val LocalAutoLeaveEdit = androidx.compose.runtime.staticCompositionLocalOf { true }
 
 /** clickable without ripple; D-pad centre / Enter also click it. */
 private fun Modifier.androidx_clickable(source: androidx.compose.foundation.interaction.MutableInteractionSource, onClick: () -> Unit): Modifier =

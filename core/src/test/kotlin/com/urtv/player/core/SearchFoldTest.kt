@@ -37,3 +37,24 @@ class SearchFoldTest {
         for (g in listOf("News", "Sports", "Kids", "Religious", "Movies", "Documentary", "Cooking", "General", "Music")) assertNotEquals(g, GroupNames.display(g, true), g)
     }
 }
+
+class FrameStatsTest {
+    @Test fun jankShareAndPercentiles() {
+        val smooth = List(100) { 16.6 }
+        assertEquals(0.0, FrameStats.of(smooth).jankyPct)
+        val mixed = List(80) { 16.6 } + List(20) { 48.0 }
+        val r = FrameStats.of(mixed)
+        assertEquals(20.0, r.jankyPct, 0.001); assertEquals(16.6, r.p50, 0.001); assertEquals(48.0, r.p90, 0.001); assertEquals(100, r.frames)
+        assertEquals(0, FrameStats.of(emptyList()).frames)
+        assertTrue(r.line.contains("janky 20.0 %"))
+    }
+
+    @Test fun fpsFromRenderedFrameCounts() {
+        assertEquals(25f, FrameStats.fps(25, 1000), 0.01f); assertEquals(50f, FrameStats.fps(100, 2000), 0.01f)
+        assertEquals(0f, FrameStats.fps(0, 1000)); assertEquals(0f, FrameStats.fps(10, 100), "too short a window to say")
+    }
+
+    @Test fun moreArabicGroupNames() {
+        assertEquals("عائلية", GroupNames.display("Family", true)); assertEquals("Family", GroupNames.display("Family", false))
+    }
+}

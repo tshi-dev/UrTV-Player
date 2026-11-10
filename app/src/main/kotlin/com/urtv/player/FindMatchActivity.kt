@@ -42,7 +42,7 @@ class FindMatchActivity : ComponentActivity() {
         setContent {
             val look by app.store.appearance.collectAsState(); val scale by app.store.textScale.collectAsState()
             UrtvTheme(look, scale) {
-                FindMatchRoot(app, req, onPlayed = { setResult(RESULT_OK) }, onSearch = { startActivity(Intent(this, MainActivity::class.java)); finish() }, onClose = { finish() })
+                FindMatchRoot(app, req, onPlayed = { setResult(RESULT_OK) }, onSearch = { text -> (application as UrtvApp).pendingSearch = text.take(com.urtv.player.core.MatchFinder.MAX_LEN).ifBlank { null }; startActivity(Intent(this, MainActivity::class.java)); finish() }, onClose = { finish() })
             }
         }
     }

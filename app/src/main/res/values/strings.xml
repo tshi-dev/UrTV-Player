@@ -62,7 +62,7 @@
     <string name="phone_step1">امسح الرمز بجوالك</string>
     <string name="phone_step2">أو افتح هذا العنوان في متصفح جوالك وأدخل الرمز. الجوال والتلفاز على نفس الشبكة.</string>
     <string name="phone_code">الرمز</string>
-    <string name="phone_safe">الصفحة تعمل على شبكتك فقط وتُغلق بعد الإرسال أو بعد ١٠ دقائق.</string>
+    <string name="phone_safe">الصفحة تعمل على شبكتك فقط وتُغلق بعد الإرسال أو بعد 10 دقائق.</string>
     <string name="phone_closed">أُغلقت الصفحة</string>
     <string name="phone_no_lan">التلفاز غير متصل بشبكة محلية</string>
     <string name="phone_no_lan_hint">اتصل بالواي فاي أو الكابل، أو أضف القائمة بالكتابة.</string>
@@ -87,7 +87,7 @@
     <string name="pin_none">غير مضبوط</string>
     <string name="pin_remove">إزالة الرمز السري</string>
     <string name="pin_enter">أدخل الرمز السري</string>
-    <string name="pin_new">اختر رمزًا من ٤ أرقام</string>
+    <string name="pin_new">اختر رمزًا من 4 أرقام</string>
     <string name="pin_confirm">أعد إدخال الرمز</string>
     <string name="pin_wrong">الرمز غير صحيح</string>
     <string name="pin_mismatch">الرمزان غير متطابقين</string>
@@ -234,6 +234,7 @@
     <string name="share_scan">امسح الكود بجوالك، اكتب كلماتك، ثم اضغط أرسل. التلفاز نفسه لا يرسل شيئًا.</string>
     <string name="share_contains">الملخص: النسخة والنظام وعدد القوائم وأنواعها فقط.</string>
     <string name="why_title">ليش يقطّع؟</string>
+    <string name="why_ok">البث سليم</string>
     <string name="why_source">غالبًا من مصدر القناة: البث يصل أبطأ مما تحتاجه</string>
     <string name="why_network">غالبًا من شبكة البيت: الإشارة أو السرعة ضعيفة، والمشكلة تظهر في أكثر من قناة</string>
     <string name="why_decoder">التلفاز لا يلحق بعرض هذه الجودة. جرّب جودة أقل</string>
@@ -245,8 +246,8 @@
     <string name="lt_row">اختبار القائمة</string>
     <string name="lt_row_hint">يجرّب عيّنة من القنوات ليقيس سرعة الاستجابة ونسبة الوصول</string>
     <string name="lt_running">جارٍ الاختبار %1$d من %2$d…</string>
-    <string name="lt_reach">وصلت %1$d٪ من العيّنة (%2$d قناة)</string>
-    <string name="lt_ttfb">زمن أول بايت: الوسيط %1$s ث، و٩٠٪ أقل من %2$s ث</string>
+    <string name="lt_reach">وصلت %1$d%% من العيّنة (%2$d قناة)</string>
+    <string name="lt_ttfb">زمن أول بايت: الوسيط %1$s ث، و90%% أقل من %2$s ث</string>
     <string name="lt_fails">لم تصل: لا ترد %1$d، خطأ من المصدر %2$d، قناة غير موجودة %3$d</string>
     <string name="lt_good">القائمة تبدو جيدة</string>
     <string name="lt_fair">القائمة مقبولة، وقد تتأخر بعض القنوات</string>
@@ -264,7 +265,7 @@
     <string name="su_allow_title">السماح بالتثبيت مرة واحدة</string>
     <string name="su_allow_body">لتحديث UrTV Player من داخله، يطلب أندرويد إذنًا واحدًا لهذا التطبيق وحده: «تثبيت التطبيقات غير المعروفة». لن يُثبَّت شيء بدون ضغطك، وبياناتك وقوائمك تبقى كما هي.</string>
     <string name="su_open_settings">فتح الإعدادات</string>
-    <string name="su_downloading">جارٍ تنزيل التحديث %1$d٪</string>
+    <string name="su_downloading">جارٍ تنزيل التحديث %1$d%%</string>
     <string name="su_verifying">نتأكد من سلامة الملف…</string>
     <string name="su_handed">سلّمنا التحديث إلى أندرويد: اتبع شاشة التثبيت</string>
     <string name="su_failed">تعذّر التحديث الآن. نسختك الحالية تعمل كما هي وسنحاول لاحقًا</string>

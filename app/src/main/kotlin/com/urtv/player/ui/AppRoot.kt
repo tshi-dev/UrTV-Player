@@ -92,6 +92,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)
     }
 
+    LaunchedEffect(app.pendingSearch) { if (app.pendingSearch != null && !homeOnly) { tab = Tab.Live; screen = Screen.Home; playing = null } }
     // Back from a tab goes to the Home tab first; Back on the Home tab leaves the app
     androidx.activity.compose.BackHandler(enabled = screen == Screen.Home && tab != Tab.Home && !homeOnly) { tab = Tab.Home }
 
@@ -147,6 +148,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.upd_home_line, o.name), style = T.small,
             modifier = androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = 18.dp))
     }
+    if (store.statsOverlay.collectAsState().value && screen != Screen.Player && screen != Screen.Vod) FrameMeterOverlay("${screen.name}/${tab.name}", androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopEnd).padding(top = 6.dp, end = 12.dp))
     banner?.let { b ->
         androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 28.dp)
             .background(androidx.compose.ui.graphics.Color(0xF0141619), Rd(16)).padding(horizontal = 28.dp, vertical = 14.dp)) { Text(b, style = T.row) }

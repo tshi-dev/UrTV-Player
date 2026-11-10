@@ -93,6 +93,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats
     private var ttffAvg = 0L; private var ttffN = 0
+    private var lastRendered = 0; private var lastRenderedAt = 0L; private var measuredFps = 0f
 
     // ---- «ليش يقطّع؟»: likely cause from what is measured; opt-in backup channels
     private val _cause = MutableStateFlow(Diagnosis.Cause.None)
@@ -265,9 +266,16 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     fun sampleStats() {
         val p = player ?: return
         val f = p.videoFormat
+        val dc = p.videoDecoderCounters
+        dc?.ensureUpdated()
+        val rendered = dc?.renderedOutputBufferCount ?: 0
+        val nowT = System.currentTimeMillis()
+        val measured = if (rendered >= lastRendered && lastRenderedAt > 0) com.urtv.player.core.FrameStats.fps((rendered - lastRendered).toLong(), nowT - lastRenderedAt) else 0f
+        if (nowT - lastRenderedAt >= 900 || rendered < lastRendered) { lastRendered = rendered; lastRenderedAt = nowT }
+        if (measured > 0f) measuredFps = measured
         _stats.value = _stats.value.copy(width = f?.width ?: 0, height = f?.height ?: 0, videoKbps = ((f?.bitrate ?: 0) / 1000).coerceAtLeast(0),
             estimateKbps = ((meter?.bitrateEstimate ?: 0L) / 1000).toInt(), bufferedMs = p.totalBufferedDuration, dropped = p.videoDecoderCounters?.droppedBufferCount ?: 0,
-            codec = (f?.sampleMimeType ?: "").removePrefix("video/") + (f?.codecs?.let { " $it" } ?: ""), fps = f?.frameRate?.takeIf { it > 0 } ?: 0f)
+            codec = (f?.sampleMimeType ?: "").removePrefix("video/") + (f?.codecs?.let { " $it" } ?: ""), fps = f?.frameRate?.takeIf { it > 0 } ?: measuredFps)
     }
 
     private fun readTracks(t: Tracks): TrackState {
@@ -324,7 +332,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private fun startPlay(ch: Channel, startMs: Long, isVod: Boolean) {
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
-        _firstFrame.value = false; LoadTrace.begin()
+        _firstFrame.value = false; LoadTrace.begin(); measuredFps = 0f; lastRenderedAt = 0L
         triedAlt.clear(); _altNote.value = null; errorKind = Diagnosis.ErrorKind.None; lastHttpStatus = 0; _cause.value = Diagnosis.Cause.None; if (!preview) tracker.clear()
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f
         load(ch)

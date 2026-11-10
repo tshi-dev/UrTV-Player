@@ -40,6 +40,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.urtv.player.R
 import com.urtv.player.UrtvApp
+import kotlinx.coroutines.launch
 import com.urtv.player.data.PlaylistDef
 import com.urtv.player.phone.PhoneInput
 import com.urtv.player.phone.PhoneServer
@@ -47,8 +48,12 @@ import com.urtv.player.phone.PhoneServer
 private enum class AddMode { Phone, M3u, Xtream }
 
 @Composable
-fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null, onDone: (added: Boolean) -> Unit) {
+fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null, lifetimeMs: Long = 10 * 60_000L, address: () -> java.net.InetAddress? = PhoneServer::lanAddress, onDone: (added: Boolean) -> Unit) {
     BackHandler { onDone(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // While a phone session is renewed the Retry button disappears and Android moves the focus to the nearest tab (the Xtream one in right-to-left):
+    // a tab that merely RECEIVES focus then must not switch the page.
+    var renewing by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf(AddMode.Phone) }
     val first = remember { FocusRequester() }
     val tabRequesters = remember { AddMode.entries.associateWith { if (it == AddMode.Phone) first else FocusRequester() } }
@@ -66,7 +71,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         Spacer(Modifier.height(40.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             for (m in AddMode.entries) {
-                Tv({ mode = m }, Modifier.height(104.dp), Rd(52), selected = m == mode, onFocus = { if (it) mode = m }, focusRequester = tabRequesters[m]) {
+                Tv({ mode = m }, Modifier.height(104.dp), Rd(52), selected = m == mode, onFocus = { if (it && !renewing) mode = m }, focusRequester = tabRequesters[m]) {
                     Text(stringResource(when (m) { AddMode.Phone -> R.string.add_phone; AddMode.M3u -> R.string.kind_m3u; AddMode.Xtream -> R.string.kind_xtream }),
                         style = if (m == mode) T.bodyBold else T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center).padding(horizontal = 48.dp))
                 }
@@ -75,7 +80,10 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
         Spacer(Modifier.height(48.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (mode) {
-                AddMode.Phone -> if (demo == null && app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) UnofficialNote() else PhonePane(demo, ::save)
+                AddMode.Phone -> if (demo == null && app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) UnofficialNote() else PhonePane(demo, ::save, lifetimeMs, address) {
+                    // the session was renewed: put the focus back on the Phone tab (the Retry button is replaced by the new code, and focus must not fall onto another tab and switch the page)
+                    scope.launch { renewing = true; kotlinx.coroutines.delay(80); runCatching { first.requestFocus() }; kotlinx.coroutines.delay(250); renewing = false }
+                }
                 AddMode.M3u -> FormPane(false, ::save) { runCatching { tabRequesters[AddMode.M3u]!!.requestFocus() } }
                 AddMode.Xtream -> FormPane(true, ::save) { runCatching { tabRequesters[AddMode.Xtream]!!.requestFocus() } }
             }
@@ -84,7 +92,7 @@ fun AddPlaylistScreen(app: UrtvApp, demo: Triple<String, String, String>? = null
 }
 
 @Composable
-private fun PhonePane(demo: Triple<String, String, String>?, onInput: (PhoneInput) -> Unit) {
+private fun PhonePane(demo: Triple<String, String, String>?, onInput: (PhoneInput) -> Unit, lifetimeMs: Long, address: () -> java.net.InetAddress?, onRenewed: () -> Unit) {
     val main = remember { Handler(Looper.getMainLooper()) }
     var info by remember { mutableStateOf<Triple<String, String, String>?>(null) } // url, code, host:port
     var failed by remember { mutableStateOf(false) }
@@ -96,8 +104,8 @@ private fun PhonePane(demo: Triple<String, String, String>?, onInput: (PhoneInpu
     DisposableEffect(round) {
         if (demo != null) { info = demo; return@DisposableEffect onDispose { } }
         closed = false; failed = false
-        val ip = PhoneServer.lanAddress()
-        val srv = ip?.let { PhoneServer(it, onInput = { i -> main.post { onInput(i) } }, onClosed = { main.post { closed = true } }) }
+        val ip = address()
+        val srv = ip?.let { PhoneServer(it, onInput = { i -> main.post { onInput(i) } }, onClosed = { main.post { closed = true } }, lifetimeMs = lifetimeMs) }
         if (srv == null || !srv.start()) { failed = true; info = null } else info = Triple("http://${ip.hostAddress}:${srv.port}/?c=${srv.code}", srv.code, "${ip.hostAddress}:${srv.port}")
         onDispose { srv?.close() }
     }
@@ -108,7 +116,7 @@ private fun PhonePane(demo: Triple<String, String, String>?, onInput: (PhoneInpu
         Column(Modifier.weight(1f)) {
             when {
                 failed -> { Text(stringResource(R.string.phone_no_lan), style = T.title); Spacer(Modifier.height(16.dp)); Text(stringResource(R.string.phone_no_lan_hint), style = T.body.copy(color = C.muted)) }
-                closed -> { Text(stringResource(R.string.phone_closed), style = T.title); Spacer(Modifier.height(40.dp)); TvButton(stringResource(R.string.retry), { round++ }, primary = true, focusRequester = retryFr) }
+                closed -> { Text(stringResource(R.string.phone_closed), style = T.title); Spacer(Modifier.height(40.dp)); TvButton(stringResource(R.string.retry), { onRenewed(); round++ }, primary = true, focusRequester = retryFr) }
                 i != null -> {
                     Text(stringResource(R.string.phone_step1), style = T.title)
                     Spacer(Modifier.height(16.dp))
