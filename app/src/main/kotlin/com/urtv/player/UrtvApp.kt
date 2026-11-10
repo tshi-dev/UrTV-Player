@@ -27,6 +27,10 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     var resumeHandled = false
     /** Official / debug / unofficial build; computed off the main thread at start. Gates the LAN pairing page and backup restore. */
     var integrity by mutableStateOf(com.urtv.player.data.Integrity.Status.Official)
+    /** Data written by a newer Player than this one: the app stops with a notice instead of touching it. */
+    var schemaTooNew by mutableStateOf(false)
+    /** What UrTV last said about a newer Player (cached; asked at most once a day). */
+    var update by mutableStateOf(com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.UpToDate))
     /** The launch animation plays once per process. */
     var splashDone by mutableStateOf(false)
 
@@ -41,6 +45,20 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
         com.urtv.player.phone.PhoneServer.logger = { android.util.Log.i("UrtvPhone", it) }
         Thread.getDefaultUncaughtExceptionHandler().let { prev -> Thread.setDefaultUncaughtExceptionHandler { t, e -> com.urtv.player.data.Diag.record(e); prev?.uncaughtException(t, e) } }   // class names only, kept in memory
         store = Store(this)                                    // preferences only: cheap
-        Thread({ store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this) }, "load-store").start()     // Keystore, encrypted files and the certificate check, off the main thread
+        val sp = getSharedPreferences("urtv", MODE_PRIVATE)
+        schemaTooNew = com.urtv.player.data.Schema.check(sp) == com.urtv.player.data.Schema.Status.TooNew
+        update = com.urtv.player.data.Update.load(sp, BuildConfig.VERSION_CODE)
+        Thread({
+            store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this)
+            // updates: only the official build, at most once a day, a few seconds after start, never while something plays
+            if (integrity == com.urtv.player.data.Integrity.Status.Official && !schemaTooNew) {
+                Thread.sleep(5000)
+                val now = System.currentTimeMillis()
+                if (com.urtv.player.data.Update.due(sp.getLong("upd_last", 0), now) && !PlayerController.active) {
+                    val s = com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE)
+                    com.urtv.player.data.Update.save(sp, s, now); update = s
+                }
+            }
+        }, "load-store").start()     // Keystore, encrypted files, the certificate check and the daily update question, off the main thread     // Keystore, encrypted files and the certificate check, off the main thread
     }
 }

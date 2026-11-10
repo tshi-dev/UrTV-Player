@@ -6,7 +6,7 @@
     <!-- Only exception to "INTERNET only": a normal, app-defined permission declared by the UrTV home app. No user prompt, and it
          grants nothing beyond one value (UrTV's language, ar or en). The queries line is Android 11+ package visibility. -->
     <uses-permission android:name="sa.urtv.permission.READ_LANG" />
-    <queries><package android:name="sa.urtv.home" /><package android:name="sa.urtv.screensaver" /><provider android:authorities="sa.urtv.home.lang" /></queries>
+    <queries><package android:name="sa.urtv.home" /><package android:name="sa.urtv.screensaver" /><provider android:authorities="sa.urtv.home.lang" /><provider android:authorities="sa.urtv.home.player" /></queries>
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

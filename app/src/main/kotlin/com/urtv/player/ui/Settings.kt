@@ -150,6 +150,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     Column(Modifier.padding(horizontal = 12.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted))
                         Text(stringResource(R.string.about_version, com.urtv.player.BuildConfig.VERSION_NAME), style = T.bodyBold)
+                        UpdateRow(app)
                         Setting(stringResource(R.string.share_row), "", stringResource(R.string.share_row_hint)) { share = true }
                         when (app.integrity) {
                             com.urtv.player.data.Integrity.Status.Official -> Text(stringResource(R.string.about_official), style = T.body.copy(color = C.accent))
@@ -256,5 +257,26 @@ private fun ManageList(title: String, hint: String, items: List<Pair<String, Str
             }
         }
         TvButton(stringResource(R.string.back), onBack)
+    }
+}
+
+/** «Update available x» opens UrTV's installer screen (UrTV checks sha256 and certificate; Android shows its own prompt). Never asks to uninstall. */
+@Composable
+private fun UpdateRow(app: UrtvApp) {
+    val u = app.update
+    var handed by remember { mutableStateOf(false) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode == android.app.Activity.RESULT_OK) handed = true
+    }
+    val offer = u.offer
+    when {
+        handed -> Text(stringResource(R.string.upd_handed), style = T.body.copy(color = C.accent))
+        u.kind == com.urtv.player.data.Update.Kind.Available && offer != null && app.integrity == com.urtv.player.data.Integrity.Status.Official ->
+            Setting(stringResource(R.string.upd_available, offer.name), "", offer.notes.ifBlank { stringResource(R.string.upd_hint) }) {
+                val i = android.content.Intent(com.urtv.player.data.Update.ACTION_INSTALL).setPackage(com.urtv.player.data.Update.UPDATE_PACKAGE).putExtra("version_code", offer.code)
+                try { launcher.launch(i) } catch (_: Exception) { app.update = com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.NoUrtv) }   // UrTV missing or too old to answer
+            }
+        u.kind == com.urtv.player.data.Update.Kind.NoUrtv -> Text(stringResource(R.string.upd_from_tv), style = T.body.copy(color = C.muted))
+        else -> Unit
     }
 }

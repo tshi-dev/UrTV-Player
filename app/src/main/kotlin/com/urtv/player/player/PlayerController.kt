@@ -331,6 +331,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         retryJob?.cancel()
         if (player == null || builtFor != buffer || builtLive != !vod || builtServer != serverMode) { saveBandwidth(); player?.release(); player = build(!vod) }
         val p = player!!
+        active = true
         loadStartMs = System.currentTimeMillis(); readySince = false
         if (_attempt.value == 0) { rebuffers.reset(); p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoBitrate(Int.MAX_VALUE).build(); _stats.value = _stats.value.copy(capped = false) }
         p.volume = if (preview) 0f else 1f
@@ -410,10 +411,10 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
 
     fun release() {
         saveBandwidth(); watchdog?.cancel(); retryJob?.cancel(); watchdog = null
-        player?.release(); player = null; _status.value = PlayStatus.Idle
+        player?.release(); player = null; _status.value = PlayStatus.Idle; active = false
     }
 
     fun stop() { release(); current = null }
 
-    companion object { const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 15; const val FROZEN_LIMIT_SEC = 8 }
+    companion object { @Volatile var active = false; const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 15; const val FROZEN_LIMIT_SEC = 8 }
 }

@@ -254,4 +254,11 @@
     <string name="lt_nodata">Couldn\'t test: no channels with web links</string>
     <string name="lt_note">Only a sample, and results vary with the time of day. No link is saved.</string>
     <string name="lt_again">Test again</string>
+    <string name="upd_available">Update available %1$s</string>
+    <string name="upd_hint">Press OK and your TV opens the update. Your data and playlists stay as they are</string>
+    <string name="upd_from_tv">Updates come from your TV</string>
+    <string name="upd_home_line">Update %1$s available: Settings, then About</string>
+    <string name="upd_handed">The update was handed to Android to finish</string>
+    <string name="data_too_new_title">The app\'s data is newer than this version</string>
+    <string name="data_too_new_body">Nothing was changed. Install the newer version from your TV.</string>
 </resources>

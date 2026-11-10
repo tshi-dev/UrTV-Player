@@ -254,4 +254,11 @@
     <string name="lt_nodata">ما قدرنا نجرّب: لا توجد قنوات بروابط ويب</string>
     <string name="lt_note">هذه عيّنة فقط وتتغيّر النتيجة حسب الوقت. لا يُحفظ أي رابط.</string>
     <string name="lt_again">أعد الاختبار</string>
+    <string name="upd_available">تحديث متوفر %1$s</string>
+    <string name="upd_hint">اضغط OK ليفتح تلفزيونك التحديث. بياناتك وقوائمك تبقى كما هي</string>
+    <string name="upd_from_tv">التحديث من تلفزيونك</string>
+    <string name="upd_home_line">تحديث متوفر %1$s، من الإعدادات ثم عن التطبيق</string>
+    <string name="upd_handed">سُلّم التحديث إلى نظام أندرويد لإكماله</string>
+    <string name="data_too_new_title">بيانات التطبيق أحدث من هذه النسخة</string>
+    <string name="data_too_new_body">لم نغيّر شيئًا. ثبّت النسخة الأحدث من تلفزيونك.</string>
 </resources>

@@ -3,6 +3,7 @@ package com.urtv.player.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
@@ -28,7 +29,9 @@ private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, 
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val ready by app.store.ready.collectAsState()
     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(C.bg)) {
-        if (ready) AppContent(app, onLanguageChanged) else androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 130.dp)) { SkeletonRows(9) }
+        if (app.schemaTooNew) Column(androidx.compose.ui.Modifier.fillMaxSize().padding(120.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+            Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.data_too_new_title), style = T.title); Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.data_too_new_body), style = T.body.copy(color = C.muted), modifier = androidx.compose.ui.Modifier.padding(top = 12.dp))
+        } else if (ready) AppContent(app, onLanguageChanged) else androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 130.dp)) { SkeletonRows(9) }
         if (app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) androidx.compose.foundation.layout.Row(
             androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 10.dp).background(C.danger.copy(alpha = 0.92f), Rd(10)).padding(horizontal = 22.dp, vertical = 6.dp)) {
             Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.unofficial_build), style = T.small.copy(color = androidx.compose.ui.graphics.Color.Black))
@@ -137,6 +140,10 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Series -> def?.let { d -> SeriesDetail(app, d, detailId, onPlay = { l, i, at -> playVod(l, i, at, Screen.Series) }, onBack = { screen = Screen.Home }) } ?: run { screen = Screen.Home }
         Screen.Vod -> if (vodItems.isEmpty()) screen = Screen.Home else VodPlayerScreen(app, vodItems, vodIndex, vodStart, onExit = { screen = vodBack })
     } }
+    if (screen == Screen.Home && tab == Tab.Home && !homeOnly) app.update.offer?.let { o ->
+        Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.upd_home_line, o.name), style = T.small,
+            modifier = androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = 18.dp))
+    }
     banner?.let { b ->
         androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 28.dp)
             .background(androidx.compose.ui.graphics.Color(0xF0141619), Rd(16)).padding(horizontal = 28.dp, vertical = 14.dp)) { Text(b, style = T.row) }
