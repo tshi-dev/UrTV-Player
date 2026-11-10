@@ -242,4 +242,16 @@
     <string name="alt_playing">Playing a backup copy: %1$s</string>
     <string name="set_autoalt">Automatic backup channel</string>
     <string name="set_autoalt_hint">If a channel won\'t play, try one with the same name in your list</string>
+    <string name="lt_row">Test the playlist</string>
+    <string name="lt_row_hint">Tries a sample of channels to measure response time and how many answer</string>
+    <string name="lt_running">Testing %1$d of %2$d…</string>
+    <string name="lt_reach">%1$d%% of the sample answered (%2$d channels)</string>
+    <string name="lt_ttfb">Time to first byte: median %1$s s, 90%% under %2$s s</string>
+    <string name="lt_fails">Did not answer: no reply %1$d, source error %2$d, channel not found %3$d</string>
+    <string name="lt_good">The list looks good</string>
+    <string name="lt_fair">The list is acceptable; some channels may be slow</string>
+    <string name="lt_weak">The list is weak: many channels don\'t answer or are slow</string>
+    <string name="lt_nodata">Couldn\'t test: no channels with web links</string>
+    <string name="lt_note">Only a sample, and results vary with the time of day. No link is saved.</string>
+    <string name="lt_again">Test again</string>
 </resources>

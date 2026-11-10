@@ -242,4 +242,16 @@
     <string name="alt_playing">تشغيل نسخة بديلة: %1$s</string>
     <string name="set_autoalt">قناة بديلة تلقائيًا</string>
     <string name="set_autoalt_hint">إذا تعذّر تشغيل قناة، جرّب قناة بنفس الاسم في قائمتك</string>
+    <string name="lt_row">اختبار القائمة</string>
+    <string name="lt_row_hint">يجرّب عيّنة من القنوات ليقيس سرعة الاستجابة ونسبة الوصول</string>
+    <string name="lt_running">جارٍ الاختبار %1$d من %2$d…</string>
+    <string name="lt_reach">وصلت %1$d٪ من العيّنة (%2$d قناة)</string>
+    <string name="lt_ttfb">زمن أول بايت: الوسيط %1$s ث، و٩٠٪ أقل من %2$s ث</string>
+    <string name="lt_fails">لم تصل: لا ترد %1$d، خطأ من المصدر %2$d، قناة غير موجودة %3$d</string>
+    <string name="lt_good">القائمة تبدو جيدة</string>
+    <string name="lt_fair">القائمة مقبولة، وقد تتأخر بعض القنوات</string>
+    <string name="lt_weak">القائمة ضعيفة: كثير من القنوات لا يصل أو يتأخر</string>
+    <string name="lt_nodata">ما قدرنا نجرّب: لا توجد قنوات بروابط ويب</string>
+    <string name="lt_note">هذه عيّنة فقط وتتغيّر النتيجة حسب الوقت. لا يُحفظ أي رابط.</string>
+    <string name="lt_again">أعد الاختبار</string>
 </resources>

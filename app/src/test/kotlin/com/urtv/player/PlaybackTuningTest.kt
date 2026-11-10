@@ -45,4 +45,17 @@ class PlaybackTuningTest {
         assertFalse(PlaybackTuning.shouldSeekToLive(8_000, 60_000)); assertFalse(PlaybackTuning.shouldSeekToLive(40_000, 5_000))
         assertTrue(PlaybackTuning.shouldSeekToLive(40_000, 60_000))
     }
+
+    // ---- budgets that can be pinned without a TV (real first-frame and zap times need a device: docs/PERFORMANCE.md)
+    @Test fun startAndRecoveryBudgetsStayTight() {
+        val normalLive = PlaybackTuning.buffers(com.urtv.player.data.BufferMode.Normal, live = true, lowRam = false)
+        assertTrue(normalLive.startMs <= 1500, "live start buffer ${normalLive.startMs} ms")
+        assertTrue(PlaybackTuning.buffers(com.urtv.player.data.BufferMode.Low, true, false).startMs <= 1000)
+        assertTrue(PlaybackTuning.buffers(com.urtv.player.data.BufferMode.Normal, true, true).maxMs <= 15_000, "low-RAM TVs keep at most 15 s")
+        // worst case time before a dead channel is declared failed: stall limit + sum of back-off delays
+        val c = com.urtv.player.player.PlayerController
+        var wait = 0L; for (n in 1..c.MAX_ATTEMPTS) wait += minOf(1000L shl (n - 1), 12_000L) + c.STALL_LIMIT_SEC * 1000L
+        assertTrue(wait <= 200_000L, "give-up time $wait ms (about 3 min today)")
+        assertTrue(c.STALL_LIMIT_SEC <= 15 && c.FROZEN_LIMIT_SEC <= 8, "a frozen picture is noticed within 8 s, a stall within 15 s")
+    }
 }

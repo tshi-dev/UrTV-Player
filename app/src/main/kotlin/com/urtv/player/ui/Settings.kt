@@ -64,6 +64,8 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     val look by store.appearance.collectAsState()
     var appearance by remember { mutableStateOf(false) }
     if (appearance) { AppearanceScreen(store) { appearance = false }; return }
+    var listTest by remember { mutableStateOf(false) }
+    if (listTest) { ListTestScreen(app) { listTest = false }; return }
     var share by remember { mutableStateOf(false) }
     if (share) { ShareScreen(app) { share = false }; return }
     val offsets by store.epgOffsetMin.collectAsState()
@@ -111,6 +113,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                             }
                         }
                         item { Setting(stringResource(R.string.set_groups), "", stringResource(R.string.set_groups_hint)) { onManageGroups() } }
+                        item { Setting(stringResource(R.string.lt_row), "", stringResource(R.string.lt_row_hint)) { listTest = true } }
                     }
                 }
                 Section.Playback -> {
