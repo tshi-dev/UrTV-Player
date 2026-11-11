@@ -45,7 +45,7 @@ class FrameStatsTest {
         val mixed = List(80) { 16.6 } + List(20) { 48.0 }
         val r = FrameStats.of(mixed)
         assertEquals(20.0, r.jankyPct, 0.001); assertEquals(16.6, r.p50, 0.001); assertEquals(48.0, r.p90, 0.001); assertEquals(100, r.frames)
-        assertEquals(0, FrameStats.of(emptyList()).frames)
+        assertEquals(0, FrameStats.of(emptyList<Double>()).frames)
         assertTrue(r.line.contains("janky 20.0 %"))
     }
 
@@ -71,4 +71,14 @@ class KeyModeTest {
         assertEquals("قناة", SearchFold.applyMode("قناة", SearchFold.KeyMode.Arabic), "already Arabic: unchanged")
     }
     @Test fun autoLeavesTextAlone() { assertEquals("ضعقشى quran", SearchFold.applyMode("ضعقشى quran", SearchFold.KeyMode.Auto)) }
+}
+
+class FrameRuleTest {
+    @Test fun jankIsMissingTheDeadlineNotJustTakingLongerThanOneInterval() {
+        // 100 frames of 34 ms that all met their (two-interval) deadline are not janky; 10 that missed it are
+        val ok = List(90) { FrameStats.Frame(34.0, false) } + List(10) { FrameStats.Frame(60.0, true) }
+        val r = FrameStats.of(ok)
+        assertEquals(10.0, r.jankyPct, 0.001); assertEquals(34.0, r.p50, 0.001); assertEquals(100, r.frames)
+        assertEquals(0, FrameStats.of(emptyList<FrameStats.Frame>()).frames)
+    }
 }

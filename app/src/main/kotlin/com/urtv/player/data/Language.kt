@@ -35,6 +35,9 @@ object Language {
         ctx.contentResolver.query(Uri.parse(URTV_URI), arrayOf("lang"), null, null, null)?.use { c -> if (c.moveToFirst()) normalize(c.getString(0)) else null }
     }.getOrNull()
 
+    /** True on the very first start in Auto: nothing remembered about UrTV and no answer or timeout recorded yet, so the first frame waits briefly for UrTV. */
+    fun needsFirstAnswer(choice: String, rememberedUrtv: String?, checked: Boolean): Boolean = choice != "ar" && choice != "en" && rememberedUrtv == null && !checked
+
     /** Result of the cold-start decision: the language to show and what to remember of UrTV's answer. */
     data class Start(val lang: String, val urtvToCache: String?)
 

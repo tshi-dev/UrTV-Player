@@ -16,6 +16,8 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base, fresh = false))     // remembered answer or the TV's language: nothing waits for UrTV before the first frame
 
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean { com.urtv.player.ui.KeyTrace.onKey(event); return super.dispatchKeyEvent(event) }
+
     override fun onResume() {
         super.onResume()
         // Auto language follows UrTV: re-check whenever we come back to the foreground (off the main thread).
@@ -29,6 +31,14 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val app = application as UrtvApp
         com.urtv.player.ui.Fonts.init(this)
+        // Very first start in Auto: the first frame waits (behind a static splash, off the main thread, at most 700 ms) for UrTV's language, so the
+        // whole first run is in the right language. A slower answer is picked up by onResume's check, which re-creates the screen at once.
+        if (app.langGate) Thread({
+            val u = com.urtv.player.data.Language.within(700) { com.urtv.player.data.Language.readUrtv(applicationContext) }
+            val changed = app.store.onUrtvLanguage(u)
+            getSharedPreferences("urtv", MODE_PRIVATE).edit().putBoolean("urtvLangChecked", true).apply()
+            runOnUiThread { app.langGate = false; if (changed) recreate() }
+        }, "lang-first").start()
         setContent {
             val look by app.store.appearance.collectAsState(); val scale by app.store.textScale.collectAsState()
             UrtvTheme(look, scale) { AppRoot(app, onLanguageChanged = { recreate() }) }
@@ -48,7 +58,8 @@ fun localized(base: Context, fresh: Boolean = true): Context {
         val r = com.urtv.player.data.Language.resolveAtStart(choice, cached, com.urtv.player.data.Language.systemLanguage()) { com.urtv.player.data.Language.within(if (cached == null) 800 else 250) { com.urtv.player.data.Language.readUrtv(base) } }     // first ever start waits longer; later starts use the remembered answer if UrTV is slow to wake
         sp.edit().apply { r.urtvToCache?.let { if (it != cached) putString("urtvLang", it) } }.putString("resolvedLang", r.lang).apply()
         r.lang
-    } else sp.getString("resolvedLang", null) ?: com.urtv.player.data.Language.resolve(choice, cached, com.urtv.player.data.Language.systemLanguage())
+    } else com.urtv.player.data.Language.resolve(choice, cached, com.urtv.player.data.Language.systemLanguage())     // never trust an old resolvedLang: it is rewritten below with what this screen really uses
+    sp.edit().putString("resolvedLang", lang).apply()      // the language IN USE: a later UrTV answer is compared with it to decide whether to re-create the screen
     val loc = Locale.forLanguageTag("$lang-u-nu-latn")   // Western digits in Arabic: clearer for channel numbers and times
     Locale.setDefault(loc)
     val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }

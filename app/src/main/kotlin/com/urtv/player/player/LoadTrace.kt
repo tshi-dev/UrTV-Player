@@ -15,6 +15,7 @@ class CachingDns(private val ttlMs: Long = 10 * 60_000L, private val delegate: D
         if (h != null && now() - h.at < ttlMs) return h.addrs
         return delegate.lookup(hostname).also { if (it.isNotEmpty()) cache[hostname] = Hit(now(), it) }
     }
+    fun has(hostname: String): Boolean = cache[hostname]?.let { now() - it.at < ttlMs } == true
     fun forget() = cache.clear()
 }
 

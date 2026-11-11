@@ -22,6 +22,7 @@ object Bisect {
         "nomarquee",      // the focused row's name does not scroll
         "springscroll",   // the list scrolls with the framework's spring animation instead of jumping to the row
         "nometer",        // no frame meter even when stats are on
+        "keytrace",       // log what every D-pad press costs, frame by frame (adb logcat -s UrTVKeyTrace)
     )
     var flags by mutableStateOf(emptySet<String>()); private set
     fun on(f: String) = f in flags

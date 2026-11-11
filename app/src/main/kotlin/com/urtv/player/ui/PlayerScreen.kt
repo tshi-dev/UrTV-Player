@@ -266,7 +266,11 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     val fr = remember { FocusRequester() }
-    LaunchedEffect(Unit) { state.scrollToItem((idx - 2).coerceAtLeast(0)); runCatching { fr.requestFocus() } }
+    // open on the CURRENT channel: scroll it into the composed range first, then ask for the focus until its row exists (the first try can land before it is laid out)
+    LaunchedEffect(Unit) {
+        state.scrollToItem((idx - 2).coerceAtLeast(0))
+        repeat(12) { if (runCatching { fr.requestFocus(); true }.getOrDefault(false)) return@LaunchedEffect; delay(30) }
+    }
     // scrim fades toward the video from the start side. The list is on the start side; the quick actions are a FIXED column on the end side,
     // one D-pad move (toward the video) from wherever the list is, however far down the current channel is.
     Row(Modifier.fillMaxHeight().width(940.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE6080909), Color.Transparent)))) {

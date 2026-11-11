@@ -77,3 +77,25 @@ Is it code that has not been compiled yet? Compile the app fully ahead of time a
     adb shell cmd package compile --reset com.urtv.player              # back to the default
 
 If "nopreview" fixes it the video surface/preview is compositing the whole screen; if "nologos" does, image decoding/drawing is; if only "nofocus" does, it is the animations; if only the AOT compile does, it is warm-up and the baseline profile will fix it after the first background dexopt.
+
+## v0.9.9: install state, the late frame per key, the backdrop
+**What the TCL bisect showed (v0.9.8):** the TV's own list draws at p50 11 ms / 1 % janky. Ours back to back: 17.8 % as installed, 0.7 % after `compile -m speed`, 1.2 % after `compile -m speed-profile` (so the shipped baseline profile is enough once it is compiled). With keys 0.1 s apart: 14 to 15 % in every state, about one late frame per key press.
+
+**Does an install get compiled code? Honestly: not at once.** An app cannot ask Android to compile it (dex2oat is the system's). The release APK carries the baseline profile (`assets/dexopt/baseline.prof`, checked by CI); on the first run the AndroidX ProfileInstaller (already included; its start-up initializer runs after launch) writes it to the system, and Android compiles it during the next idle maintenance window (device idle, charging/screen off). A PackageInstaller or sideloaded install gets no ahead-of-time compile of the profile at install time (only a store with a cloud profile does). Until that maintenance run the app is interpreted/JIT'd, which is why a fresh install scrolls at 15 to 18 % janky. What the app does about it: the stats frame meter prints the state (`aot: compiled with profile` / `profile waiting for the system's idle compile` / `no profile compiled`), so every measurement says which state it was taken in; measurements for the UI budget are to be taken in the profiled state (`adb shell cmd package compile -m speed-profile -f com.urtv.player`, or after a night of standby). We also lowered the per-frame work so the un-compiled state suffers less (below).
+
+**Changes aimed at the per-key frame and the per-frame cost**
+- The screen background is the *window's* background drawable (one static gradient the system draws), not a full-screen gradient Compose records again every frame. `C.bgBrush` is now transparent and the screens no longer paint a full-screen layer (`nobackdrop` took p50 from 23 to 18 ms).
+- The preview/info pane follows the focus about 90 ms behind it, so one key press = a light frame (focus + scroll) and the heavier pane update lands in the next frame, not in the same one.
+- Row logos come from an in-memory bitmap cache at their fixed size (one plain `Image` when cached, no image-request machinery while composing a row); prefetched a screen ahead.
+- DNS pre-resolve on focus is a map lookup plus, only for a new host, a task on one background thread (no thread per key).
+- The frame meter's "janky" now follows gfxinfo: a frame is janky when it missed its own deadline (FrameMetrics DEADLINE, API 31+; before that more than 1.5 display intervals), and the line prints the frame count.
+
+**Trace one key press** (find the late frame):
+
+    adb shell setprop debug.urtv.bisect keytrace      # then press a tab so it is re-read
+    adb logcat -c; adb logcat -s UrTVKeyTrace          # press DOWN a few times at 0.1 s
+    # per key: "key DPAD_DOWN dispatchLag=..." then every frame in the next 400 ms:
+    #   +Nms frame: unknown= input= anim+compose= layout= draw= sync= cmd= swap= total= late=
+    adb shell setprop debug.urtv.bisect ""
+
+Reading it: `anim+compose` is the Choreographer animation callback, which is where Compose recomposes; `layout` is measure/layout; `draw` is recording the draw commands on the UI thread; `sync`/`cmd`/`swap` are the render thread (GPU side); `unknown` is time lost before the frame started (a busy main thread). The stage that is large in the late frame is the one to fix.

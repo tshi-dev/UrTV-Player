@@ -34,6 +34,8 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     var schemaTooNew by mutableStateOf(false)
     /** What UrTV last said about a newer Player (cached; asked at most once a day). */
     var update by mutableStateOf(com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.UpToDate))
+    /** True only on the very first start in Auto language, until UrTV's answer (or a short timeout) is in: the content stays behind a static splash. */
+    var langGate by mutableStateOf(false)
     /** Text to put in the channel search when the app is brought up (FIND_MATCH's «search channels»); in-process only, never from an intent. */
     var pendingSearch by mutableStateOf<PendingSearch?>(null)
     /** The launch animation plays once per process. */
@@ -45,6 +47,19 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
         .diskCache { coil3.disk.DiskCache.Builder().directory(cacheDir.resolve("img").toOkioPath()).maxSizeBytes(64L * 1024 * 1024).build() }
         .build()
 
+    // ---- the channel search handed over by FIND_MATCH survives a cold start of the main screen: kept in preferences for 30 seconds
+    fun handOverSearch(p: PendingSearch, now: Long = System.currentTimeMillis()) {
+        pendingSearch = p
+        getSharedPreferences("urtv", MODE_PRIVATE).edit().putString("pendingSearch", "${now + 30_000}\t${p.text.replace('\t', ' ').replace('\n', ' ')}\t${p.hint.replace('\t', ' ').replace('\n', ' ')}").apply()
+    }
+    fun restorePendingSearch(now: Long = System.currentTimeMillis()) {
+        val sp = getSharedPreferences("urtv", MODE_PRIVATE)
+        val raw = sp.getString("pendingSearch", null) ?: return
+        val parts = raw.split('\t')
+        if (parts.size >= 3 && (parts[0].toLongOrNull() ?: 0L) > now && pendingSearch == null) pendingSearch = PendingSearch(parts[1].take(80), parts[2].take(160)) else sp.edit().remove("pendingSearch").apply()
+    }
+    fun consumePendingSearch(): PendingSearch? { val p = pendingSearch; pendingSearch = null; getSharedPreferences("urtv", MODE_PRIVATE).edit().remove("pendingSearch").apply(); return p }
+
     override fun onCreate() {
         super.onCreate()
         com.urtv.player.phone.PhoneServer.logger = { android.util.Log.i("UrtvPhone", it) }
@@ -53,6 +68,8 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
         val sp = getSharedPreferences("urtv", MODE_PRIVATE)
         schemaTooNew = com.urtv.player.data.Schema.check(sp) == com.urtv.player.data.Schema.Status.TooNew
         update = com.urtv.player.data.Update.load(sp, BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME)
+        langGate = com.urtv.player.data.Language.needsFirstAnswer(sp.getString("lang", com.urtv.player.data.Language.AUTO) ?: "auto", sp.getString("urtvLang", null), sp.getBoolean("urtvLangChecked", false))
+        restorePendingSearch()
         Thread({
             store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this)
             com.urtv.player.data.SelfUpdater.cleanup(this)

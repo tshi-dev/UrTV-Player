@@ -5,6 +5,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.onFocusChanged
@@ -28,10 +29,11 @@ private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, 
 @Composable
 fun AppRoot(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val ready by app.store.ready.collectAsState()
-    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(C.bg)) {
+    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {     // the window paints the background
         if (app.schemaTooNew) Column(androidx.compose.ui.Modifier.fillMaxSize().padding(120.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
             Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.data_too_new_title), style = T.title); Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.data_too_new_body), style = T.body.copy(color = C.muted), modifier = androidx.compose.ui.Modifier.padding(top = 12.dp))
-        } else if (ready) AppContent(app, onLanguageChanged) else androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 130.dp)) { SkeletonRows(9) }
+        } else if (app.langGate) androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(C.bg), contentAlignment = androidx.compose.ui.Alignment.Center) { androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.urtv.player.R.drawable.ic_mark), null, androidx.compose.ui.Modifier.requiredSize(120.dp)) }     // first start: nothing but the mark until UrTV's language is known (700 ms at most)
+        else if (ready) AppContent(app, onLanguageChanged) else androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 130.dp)) { SkeletonRows(9) }
         if (app.integrity == com.urtv.player.data.Integrity.Status.Unofficial) androidx.compose.foundation.layout.Row(
             androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 10.dp).background(C.danger.copy(alpha = 0.92f), Rd(10)).padding(horizontal = 22.dp, vertical = 6.dp)) {
             Text(androidx.compose.ui.res.stringResource(com.urtv.player.R.string.unofficial_build), style = T.small.copy(color = androidx.compose.ui.graphics.Color.Black))
@@ -47,7 +49,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val homeOnly by app.servers.homeOnly.collectAsState()
     // Start screen: «home server only» forces the server; otherwise the start-screen setting may pick it.
     var screen by rememberSaveable { mutableStateOf(if (app.servers.homeOnly.value || (store.startScreen.value == "server" && app.servers.servers.value.isNotEmpty())) Screen.Server else Screen.Home) }
-    var tab by rememberSaveable { mutableStateOf(startTab(store.startScreen.value)) }
+    var tab by rememberSaveable { mutableStateOf(if (app.pendingSearch != null) Tab.Live else startTab(store.startScreen.value)) }     // a search handed over by FIND_MATCH opens the channel list even on a cold start
     var queue by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var playing by remember { mutableStateOf<Channel?>(null) }
     var restoreKey by remember { mutableStateOf<String?>(null) }
@@ -92,6 +94,8 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)
     }
 
+    val hostCtx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Bisect.flags) { KeyTrace.set((hostCtx as? android.app.Activity)?.window ?: (hostCtx as? android.content.ContextWrapper)?.baseContext?.let { (it as? android.app.Activity)?.window }, Bisect.on("keytrace")) }
     LaunchedEffect(app.pendingSearch) { if (app.pendingSearch != null && !homeOnly) { tab = Tab.Live; screen = Screen.Home; playing = null } }     // also when the search text is empty: the person lands on the channel list
     // Back from a tab goes to the Home tab first; Back on the Home tab leaves the app
     androidx.activity.compose.BackHandler(enabled = screen == Screen.Home && tab != Tab.Home && !homeOnly) { tab = Tab.Home }

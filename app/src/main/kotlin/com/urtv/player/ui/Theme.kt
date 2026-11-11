@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -63,7 +64,8 @@ object C {
     val onFocus3 get() = spec.onFocus.copy(alpha = 0.5f)
     /** Fill of the thin progress bars and now-lines. */
     val accentBrush: Brush get() = SolidColor(spec.accent)
-    val bgBrush: Brush get() = if (spec.background == BgStyle.Solid) SolidColor(spec.bg) else Brush.verticalGradient(listOf(spec.bgTop, spec.bg))
+    /** Screens no longer paint their own background: the window does (see [UrtvTheme]). Kept as a transparent brush so existing `background(C.bgBrush)` calls cost nothing. */
+    val bgBrush: Brush get() = SolidColor(androidx.compose.ui.graphics.Color.Transparent)
     /** Dark layers drawn over video (OSD, mini guide). Always dark, whatever the theme. */
     val videoScrim = Color(0xEE05070B)
     val videoPanel = Color(0xF005070B)
@@ -100,6 +102,13 @@ object T {
 fun UrtvTheme(appearance: Appearance = Appearance(), textScale: Int = 0, content: @Composable () -> Unit) {
     val spec = remember(appearance) { resolveSpec(appearance) }
     C.spec = spec
+    // The screen background is the WINDOW's background (one static drawable the system draws), not a full-screen gradient that Compose records again on every frame.
+    val hostView = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(spec) {
+        val w = (hostView.context as? android.app.Activity)?.window ?: (hostView.context as? android.content.ContextWrapper)?.baseContext?.let { (it as? android.app.Activity)?.window }
+        w?.setBackgroundDrawable(if (spec.background == BgStyle.Solid) android.graphics.drawable.ColorDrawable(spec.bg.toArgb()) else android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(spec.bgTop.toArgb(), spec.bg.toArgb())))
+        onDispose { }
+    }
     // Fixed 1920 x 1080 dp canvas on every TV (1 dp = 1 px at 1080p), independent of the box's density setting.
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val widthPx = ctx.resources.displayMetrics.widthPixels.coerceAtLeast(1)

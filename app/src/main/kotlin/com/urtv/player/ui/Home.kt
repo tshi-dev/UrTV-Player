@@ -58,6 +58,9 @@ import com.urtv.player.data.CatalogState
 import com.urtv.player.data.LoadError
 import com.urtv.player.data.WatchItem
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.produceState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -368,11 +371,10 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     LaunchedEffect(listState.firstVisibleItemIndex, list) {
         delay(200)
         val from = listState.firstVisibleItemIndex + listState.layoutInfo.visibleItemsInfo.size
-        val loader = coil3.SingletonImageLoader.get(logoCtx)
-        for (i in from until minOf(from + 14, list.size)) list[i].logo?.takeIf { it.isNotBlank() }?.let { loader.enqueue(coil3.request.ImageRequest.Builder(logoCtx).data(it).size(logoPx, logoPx).build()) }
+        for (i in from until minOf(from + 14, list.size)) list[i].logo?.takeIf { it.isNotBlank() }?.let { LogoCache.load(logoCtx, it, logoPx) }
     }
     var matchHint by remember { mutableStateOf("") }
-    LaunchedEffect(app.pendingSearch) { app.pendingSearch?.let { query = it.text; matchHint = it.hint; group = Browse.ALL; app.pendingSearch = null } }
+    LaunchedEffect(app.pendingSearch) { if (app.pendingSearch != null) app.consumePendingSearch()?.let { query = it.text; matchHint = it.hint; group = Browse.ALL } }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         // ---- groups rail: plain text rows with counts
@@ -503,7 +505,9 @@ const val PREVIEW_REST_MS = 500L
 @Composable
 private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Channel?, epg: com.urtv.player.data.EpgIndex, nowMs: Long, enabled: Boolean, modifier: Modifier) {
     val ctrl = app.player
-    val ch = focusedState.value ?: first
+    // The pane follows the focus ~90 ms behind it, so a key press costs one light frame (focus + scroll), and the heavier pane update lands in the next one.
+    val followed by produceState<Channel?>(null, focusedState) { snapshotFlow { focusedState.value }.collectLatest { c -> if (value != null) delay(90); value = c } }
+    val ch = followed ?: first
     var shownUrl by remember { mutableStateOf<String?>(null) }
     val pst by ctrl.status.collectAsState()
     LaunchedEffect(ch?.url, enabled) {
@@ -574,22 +578,14 @@ fun ChannelMenu(app: UrtvApp, pid: String, ch: Channel, number: Int, now: Progra
     }
 }
 
-/** Channel logo: decoded at its fixed on-screen size (cache hits while scrolling), monogram only until the picture is there. No subcomposition. */
+/** Channel logo: from the in-memory [LogoCache] at its fixed on-screen size (one plain Image when cached), the monogram until it is there. */
 @Composable
 fun Logo(ch: Channel, size: Int) {
-    val url = ch.logo
     if (Bisect.on("nologos")) { Box(Modifier.size(size.dp)); return }
-    if (url.isNullOrBlank()) { Monogram(ch.name, size); return }
-    val ctx = androidx.compose.ui.platform.LocalContext.current
     val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.dp.roundToPx() }
-    var shown by remember(url) { mutableStateOf(false) }
-    Box(Modifier.size(size.dp)) {
-        if (!shown) Monogram(ch.name, size)
-        coil3.compose.AsyncImage(
-            model = remember(url, px) { coil3.request.ImageRequest.Builder(ctx).data(url).size(px, px).build() },
-            contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit, onSuccess = { shown = true },
-        )
-    }
+    val bmp = rememberLogo(ch.logo, px)
+    if (bmp == null) Monogram(ch.name, size)
+    else androidx.compose.foundation.Image(bmp, null, Modifier.size(size.dp), contentScale = ContentScale.Fit)
 }
 
 /** Poster/still with a stable tinted placeholder underneath (no flash while loading, nothing broken when it fails). */

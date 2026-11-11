@@ -122,7 +122,7 @@ class FlowTest {
         app.catalog.open("demo")
         val end = System.currentTimeMillis() + 10_000
         while (app.catalog.state.value.channels.isEmpty() || !app.store.ready.value) { check(System.currentTimeMillis() < end) { "playlist did not load" }; shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(30) }
-        app.splashDone = true
+        app.splashDone = true; app.langGate = false     // the first-start language gate is MainActivity's job
     }
 
     private fun focusedTexts(): List<String> = rule.onAllNodes(isFocused()).fetchSemanticsNodes().flatMap { n -> if (n.config.contains(SemanticsProperties.Text)) n.config[SemanticsProperties.Text].map { it.text } else emptyList() }
@@ -163,6 +163,15 @@ class FlowTest {
         rule.onNode(hasText(app.getString(R.string.tab_live)) and isFocused()).performKeyInput { pressKey(Key.DirectionDown) }
         settle(); settle()
         assertTrue(focusedTexts().any { it == "قناة تجريبية 7" || it == app.getString(R.string.search_hint) }, "focus is on the search box, got ${focusedTexts()}")
+        // go down into the list (a row now has the focus and is remembered), back up to the tab, Down again: still the search box, never the remembered row
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionDown) }
+        settle(); settle()
+        assertTrue(focusedTexts().any { it.startsWith("قناة تجريبية") && it != "قناة تجريبية 7" || it.contains("قناة تجريبية") }, "a channel row has the focus, got ${focusedTexts()}")
+        rule.onNode(hasText(app.getString(R.string.tab_live)) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        settle(); settle()
+        rule.onNode(hasText(app.getString(R.string.tab_live)) and isFocused()).performKeyInput { pressKey(Key.DirectionDown) }
+        settle(); settle()
+        assertTrue(focusedTexts().any { it == "قناة تجريبية 7" || it == app.getString(R.string.search_hint) }, "Down from the tab is the search box every time, got ${focusedTexts()}")
     }
 
     @Test fun theOkPanelActionsAreOneMoveAwayWhateverTheChannelNumber() {
@@ -176,5 +185,20 @@ class FlowTest {
         rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionRight) }
         settle(); settle()
         assertTrue(focusedTexts().any { it.contains("قناة") }, "and one move back returns to the list")
+    }
+
+    @Test fun zSearchHandedOverBeforeTheProcessDiedIsRestoredOnAColdStartAndOpensTheLiveTab() {
+        seedPlaylist()
+        app.handOverSearch(com.urtv.player.PendingSearch("قناة تجريبية 9", "Team A – Team B"))       // what FindMatchActivity does before starting the main screen
+        app.pendingSearch = null                                                                       // the process died: only the preferences remain
+        app.restorePendingSearch()
+        assertEquals("قناة تجريبية 9", app.pendingSearch?.text, "restored from preferences")
+        show { com.urtv.player.ui.AppRoot(app) {} }
+        until(10_000) { texts().any { it == "قناة تجريبية 9" } }
+        assertTrue(texts().any { it.contains(app.getString(R.string.tab_live)) }, "the channel list is open")
+        assertEquals(null, app.pendingSearch); assertEquals(null, app.getSharedPreferences("urtv", 0).getString("pendingSearch", null), "consumed everywhere")
+        // an old hand-over (30 s passed) is ignored
+        app.handOverSearch(com.urtv.player.PendingSearch("x", "y"), now = System.currentTimeMillis() - 60_000); app.pendingSearch = null; app.restorePendingSearch()
+        assertEquals(null, app.pendingSearch)
     }
 }

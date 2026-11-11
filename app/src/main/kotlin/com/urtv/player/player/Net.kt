@@ -22,13 +22,15 @@ object Net {
             .build()
     }
 
+    private val dnsPool: java.util.concurrent.ExecutorService by lazy { java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "dns-pre").apply { isDaemon = true } } }
     private val warmClient by lazy { client.newBuilder().callTimeout(4, TimeUnit.SECONDS).build() }
 
     /** Starts resolving a stream's host name in the background (cached ten minutes), so a later zap or preview skips DNS. Never touches the stream. */
     fun preResolve(url: String) {
-        val host = runCatching { java.net.URI(url).host }.getOrNull() ?: return
         if (!(url.startsWith("http://", true) || url.startsWith("https://", true))) return
-        Thread({ runCatching { dns.lookup(host) } }, "dns-pre").apply { isDaemon = true }.start()
+        val host = runCatching { java.net.URI(url).host }.getOrNull() ?: return
+        if (dns.has(host)) return                      // nothing to do: the key path pays only for a map lookup
+        dnsPool.execute { runCatching { dns.lookup(host) } }
     }
 
     /**

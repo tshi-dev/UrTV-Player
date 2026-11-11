@@ -74,6 +74,12 @@ class WatchItemTest {
 }
 
 class LanguageTest {
+    @Test fun theFirstFrameWaitsForUrtvOnlyOnTheVeryFirstAutoStart() {
+        assertTrue(Language.needsFirstAnswer("auto", null, false))
+        assertFalse(Language.needsFirstAnswer("auto", "ar", false), "an answer is remembered"); assertFalse(Language.needsFirstAnswer("auto", null, true), "already asked once (UrTV absent)")
+        assertFalse(Language.needsFirstAnswer("ar", null, false)); assertFalse(Language.needsFirstAnswer("en", null, false), "a manual choice never waits")
+    }
+
     @Test fun coldStartAsksUrtvFirstAndUsesTheCacheOnlyAsFallback() {
         // first start ever: nothing cached, UrTV says ar, TV is English -> Arabic (not the TV's English)
         assertEquals(Language.Start("ar", "ar"), Language.resolveAtStart("auto", null, "en") { "ar" })

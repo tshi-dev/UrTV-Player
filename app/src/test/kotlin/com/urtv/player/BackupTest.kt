@@ -133,6 +133,16 @@ class ReminderTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = UrtvApp::class)
 class LanguageStoreTest {
+    @Test fun aLateUrtvAnswerThatDiffersFromTheLanguageInUseRecreatesTheScreen() {
+        val app = ApplicationProvider.getApplicationContext<UrtvApp>(); val s = app.store
+        // the screen started in English (TV language) and wrote what it uses; UrTV then answers Arabic
+        app.getSharedPreferences("urtv", 0).edit().putString("lang", "auto").remove("urtvLang").putString("resolvedLang", "en").commit()
+        s.setLang("auto"); app.getSharedPreferences("urtv", 0).edit().putString("resolvedLang", "en").remove("urtvLang").commit()
+        assertTrue(s.onUrtvLanguage("ar"), "Arabic differs from the English in use: recreate")
+        assertFalse(s.onUrtvLanguage("ar"), "and not again")
+        assertFalse(s.onUrtvLanguage(null), "a missing answer neither recreates nor forgets the remembered one"); assertEquals("ar", app.getSharedPreferences("urtv", 0).getString("urtvLang", null))
+    }
+
     @Test fun autoFollowsUrtvChangesAndManualOverrides() {
         val s = ApplicationProvider.getApplicationContext<UrtvApp>().store
         s.setLang("auto"); s.onUrtvLanguage("ar"); assertEquals("ar", s.resolvedLang())
