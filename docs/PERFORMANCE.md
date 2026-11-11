@@ -99,3 +99,10 @@ If "nopreview" fixes it the video surface/preview is compositing the whole scree
     adb shell setprop debug.urtv.bisect ""
 
 Reading it: `anim+compose` is the Choreographer animation callback, which is where Compose recomposes; `layout` is measure/layout; `draw` is recording the draw commands on the UI thread; `sync`/`cmd`/`swap` are the render thread (GPU side); `unknown` is time lost before the frame started (a busy main thread). The stage that is large in the late frame is the one to fix.
+
+## v0.9.10: one late frame per key
+
+- A channel row is now one self-drawing node: the highlight, texts, logo, progress bar and heart are painted in a single draw block, and focus is read only at draw time. A focus change records only the two rows that change.
+- Coming back from the player restores the remembered row once; going between tabs no longer jumps the focus into the content (the Home rows no longer take focus on their own).
+- The OK panel remembers the row it was opened from, so RIGHT/LEFT back from the actions returns to that row.
+- To re-measure on the TV: `adb shell setprop debug.urtv.bisect keytrace`, press keys about 400 ms apart, `adb logcat -s UrTVKeyTrace`. Targets: draw stage at most 2 ms, total at most 12 ms on the focus-change frame.

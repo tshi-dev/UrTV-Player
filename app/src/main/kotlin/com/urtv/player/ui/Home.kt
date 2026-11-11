@@ -1,6 +1,17 @@
 package com.urtv.player.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import com.urtv.player.data.FocusStyle
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.key
@@ -92,7 +103,7 @@ fun leftText(p: Programme, nowMs: Long) = stringResource(R.string.min_left, ((p.
 fun HomeScreen(
     app: UrtvApp, tab: Tab, onTab: (Tab) -> Unit,
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
-    restoreKey: String?,
+    restoreKey: String?, onRestored: () -> Unit = {},
     onManageGroups: () -> Unit = {}, onManageHome: () -> Unit = {}, onBackup: (Boolean) -> Unit = {}, onOpenMovie: (String) -> Unit = {}, onOpenSeries: (String) -> Unit = {},
     onCatchup: (Channel, Programme) -> Unit = { _, _ -> }, onResume: (WatchItem) -> Unit = {}, onServer: () -> Unit = {},
 ) {
@@ -138,7 +149,7 @@ fun HomeScreen(
             if (playlists.isEmpty() && tab != Tab.Settings) EmptyPlaylists(onAdd)
             else when (tab) {
                 Tab.Home -> HomeRows(app, cat, nowMs, onPlay, onOpenMovie, onOpenSeries, onResume, onManageHome)
-                Tab.Live -> LiveTab(app, cat, nowMs, onPlay, restoreKey)
+                Tab.Live -> LiveTab(app, cat, nowMs, onPlay, restoreKey, onRestored)
                 Tab.Movies -> PosterBrowse(app, true, onOpenMovie)
                 Tab.Series -> PosterBrowse(app, false, onOpenSeries)
                 Tab.Guide -> GuideScreen(app, cat, onPlay, onCatchup)
@@ -183,7 +194,6 @@ private fun HomeRows(
     val byKey = remember(cat.channels) { cat.channels.associateBy { chKey(pid, it) } }
     val first = remember { FocusRequester() }
     var firstTaken = false
-    LaunchedEffect(rows.size, watching.size) { runCatching { first.requestFocus() } }
 
     @Composable
     fun channelRow(titleRes: Int, list: List<Channel>) {
@@ -311,7 +321,7 @@ private fun ContinueCard(w: WatchItem, onClick: () -> Unit, onLong: () -> Unit, 
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<Channel>, Channel) -> Unit, restoreKey: String?) {
+private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<Channel>, Channel) -> Unit, restoreKey: String?, onRestored: () -> Unit = {}) {
     val store = app.store
     val pid = cat.playlistId.orEmpty()
     val order by store.groupOrder.collectAsState()
@@ -355,7 +365,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     var prevSize by remember { mutableStateOf(list.size) }
     LaunchedEffect(list.size) { if (list.size < prevSize && lastIdx >= 0 && list.isNotEmpty()) focusIdx = minOf(lastIdx, list.size - 1); prevSize = list.size }
     val fr = remember { FocusRequester() }
-    LaunchedEffect(focusIdx, list.size) { if (focusIdx in list.indices) { listState.scrollToItem(focusIdx); runCatching { fr.requestFocus() }; lastIdx = focusIdx; focusIdx = -1 } }
+    LaunchedEffect(focusIdx, list.size) { if (focusIdx in list.indices) { listState.scrollToItem(focusIdx); runCatching { fr.requestFocus() }; lastIdx = focusIdx; focusIdx = -1; onRestored() } }     // the row you left is restored ONCE (coming back from the player), not every time you return to this tab
 
     val focusedState = remember(pid) { mutableStateOf<Channel?>(null) }     // read only inside the preview pane, so moving the focus does not recompose the whole tab
     var menuFor by remember { mutableStateOf<Channel?>(null) }
@@ -473,30 +483,117 @@ fun SearchRow(query: String, onQuery: (String) -> Unit, mode: com.urtv.player.co
     }
 }
 
-/** One dense row: number, logo, name over programme (with time left at the end) and a thin progress bar. */
+/**
+ * One dense row: number, logo, name over programme (time left at the end) and a thin progress bar.
+ *
+ * Built for scrolling on a weak TV: the whole row is ONE node that draws itself (text layouts measured once and cached, colours chosen at draw
+ * time), so moving the focus changes only the draw of the two rows involved: no recomposition, no child nodes to re-record, no state read in
+ * composition. The focus highlight is the same as [Tv]'s (solid fill, ring or glow, outline at rest) without its animations.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Boolean, onClick: () -> Unit, onLong: () -> Unit, focusRequester: FocusRequester?, onFocus: (Boolean) -> Unit) {
-    var f by remember { mutableStateOf(false) }
-    // dense list rows are flat (no scale, no shadow): cheap to draw while scrolling on a weak TV GPU; long OK, Menu and Info open the channel menu
-    Tv(onClick, Modifier.fillMaxWidth().height(76.dp).onKeyEvent { e -> if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && (e.key == androidx.compose.ui.input.key.Key.Menu || e.key == androidx.compose.ui.input.key.Key.Info)) { onLong(); true } else false },
-        Rd(12), focusRequester = focusRequester, onFocus = { f = it; onFocus(it) }, onLongClick = onLong, lift = 1f, flat = true) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("$number", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
-            Logo(ch, 44); Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(ch.name, style = T.row.copy(fontSize = 25.sp, lineHeight = 32.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f && !Bisect.on("nomarquee")) Modifier.basicMarquee() else Modifier)
-                if (now != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(now.title, style = T.small.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(12.dp)); Text(leftText(now, nowMs), style = T.tiny.copy(fontSize = 17.sp))
+    val th = LocalTheme.current
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer(256)
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val logoPx = with(density) { 44.dp.roundToPx() }
+    val logo = rememberLogo(ch.logo, logoPx)
+    val noLogo = Bisect.on("nologos")
+    val focused = remember { mutableStateOf(false) }
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    // text styles without a colour (the colour is picked per focus state while drawing)
+    val nameStyle = T.row.copy(fontSize = 25.sp, lineHeight = 32.sp, color = Color.Unspecified)
+    val subStyle = T.small.copy(fontSize = 20.sp, lineHeight = 26.sp, color = Color.Unspecified)
+    val tinyStyle = T.tiny.copy(fontSize = 17.sp, color = Color.Unspecified)
+    val numStyle = T.small.copy(color = Color.Unspecified)
+    val letterStyle = T.bodyBold.copy(color = Color.White, fontSize = (44 * 0.42f).sp)
+    val title = now?.title
+    val leftStr = if (now != null) leftText(now, nowMs) else null
+    val progress = now?.let { ((nowMs - it.startMs).toFloat() / (it.stopMs - it.startMs).coerceAtLeast(1)).coerceIn(0f, 1f) } ?: 0f
+    val letter = remember(ch.name) { Regex("""\d{1,2}$""").find(ch.name.trim())?.value ?: (ch.name.trim().firstOrNull() ?: '?').toString() }.uppercase()
+    val hue = remember(ch.name) { (ch.name.trim().fold(0) { a, c -> (a * 31 + c.code) and 0xFFFF } % 360).toFloat() }
+
+    Box(
+        Modifier.fillMaxWidth().height(76.dp)
+            .onKeyEvent { e -> if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && (e.key == androidx.compose.ui.input.key.Key.Menu || e.key == androidx.compose.ui.input.key.Key.Info)) { onLong(); true } else false }
+            .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
+            .onFocusChanged { focused.value = it.isFocused; onFocus(it.isFocused) }
+            .combinedClickable(interactionSource = interaction, indication = null, onClick = onClick, onLongClick = onLong)
+            .semantics(mergeDescendants = true) { text = androidx.compose.ui.text.AnnotatedString(ch.name) }
+            .drawWithCache {
+                val w = size.width; val h = size.height
+                val pad = 16.dp.toPx(); val numW = 52.dp.toPx(); val lg = 44.dp.toPx(); val gap = 16.dp.toPx()
+                val favW = if (fav) 32.dp.toPx() else 0f
+                val textX = pad + numW + lg + gap                 // distance from the start edge
+                val textW = (w - textX - pad - favW).coerceAtLeast(1f)
+                val ld = if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
+                fun fit(t: String, st: androidx.compose.ui.text.TextStyle, maxW: Float) = measurer.measure(androidx.compose.ui.text.AnnotatedString(t), st, overflow = TextOverflow.Ellipsis, softWrap = false, maxLines = 1,
+                    constraints = androidx.compose.ui.unit.Constraints(maxWidth = maxW.toInt().coerceAtLeast(1)), layoutDirection = ld)
+                val leftL = leftStr?.let { fit(it, tinyStyle, textW / 3) }
+                val nameL = fit(ch.name, nameStyle, textW)
+                val subL = title?.let { fit(it, subStyle, textW - (leftL?.size?.width ?: 0) - 12.dp.toPx()) }
+                val numL = fit("$number", numStyle, numW)
+                val letterL = if (logo == null && !noLogo) measurer.measure(androidx.compose.ui.text.AnnotatedString(letter), letterStyle, layoutDirection = ld) else null
+                val contentH = nameL.size.height + (if (subL != null) subL.size.height + 6.dp.toPx() else 0f)
+                val top = (h - contentH) / 2f
+                val r = 12.dp.toPx() * th.cornerScale
+                fun x(fromStart: Float, width: Float) = if (rtl) w - fromStart - width else fromStart      // mirror in right-to-left
+                onDrawBehind {
+                    val f = focused.value
+                    val solid = f && th.solidFocus
+                    val ink = if (solid) th.onFocus else th.text
+                    val muted = ink.copy(alpha = th.mutedAlpha)
+                    val faint = if (solid) th.onFocus.copy(alpha = 0.5f) else C.faint
+                    val tiny = (if (solid) th.onFocus else th.text).copy(alpha = th.mutedAlpha * 0.64f / 0.7f)
+                    // highlight
+                    if (f) drawRoundRect(if (solid) th.focusFill else th.focusSoft, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
+                    when {
+                        f && (th.focus == FocusStyle.Ring) -> drawRoundRect(th.ring, style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
+                        f && th.focus == FocusStyle.Glow -> drawRoundRect(th.accent, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
+                        f && th.outlineAtRest -> drawRoundRect(th.ring, style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
+                        th.outlineAtRest -> drawRoundRect(th.text.copy(alpha = 0.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(r))
                     }
-                    Spacer(Modifier.height(3.dp)); ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1), Modifier.width(220.dp))
+                    // number
+                    drawText(numL, color = faint, topLeft = Offset(x(pad, numL.size.width.toFloat()), (h - numL.size.height) / 2f))
+                    // logo
+                    val lx = x(pad + numW, lg); val ly = (h - lg) / 2f
+                    if (!noLogo) {
+                        if (logo != null) {
+                            val sc = minOf(lg / logo.width, lg / logo.height)
+                            val dw = (logo.width * sc).toInt().coerceAtLeast(1); val dh = (logo.height * sc).toInt().coerceAtLeast(1)
+                            drawImage(logo, dstOffset = androidx.compose.ui.unit.IntOffset((lx + (lg - dw) / 2f).toInt(), (ly + (lg - dh) / 2f).toInt()), dstSize = androidx.compose.ui.unit.IntSize(dw, dh))
+                        } else {
+                            drawRoundRect(Brush.linearGradient(listOf(Color.hsv(hue, 0.38f, 0.40f), Color.hsv((hue + 30) % 360, 0.42f, 0.26f)), Offset(lx, ly), Offset(lx + lg, ly + lg)), Offset(lx, ly), androidx.compose.ui.geometry.Size(lg, lg), androidx.compose.ui.geometry.CornerRadius(lg / 4.5f))
+                            letterL?.let { drawText(it, topLeft = Offset(lx + (lg - it.size.width) / 2f, ly + (lg - it.size.height) / 2f)) }
+                        }
+                    }
+                    // name, programme, time left, progress
+                    val tx = textX
+                    drawText(nameL, color = ink, topLeft = Offset(if (rtl) w - tx - nameL.size.width else tx, top))
+                    if (subL != null) {
+                        val sy = top + nameL.size.height + 6.dp.toPx() - 6.dp.toPx() + 0f
+                        drawText(subL, color = muted, topLeft = Offset(if (rtl) w - tx - subL.size.width else tx, sy))
+                        leftL?.let { drawText(it, color = tiny, topLeft = Offset(if (rtl) pad + favW else w - pad - favW - it.size.width, sy + (subL.size.height - it.size.height) / 2f)) }
+                        val by = sy + subL.size.height + 3.dp.toPx()
+                        val bw = 220.dp.toPx(); val bh = 3.dp.toPx(); val bx = if (rtl) w - tx - bw else tx
+                        drawRoundRect(if (solid) th.onFocus.copy(alpha = 0.15f) else th.text.copy(alpha = 0.16f), Offset(bx, by), androidx.compose.ui.geometry.Size(bw, bh), androidx.compose.ui.geometry.CornerRadius(bh / 2))
+                        if (progress > 0f) drawRoundRect(th.accent, Offset(if (rtl) bx + bw * (1 - progress) else bx, by), androidx.compose.ui.geometry.Size(bw * progress, bh), androidx.compose.ui.geometry.CornerRadius(bh / 2))
+                    }
+                    // favourite heart
+                    if (fav) {
+                        val hs = 20.dp.toPx(); val hx = if (rtl) pad else w - pad - hs; val hy = (h - hs) / 2f
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(hx + hs / 2, hy + hs * 0.92f)
+                            cubicTo(hx - hs * 0.15f, hy + hs * 0.55f, hx + hs * 0.05f, hy - hs * 0.05f, hx + hs / 2, hy + hs * 0.30f)
+                            cubicTo(hx + hs * 0.95f, hy - hs * 0.05f, hx + hs * 1.15f, hy + hs * 0.55f, hx + hs / 2, hy + hs * 0.92f)
+                            close()
+                        }
+                        drawPath(path, if (solid) th.onFocus else th.accent)
+                    }
                 }
-            }
-            if (fav) { Spacer(Modifier.width(12.dp)); Icon(Glyph.Heart, if (f) C.onFocus else C.accent, 20, filled = true) }
-        }
-    }
+            },
+    )
 }
 
 /** Starts the preview only when the focus has RESTED on a channel (not while a key repeats); stops decoding the moment it moves again. */

@@ -184,7 +184,7 @@ class FlowTest {
         assertTrue(focusedTexts().any { it == app.getString(R.string.menu_fav) || it == app.getString(R.string.set_stats) }, "an action has the focus after ONE move, got ${focusedTexts()}")
         rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionRight) }
         settle(); settle()
-        assertTrue(focusedTexts().any { it.contains("قناة") }, "and one move back returns to the list")
+        assertTrue(focusedTexts().any { it.contains("قناة 60") }, "and one move back returns to the row you left (60), got ${focusedTexts()}")
     }
 
     @Test fun zSearchHandedOverBeforeTheProcessDiedIsRestoredOnAColdStartAndOpensTheLiveTab() {
@@ -200,5 +200,22 @@ class FlowTest {
         // an old hand-over (30 s passed) is ignored
         app.handOverSearch(com.urtv.player.PendingSearch("x", "y"), now = System.currentTimeMillis() - 60_000); app.pendingSearch = null; app.restorePendingSearch()
         assertEquals(null, app.pendingSearch)
+    }
+
+    @Test fun movingFromTheHomeTabToTheLiveTabKeepsTheFocusOnTheTabAfterTheRowWasRestoredOnce() {
+        seedPlaylist()
+        val key = com.urtv.player.ui.chKey("demo", com.urtv.player.core.Channel("c5", "", "http://example.com/s/5.m3u8"))
+        show {
+            val tab = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.urtv.player.ui.Tab.Live) }
+            val rk = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(key) }
+            com.urtv.player.ui.HomeScreen(app, tab.value, { tab.value = it }, { _, _ -> }, {}, {}, restoreKey = rk.value, onRestored = { rk.value = null })
+        }
+        until(10_000) { focusedTexts().any { it == "قناة تجريبية 5" } }
+        rule.onNode(hasText(app.getString(R.string.tab_home), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        settle(); settle()
+        val before = focusedTexts()
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionLeft) }              // right-to-left: the Live tab is to the left of Home
+        settle(); settle(); settle()
+        assertTrue(focusedTexts().any { it == app.getString(R.string.tab_live) }, "the focus stays on the tab, was $before, got ${focusedTexts()}")
     }
 }

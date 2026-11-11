@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
@@ -265,7 +266,10 @@ internal fun VideoSurface(ctrl: PlayerController) {
 internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, onPick: (Channel) -> Unit) {
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
-    val fr = remember { FocusRequester() }
+    // one focus requester per row, created as rows appear: the actions column sends the focus back to the row you LEFT (not the nearest one)
+    val rowRq = remember { HashMap<Int, FocusRequester>() }
+    val lastRow = remember { intArrayOf(idx) }
+    val fr = rowRq.getOrPut(idx) { FocusRequester() }
     // open on the CURRENT channel: scroll it into the composed range first, then ask for the focus until its row exists (the first try can land before it is laid out)
     LaunchedEffect(Unit) {
         state.scrollToItem((idx - 2).coerceAtLeast(0))
@@ -277,7 +281,7 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
         LazyColumn(Modifier.weight(1f).fillMaxHeight(), state, contentPadding = PaddingValues(start = 40.dp, end = 12.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
-                Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = if (i == idx) fr else null, lift = 1.02f) {
+                Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = rowRq.getOrPut(i) { FocusRequester() }, onFocus = { if (it) lastRow[0] = i }, lift = 1.02f, flat = true) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${Browse.numberOf(all, c)}", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
                         Logo(c, 44); Spacer(Modifier.width(16.dp))
@@ -290,13 +294,14 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
             }
         }
         Column(Modifier.width(280.dp).fillMaxHeight().padding(top = 48.dp, bottom = 48.dp, end = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Top)) {
-            Tv(onFav, Modifier.fillMaxWidth().height(60.dp), Rd(14), selected = fav, lift = 1f) {
+            val back = Modifier.focusProperties { start = rowRq[lastRow[0]] ?: FocusRequester.Default }     // toward the list: the row you left
+            Tv(onFav, Modifier.fillMaxWidth().height(60.dp).then(back), Rd(14), selected = fav, lift = 1f) {
                 Row(Modifier.padding(horizontal = 18.dp).align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Glyph.Heart, if (fav) C.accent else C.muted, 24, filled = fav); Spacer(Modifier.width(10.dp))
                     Text(stringResource(if (fav) R.string.menu_unfav else R.string.menu_fav), style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Tv(onStats, Modifier.fillMaxWidth().height(60.dp), Rd(14), selected = statsOn, lift = 1f) {
+            Tv(onStats, Modifier.fillMaxWidth().height(60.dp).then(back), Rd(14), selected = statsOn, lift = 1f) {
                 Text(stringResource(R.string.set_stats), style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 18.dp))
             }
             // «why is it choppy?» is always answered here, also when nothing is wrong

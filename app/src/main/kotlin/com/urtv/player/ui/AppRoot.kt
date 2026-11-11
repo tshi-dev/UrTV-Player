@@ -125,7 +125,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
         Screen.Home -> HomeScreen(
             app, tab, { tab = it },
             onPlay = { list, ch -> queue = list; playing = ch; screen = Screen.Player },
-            onAdd = { screen = Screen.Add }, onServer = { screen = Screen.Server }, onLanguage = onLanguageChanged, restoreKey = restoreKey,
+            onAdd = { screen = Screen.Add }, onServer = { screen = Screen.Server }, onLanguage = onLanguageChanged, restoreKey = restoreKey, onRestored = { restoreKey = null },
             onManageGroups = { screen = Screen.Groups }, onManageHome = { screen = Screen.HomeRows }, onBackup = { backupRestore = it; screen = Screen.Backup },
             onOpenMovie = { detailId = it; screen = Screen.Movie }, onOpenSeries = { detailId = it; screen = Screen.Series },
             onCatchup = { ch, p ->
