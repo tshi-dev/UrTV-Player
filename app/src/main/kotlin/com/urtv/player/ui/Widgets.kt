@@ -77,9 +77,13 @@ fun Tv(
 ) {
     val th = LocalTheme.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) lift else 1f, tween(170, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "lift")
+    val noAnim = Bisect.on("nofocus")
+    val scaleA by animateFloatAsState(if (focused) lift else 1f, tween(170, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "lift")
+    val scale = if (noAnim) 1f else scaleA
     val solid = th.solidFocus && !ring
-    val fill by animateColorAsState(if (focused && solid) th.focusFill else if (focused && !ring) th.focusSoft else if (selected) C.glass2 else restColor, tween(170, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "fill")
+    val fillTarget = if (focused && solid) th.focusFill else if (focused && !ring) th.focusSoft else if (selected) C.glass2 else restColor
+    val fillA by animateColorAsState(fillTarget, tween(170, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "fill")
+    val fill = if (noAnim) fillTarget else fillA
     val border = when {
         focused && (ring || th.focus == FocusStyle.Ring) -> BorderStroke(3.dp, th.ring)
         focused && th.focus == FocusStyle.Glow -> BorderStroke(2.dp, th.accent)

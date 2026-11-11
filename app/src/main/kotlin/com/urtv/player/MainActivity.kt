@@ -14,7 +14,7 @@ import com.urtv.player.ui.UrtvTheme
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-    override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base))
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base, fresh = false))     // remembered answer or the TV's language: nothing waits for UrTV before the first frame
 
     override fun onResume() {
         super.onResume()

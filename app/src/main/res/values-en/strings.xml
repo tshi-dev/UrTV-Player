@@ -279,4 +279,6 @@
     <string name="menu_hidden_row">Show hidden channels</string>
     <string name="loading_n">Loading the playlist… %1$d channels</string>
     <string name="opening_channel">Opening…</string>
+    <string name="preview_dead">The channel isn\'t answering</string>
+    <string name="fm_for_match">For the match: %1$s</string>
 </resources>

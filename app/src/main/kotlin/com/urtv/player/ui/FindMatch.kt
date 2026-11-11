@@ -46,7 +46,7 @@ private sealed interface FmState {
 
 /** One hit plays at once; several show a focused list (best first); none shows a short message with a way to search. */
 @Composable
-fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, onSearch: (String) -> Unit, onClose: () -> Unit) {
+fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, onSearch: (String, String) -> Unit, onClose: () -> Unit) {
     val store = app.store
     val cat by app.catalog.state.collectAsState()
     val epg by app.catalog.epg.collectAsState()
@@ -101,7 +101,9 @@ fun FindMatchRoot(app: UrtvApp, req: MatchFinder.Request, onPlayed: () -> Unit, 
                         // the channel search opens with the first channel name the caller listed (most likely to match), else the home team
                         val ar = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language == "ar"
                         val seed = req.channels.firstOrNull() ?: (if (ar) req.homeAr.ifBlank { req.homeEn } else req.homeEn.ifBlank { req.homeAr })
-                        TvButton(stringResource(R.string.fm_search), { onSearch(seed) }, primary = true, focusRequester = first)
+                        val h = if (ar) req.homeAr.ifBlank { req.homeEn } else req.homeEn.ifBlank { req.homeAr }
+                        val a = if (ar) req.awayAr.ifBlank { req.awayEn } else req.awayEn.ifBlank { req.awayAr }
+                        TvButton(stringResource(R.string.fm_search), { onSearch(seed, listOf(h, a).filter { it.isNotBlank() }.joinToString(" – ")) }, primary = true, focusRequester = first)
                         TvButton(stringResource(R.string.fm_back), onClose)
                     }
                 }

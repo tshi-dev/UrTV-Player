@@ -14,6 +14,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
+/** What the channel search should show when the app is brought to the Live tab by FIND_MATCH: the text for the box and a line saying why. */
+data class PendingSearch(val text: String, val hint: String)
+
 /** Process-wide singletons (no DI framework: keeps the APK small). */
 class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     lateinit var store: Store; private set
@@ -32,7 +35,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     /** What UrTV last said about a newer Player (cached; asked at most once a day). */
     var update by mutableStateOf(com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.UpToDate))
     /** Text to put in the channel search when the app is brought up (FIND_MATCH's «search channels»); in-process only, never from an intent. */
-    var pendingSearch by mutableStateOf<String?>(null)
+    var pendingSearch by mutableStateOf<PendingSearch?>(null)
     /** The launch animation plays once per process. */
     var splashDone by mutableStateOf(false)
 

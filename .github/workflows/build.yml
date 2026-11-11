@@ -147,6 +147,8 @@ jobs:
           grep -q "v2 scheme (APK Signature Scheme v2): true" verify.txt
           grep -q "v3 scheme (APK Signature Scheme v3): true" verify.txt
           test "$(stat -c %s "$apk")" -le 4194304
+          # the baseline profile must be inside the APK (fresh installs would otherwise start in the interpreter)
+          unzip -l "$apk" | grep -q 'assets/dexopt/baseline.prof' || { echo '::error::baseline profile missing from the APK'; exit 1; }
       - name: Publish release assets with a sha256 file
         env:
           GH_TOKEN: ${{ github.token }}

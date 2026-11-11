@@ -1,6 +1,7 @@
 package com.urtv.player.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
@@ -66,6 +67,9 @@ enum class Tab { Home, Live, Movies, Series, Guide, Settings }
 /** The focus requester of the tab you are in, so Up from the first field of a page lands on it. */
 val LocalTabFocus = androidx.compose.runtime.staticCompositionLocalOf<FocusRequester?> { null }
 
+/** The first thing the current tab wants focus on when the person presses Down from the tab bar (the search box on the channel list), not the last row they visited. */
+val LocalContentEntry = androidx.compose.runtime.staticCompositionLocalOf<androidx.compose.runtime.MutableState<FocusRequester?>?> { null }
+
 private val keyMemo = java.util.concurrent.ConcurrentHashMap<String, String>()
 /** Favourite/recent key: playlist id + a hash of the stream URL, so credentials in URLs never land in preferences. */
 fun chKey(pid: String, c: Channel): String = keyMemo.getOrPut(c.url) {
@@ -95,12 +99,14 @@ fun HomeScreen(
     val active = playlists.firstOrNull { it.id == cat.playlistId }
     val tabFocus = remember { FocusRequester() }
     val nowMs by rememberNow()
-    androidx.compose.runtime.CompositionLocalProvider(LocalTabFocus provides tabFocus) {
+    val contentEntry = remember { mutableStateOf<FocusRequester?>(null) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalTabFocus provides tabFocus, LocalContentEntry provides contentEntry) {
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
     LaunchedEffect(tab) { Backdrop.url = null }
-    Box(Modifier.fillMaxSize().background(C.bgBrush)) {
-    PosterBackdrop()
+    LaunchedEffect(tab) { Bisect.refresh() }
+    Box(Modifier.fillMaxSize().background(if (Bisect.on("nobackdrop")) androidx.compose.ui.graphics.SolidColor(C.bg) else C.bgBrush)) {
+    if (!Bisect.on("nobackdrop")) PosterBackdrop()
     Column(Modifier.fillMaxSize().padding(horizontal = 72.dp, vertical = 36.dp)) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.width(260.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -112,7 +118,7 @@ fun HomeScreen(
             Row(Modifier.clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true }) {
                     val label = stringResource(when (t) { Tab.Home -> R.string.tab_home; Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
-                    Tv({ onTab(t) }, Modifier.height(48.dp), RoundedCornerShape(50), selected = t == tab, onFocus = { if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
+                    Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties { down = if (t == Tab.Live) (contentEntry.value ?: FocusRequester.Default) else FocusRequester.Default }, RoundedCornerShape(50), selected = t == tab, onFocus = { if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
                         Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp))
                     }
                 }
@@ -350,7 +356,10 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
 
     val focusedState = remember(pid) { mutableStateOf<Channel?>(null) }     // read only inside the preview pane, so moving the focus does not recompose the whole tab
     var menuFor by remember { mutableStateOf<Channel?>(null) }
-    var searchLatin by remember { mutableStateOf(false) }
+    var keyMode by remember { mutableStateOf(com.urtv.player.core.SearchFold.KeyMode.Auto) }
+    val entry = LocalContentEntry.current
+    val searchFr = remember { FocusRequester() }
+    androidx.compose.runtime.DisposableEffect(Unit) { entry?.value = searchFr; onDispose { if (entry?.value === searchFr) entry.value = null } }
     val tabFocusRq = LocalTabFocus.current
     val showPreview by store.livePreview.collectAsState()
     // fill the image cache a screen ahead, off the UI thread, at the exact size the rows use (debounced: nothing while keys repeat)
@@ -362,7 +371,8 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         val loader = coil3.SingletonImageLoader.get(logoCtx)
         for (i in from until minOf(from + 14, list.size)) list[i].logo?.takeIf { it.isNotBlank() }?.let { loader.enqueue(coil3.request.ImageRequest.Builder(logoCtx).data(it).size(logoPx, logoPx).build()) }
     }
-    LaunchedEffect(app.pendingSearch) { app.pendingSearch?.let { query = it; group = Browse.ALL; app.pendingSearch = null } }
+    var matchHint by remember { mutableStateOf("") }
+    LaunchedEffect(app.pendingSearch) { app.pendingSearch?.let { query = it.text; matchHint = it.hint; group = Browse.ALL; app.pendingSearch = null } }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         // ---- groups rail: plain text rows with counts
@@ -387,7 +397,8 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
         }
         // ---- dense channel list
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            SearchRow(query, { query = it }, searchLatin, { searchLatin = it }, onUp = { tabFocusRq?.let { runCatching { it.requestFocus() } } })
+            if (matchHint.isNotBlank() && query.isNotBlank()) Text(stringResource(R.string.fm_for_match, matchHint), style = T.small.copy(color = C.accent), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 6.dp, start = 4.dp))
+            SearchRow(query, { query = it }, keyMode, { keyMode = it }, onUp = { tabFocusRq?.let { runCatching { it.requestFocus() } } }, focusRequester = searchFr)
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxSize()) {
                 when {
@@ -410,33 +421,53 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                             Spacer(Modifier.height(20.dp)); TvButton(stringResource(R.string.retry), { app.catalog.refreshActive() }, primary = true)
                         } else Text(stringResource(when { query.isNotBlank() -> R.string.no_results; group == Browse.FAV -> R.string.empty_favs; group == Browse.RECENT -> R.string.empty_recents; else -> R.string.empty_group }), style = T.body.copy(color = C.muted), modifier = Modifier.width(520.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
-                    else -> LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    else -> androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides (if (Bisect.on("springscroll")) SpringBringIntoView else InstantBringIntoView)) {
+                      LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         itemsIndexed(list, key = { _, c -> c.url }) { i, ch ->
                             val k = chKey(pid, ch)
                             ChannelRow(ch, numbers[ch.url] ?: (i + 1), epg.nowNext(ch.epgId, nowMs).first, nowMs, k in favs,
                                 onClick = { onPlay(list, ch) }, onLong = { menuFor = ch },
                                 focusRequester = if (i == focusIdx) fr else null, onFocus = { if (it) { lastIdx = i; focusedState.value = ch; com.urtv.player.player.Net.preResolve(ch.url) } })
                         }
+                      }
                     }
                 }
             }
         }
         // ---- preview pane
-        PreviewPane(app, focusedState, list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
+        if (Bisect.on("nopreview")) Spacer(Modifier.width(520.dp)) else PreviewPane(app, focusedState, list.firstOrNull(), epg, nowMs, showPreview && !isLocked, Modifier.width(520.dp).fillMaxHeight())
     }
     menuFor?.let { c -> ChannelMenu(app, pid, c, numbers[c.url] ?: 0, epg.nowNext(c.epgId, nowMs).first) { menuFor = null; focusIdx = lastIdx.coerceAtLeast(0) } }
     PinHost(pinReq, store) { pinReq = null }
     deleteList?.let { n -> ConfirmDialog(stringResource(R.string.delete_list_confirm, n), onYes = { store.deleteList(pid, n); group = Browse.ALL; deleteList = null }, onNo = { deleteList = null }) }
 }
 
+/** D-pad list scrolling jumps straight to the focused row instead of animating a spring that lands between frames (flag `springscroll` restores the spring). */
+@OptIn(ExperimentalFoundationApi::class)
+private class ListScrollSpec(override val scrollAnimationSpec: androidx.compose.animation.core.AnimationSpec<Float>) : androidx.compose.foundation.gestures.BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val trailing = offset + size
+        return when {
+            offset >= 0f && trailing <= containerSize -> 0f
+            offset < 0f && trailing > containerSize -> 0f
+            kotlin.math.abs(offset) < kotlin.math.abs(trailing - containerSize) -> offset
+            else -> trailing - containerSize
+        }
+    }
+}
+@OptIn(ExperimentalFoundationApi::class) private val InstantBringIntoView = ListScrollSpec(androidx.compose.animation.core.snap())
+@OptIn(ExperimentalFoundationApi::class) private val SpringBringIntoView = ListScrollSpec(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+
 /** The search box and its keyboard-language chip: D-pad Left/Right move between them (the chip is not inside the text field). */
 @Composable
-fun SearchRow(query: String, onQuery: (String) -> Unit, latin: Boolean, onLatin: (Boolean) -> Unit, onUp: () -> Unit, modifier: Modifier = Modifier) {
+fun SearchRow(query: String, onQuery: (String) -> Unit, mode: com.urtv.player.core.SearchFold.KeyMode, onMode: (com.urtv.player.core.SearchFold.KeyMode) -> Unit, onUp: () -> Unit, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        FocusField(query, onQuery, stringResource(R.string.search_hint), Modifier.weight(1f), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true,
-            onUp = onUp, hintLocale = if (latin) "en" else null)
+        // what is typed is converted live to the script the chip says (the TV keyboard may ignore the language hint)
+        FocusField(query, { onQuery(com.urtv.player.core.SearchFold.applyMode(it, mode)) }, stringResource(R.string.search_hint), Modifier.weight(1f), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true,
+            onUp = onUp, hintLocale = when (mode) { com.urtv.player.core.SearchFold.KeyMode.Latin -> "en"; com.urtv.player.core.SearchFold.KeyMode.Arabic -> "ar"; else -> null }, focusRequester = focusRequester)
         // one press switches the keyboard to Latin / back, for channel names typed in the other script
-        Tv({ onLatin(!latin) }, Modifier.height(52.dp), Rd(12), selected = latin, lift = 1f) { Text(if (latin) "EN" else "ع", style = T.bodyBold, modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp)) }
+        val next = com.urtv.player.core.SearchFold.KeyMode.entries[(mode.ordinal + 1) % com.urtv.player.core.SearchFold.KeyMode.entries.size]
+        Tv({ onMode(next) }, Modifier.height(52.dp), Rd(12), selected = mode != com.urtv.player.core.SearchFold.KeyMode.Auto, lift = 1f) { Text(when (mode) { com.urtv.player.core.SearchFold.KeyMode.Latin -> "EN"; com.urtv.player.core.SearchFold.KeyMode.Arabic -> "ع"; else -> "ع/EN" }, style = T.bodyBold, modifier = Modifier.align(Alignment.Center).padding(horizontal = 18.dp)) }
     }
 }
 
@@ -452,7 +483,7 @@ fun ChannelRow(ch: Channel, number: Int, now: Programme?, nowMs: Long, fav: Bool
             Text("$number", style = T.small.copy(color = C.faint), modifier = Modifier.width(52.dp))
             Logo(ch, 44); Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(ch.name, style = T.row.copy(fontSize = 25.sp, lineHeight = 32.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f) Modifier.basicMarquee() else Modifier)
+                Text(ch.name, style = T.row.copy(fontSize = 25.sp, lineHeight = 32.sp), maxLines = 1, softWrap = false, overflow = if (f) TextOverflow.Clip else TextOverflow.Ellipsis, modifier = if (f && !Bisect.on("nomarquee")) Modifier.basicMarquee() else Modifier)
                 if (now != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(now.title, style = T.small.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -474,6 +505,7 @@ private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Chan
     val ctrl = app.player
     val ch = focusedState.value ?: first
     var shownUrl by remember { mutableStateOf<String?>(null) }
+    val pst by ctrl.status.collectAsState()
     LaunchedEffect(ch?.url, enabled) {
         if (ch == null || !enabled) { return@LaunchedEffect }
         if (shownUrl != null && shownUrl != ch.url) { shownUrl = null; ctrl.idlePreview() }   // focus moved: stop decoding the old one at once (keeps the player)
@@ -489,6 +521,7 @@ private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Chan
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }
             }
             if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 132) }
+            if (enabled && ch != null && shownUrl == ch.url && pst == com.urtv.player.player.PlayStatus.Failed) Text(stringResource(R.string.preview_dead), style = T.bodyBold.copy(color = Color.White), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.align(Alignment.Center).background(Color(0xCC000000), Rd(10)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
         if (ch != null) {
             val (now, _) = remember(ch.epgId, epg, nowMs / 60_000) { epg.nowNext(ch.epgId, nowMs) }
@@ -545,6 +578,7 @@ fun ChannelMenu(app: UrtvApp, pid: String, ch: Channel, number: Int, now: Progra
 @Composable
 fun Logo(ch: Channel, size: Int) {
     val url = ch.logo
+    if (Bisect.on("nologos")) { Box(Modifier.size(size.dp)); return }
     if (url.isNullOrBlank()) { Monogram(ch.name, size); return }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.dp.roundToPx() }

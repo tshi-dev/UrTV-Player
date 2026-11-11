@@ -27,6 +27,7 @@ class FindMatchActivity : ComponentActivity() {
 
     private fun callerIsUrtv(): Boolean {
         val pkg = callingPackage ?: return false
+        if (BuildConfig.DEBUG) trustedCallerForTests?.let { return it(pkg) }     // debug builds only: lets a test stand in for UrTV's package and certificate
         return com.urtv.player.data.Integrity.callerAllowed(pkg, com.urtv.player.data.Integrity.certDigestsOf(this, pkg))
     }
 
@@ -42,13 +43,15 @@ class FindMatchActivity : ComponentActivity() {
         setContent {
             val look by app.store.appearance.collectAsState(); val scale by app.store.textScale.collectAsState()
             UrtvTheme(look, scale) {
-                FindMatchRoot(app, req, onPlayed = { setResult(RESULT_OK) }, onSearch = { text -> (application as UrtvApp).pendingSearch = text.take(com.urtv.player.core.MatchFinder.MAX_LEN).ifBlank { null }; startActivity(Intent(this, MainActivity::class.java)); finish() }, onClose = { finish() })
+                FindMatchRoot(app, req, onPlayed = { setResult(RESULT_OK) }, onSearch = { text, hint -> (application as UrtvApp).pendingSearch = PendingSearch(text.take(MatchFinder.MAX_LEN), hint.take(MatchFinder.MAX_LEN * 2)); startActivity(Intent(this, MainActivity::class.java)); finish() }, onClose = { finish() })
             }
         }
     }
 
     companion object {
         const val ACTION = "sa.urtv.player.action.FIND_MATCH"
+        /** Only ever set by unit tests, and only honoured in debug builds. */
+        @Volatile internal var trustedCallerForTests: ((String) -> Boolean)? = null
 
         /** Reads the extras defensively (wrong types, huge values) and returns a sanitised request. */
         fun readRequest(i: Intent, nowMs: Long): MatchFinder.Request {

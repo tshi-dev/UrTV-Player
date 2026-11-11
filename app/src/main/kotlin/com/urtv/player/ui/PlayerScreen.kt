@@ -262,35 +262,15 @@ internal fun VideoSurface(ctrl: PlayerController) {
 }
 
 @Composable
-private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, onPick: (Channel) -> Unit) {
+internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, onPick: (Channel) -> Unit) {
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { state.scrollToItem((idx - 2).coerceAtLeast(0)); runCatching { fr.requestFocus() } }
-    // scrim fades toward the video from the start side
-    Box(Modifier.fillMaxHeight().width(660.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE0080909), Color.Transparent)))) {
-        LazyColumn(Modifier.fillMaxSize(), state, contentPadding = PaddingValues(start = 40.dp, end = 100.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            // quick actions for the channel on screen: a star (favourite) and the playback stats
-            item(key = "actions") {
-                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Tv(onFav, Modifier.height(56.dp), Rd(14), selected = fav, lift = 1f) {
-                        Row(Modifier.padding(horizontal = 20.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Glyph.Heart, if (fav) C.accent else C.muted, 24, filled = fav); Spacer(Modifier.width(10.dp))
-                            Text(stringResource(if (fav) R.string.menu_unfav else R.string.menu_fav), style = T.body, maxLines = 1)
-                        }
-                    }
-                    Tv(onStats, Modifier.height(56.dp), Rd(14), selected = statsOn, lift = 1f) {
-                        Text(stringResource(R.string.set_stats), style = T.body, maxLines = 1, modifier = Modifier.align(Alignment.Center).padding(horizontal = 20.dp))
-                    }
-                }
-            }
-            // «why is it choppy?» is always answered here, also when nothing is wrong
-            item(key = "why") {
-                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.why_title) + ": ", style = T.small.copy(color = C.text))
-                    if (cause == com.urtv.player.core.Diagnosis.Cause.None) Text(stringResource(R.string.why_ok), style = T.small.copy(color = C.accent), maxLines = 2) else WhyLine(cause, httpStatus, inline = true)
-                }
-            }
+    // scrim fades toward the video from the start side. The list is on the start side; the quick actions are a FIXED column on the end side,
+    // one D-pad move (toward the video) from wherever the list is, however far down the current channel is.
+    Row(Modifier.fillMaxHeight().width(940.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE6080909), Color.Transparent)))) {
+        LazyColumn(Modifier.weight(1f).fillMaxHeight(), state, contentPadding = PaddingValues(start = 40.dp, end = 12.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
                 Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = if (i == idx) fr else null, lift = 1.02f) {
@@ -303,6 +283,23 @@ private fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.playe
                         }
                     }
                 }
+            }
+        }
+        Column(Modifier.width(280.dp).fillMaxHeight().padding(top = 48.dp, bottom = 48.dp, end = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Top)) {
+            Tv(onFav, Modifier.fillMaxWidth().height(60.dp), Rd(14), selected = fav, lift = 1f) {
+                Row(Modifier.padding(horizontal = 18.dp).align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Glyph.Heart, if (fav) C.accent else C.muted, 24, filled = fav); Spacer(Modifier.width(10.dp))
+                    Text(stringResource(if (fav) R.string.menu_unfav else R.string.menu_fav), style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Tv(onStats, Modifier.fillMaxWidth().height(60.dp), Rd(14), selected = statsOn, lift = 1f) {
+                Text(stringResource(R.string.set_stats), style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 18.dp))
+            }
+            // «why is it choppy?» is always answered here, also when nothing is wrong
+            Column(Modifier.padding(start = 6.dp, top = 8.dp)) {
+                Text(stringResource(R.string.why_title), style = T.small.copy(color = C.text))
+                if (cause == com.urtv.player.core.Diagnosis.Cause.None) Text(stringResource(R.string.why_ok), style = T.small.copy(color = C.accent), maxLines = 2)
+                else WhyLine(cause, httpStatus, inline = true)
             }
         }
     }

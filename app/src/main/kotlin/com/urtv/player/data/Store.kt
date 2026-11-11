@@ -269,8 +269,10 @@ class Store(ctx: Context) {
     fun resolvedLang(): String = sp.getString("resolvedLang", null) ?: Language.resolve(sp.getString("lang", Language.AUTO)!!, sp.getString("urtvLang", null), Language.systemLanguage())
     /** Called when UrTV's language (or null: not installed) was read. Returns true when the UI language changed and the screen must be recreated. */
     fun onUrtvLanguage(urtv: String?): Boolean {
-        sp.edit().apply { if (urtv == null) remove("urtvLang") else putString("urtvLang", urtv) }.apply()
-        val r = Language.resolve(_lang.value, urtv, Language.systemLanguage())
+        // a missing answer (UrTV slow to wake) must not erase the remembered one
+        val known = urtv ?: sp.getString("urtvLang", null)
+        if (urtv != null) sp.edit().putString("urtvLang", urtv).apply()
+        val r = Language.resolve(_lang.value, known, Language.systemLanguage())
         val changed = r != resolvedLang()
         if (changed) sp.edit().putString("resolvedLang", r).apply()
         return changed

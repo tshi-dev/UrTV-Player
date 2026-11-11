@@ -57,6 +57,19 @@ object SearchFold {
     /** The Latin keys the person's fingers hit if every Arabic letter was typed on an Arabic keyboard; null if nothing Arabic. */
     fun layoutToLatin(s: String): String? = if (!hasArabic(s)) null else s.map { ch -> LAYOUT[ch] ?: LAYOUT[when (ch) { 'أ', 'إ', 'آ' -> 'ا'; else -> ch }] ?: ch }.joinToString("")
 
+    /** Which script the person means to type, whatever the TV keyboard actually produces. */
+    enum class KeyMode { Auto, Latin, Arabic }
+
+    private val REVERSE: Map<Char, Char> = LAYOUT.entries.filter { it.value in 'a'..'z' }.associate { it.value to it.key }
+
+    /** Latin mode: Arabic letters typed on the Arabic keyboard become the Latin keys at the same positions (ضعقشى -> quran), live, as typed. */
+    fun arabicKeysToLatin(s: String): String = s.map { LAYOUT[it] ?: LAYOUT[when (it) { 'أ', 'إ', 'آ' -> 'ا'; else -> it }] ?: it }.joinToString("")
+
+    /** Arabic mode: Latin letters typed on a Latin keyboard become the Arabic letters at the same positions (quran -> ضعقشى is NOT wanted; this is for the reverse slip). */
+    fun latinKeysToArabic(s: String): String = s.map { REVERSE[it.lowercaseChar()] ?: it }.joinToString("")
+
+    fun applyMode(text: String, mode: KeyMode): String = when (mode) { KeyMode.Auto -> text; KeyMode.Latin -> arabicKeysToLatin(text); KeyMode.Arabic -> latinKeysToArabic(text) }
+
     fun translit(s: String): String = fold(s).map { TRANSLIT[it] ?: it.toString() }.joinToString("")
 
     /** Latin consonants only: "quran", "qran" and "قران" all give "qrn". */

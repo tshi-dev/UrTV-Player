@@ -48,3 +48,32 @@ Macrobenchmark run on the device are the tools for these. First TV test (TCL): c
 - List rows: logos decoded at their fixed on-screen size without subcomposition and prefetched a screen ahead off the UI thread; the preview's video surface exists only while a preview is actually playing (scrolling composes no surface); DNS of the focused channel is resolved immediately, so the 500 ms rest hides it.
 - Zap: DNS of the next two channels each way is resolved when a channel starts; the two nearest neighbours' manifests are fetched ahead and served once from memory (20 s, 256 KB, off on low-RAM TVs and metered links, on by default).
 - The stats overlay now carries a UI frame meter per screen (janky share above 25 ms, p50/p90/p99) and a real frames-per-second reading (rendered frame count over time).
+
+## v0.9.8: finding the list jank on the TV
+The gfxinfo numbers (p50 36 ms: every frame takes two vsyncs) say the cost is in every frame, not in spikes. What changed in the app, and how to bisect the rest.
+
+What changed: the list scrolls by jumping to the focused row (no spring animation that lands between frames); a **baseline profile** now ships inside the release APK (`assets/dexopt/baseline.prof`, checked by CI), so a fresh install does not scroll and draw through the interpreter; the frame meter now uses `FrameMetrics` (the same TOTAL_DURATION `dumpsys gfxinfo` reports, janky = longer than one display interval) and starts empty on every screen.
+
+Bisect from a computer (nothing to rebuild; the list is re-read when the Home screen is entered or a tab is changed, so press a tab after setting it):
+
+    adb shell setprop debug.urtv.bisect "nopreview"                 # no preview pane next to the list
+    adb shell setprop debug.urtv.bisect "nobackdrop"                # plain background colour, no gradient/poster backdrop
+    adb shell setprop debug.urtv.bisect "nologos"                   # no channel logo images
+    adb shell setprop debug.urtv.bisect "nofocus"                   # no focus animation (scale, colour fade)
+    adb shell setprop debug.urtv.bisect "nomarquee"                 # the focused name does not scroll
+    adb shell setprop debug.urtv.bisect "springscroll"              # the old spring scrolling, for comparison
+    adb shell setprop debug.urtv.bisect "nopreview,nologos,nofocus,nomarquee,nobackdrop"   # everything off at once
+    adb shell setprop debug.urtv.bisect ""                          # back to normal
+
+Turn the stats on (Settings > Playback > Playback stats, or the star/stats panel in the player) to see the live meter, labelled with the screen and the active switches. For the system's own numbers:
+
+    adb shell dumpsys gfxinfo com.urtv.player reset        # then scroll the list with a fixed key speed
+    adb shell dumpsys gfxinfo com.urtv.player              # "Janky frames" and the 50th/90th/95th/99th percentile
+
+Is it code that has not been compiled yet? Compile the app fully ahead of time and measure again; if the numbers drop, it is the interpreter/JIT:
+
+    adb shell cmd package compile -m speed -f com.urtv.player          # everything compiled
+    adb shell cmd package compile -m speed-profile -f com.urtv.player  # only what the baseline profile lists
+    adb shell cmd package compile --reset com.urtv.player              # back to the default
+
+If "nopreview" fixes it the video surface/preview is compositing the whole screen; if "nologos" does, image decoding/drawing is; if only "nofocus" does, it is the animations; if only the AOT compile does, it is warm-up and the baseline profile will fix it after the first background dexopt.

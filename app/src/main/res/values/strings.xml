@@ -279,4 +279,6 @@
     <string name="menu_hidden_row">إظهار القنوات المخفية</string>
     <string name="loading_n">جارٍ تحميل القائمة… %1$d قناة</string>
     <string name="opening_channel">جارٍ الفتح…</string>
+    <string name="preview_dead">القناة لا ترد</string>
+    <string name="fm_for_match">للمباراة: %1$s</string>
 </resources>

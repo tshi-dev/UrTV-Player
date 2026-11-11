@@ -1,18 +1,14 @@
-# Hand-written baseline profile for the start path (Home, Live list, player entry). Regenerate on a device with a
-# Macrobenchmark BaselineProfileRule when one is available; wildcards keep this valid as code moves.
+# Baseline profile: tells Android which code to compile ahead of time, so the first runs of a fresh install (and of every update) do not
+# scroll and draw through an interpreter. Compose and Media3 ship their own rules inside their libraries; these cover this app's code and the
+# parts of the libraries it uses most. Wildcards are expanded against the real dex by the build.
 HSPLcom/urtv/player/**;->**(**)**
-HSPLandroidx/compose/runtime/**;->**(**)**
-HSPLandroidx/compose/ui/**;->**(**)**
-HSPLandroidx/compose/foundation/**;->**(**)**
-HSPLandroidx/compose/animation/**;->**(**)**
-HSPLandroidx/tv/material3/**;->**(**)**
-HSPLandroidx/activity/**;->**(**)**
-HSPLandroidx/lifecycle/**;->**(**)**
-HSPLkotlinx/coroutines/**;->**(**)**
-HSPLkotlinx/serialization/json/**;->**(**)**
-HSPLcoil3/**;->**(**)**
-HSPLokhttp3/**;->**(**)**
 Lcom/urtv/player/**;
-Landroidx/compose/runtime/**;
-Landroidx/compose/ui/**;
-Landroidx/compose/foundation/**;
+HSPLandroidx/compose/foundation/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/animation/**;->**(**)**
+HSPLandroidx/tv/**;->**(**)**
+HSPLcoil3/**;->**(**)**
+Landroidx/compose/**;
+Landroidx/tv/**;
+Lcoil3/**;

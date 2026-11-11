@@ -58,3 +58,17 @@ class FrameStatsTest {
         assertEquals("عائلية", GroupNames.display("Family", true)); assertEquals("Family", GroupNames.display("Family", false))
     }
 }
+
+class KeyModeTest {
+    @Test fun latinModeTurnsArabicSlipsIntoLatinAsTyped() {
+        assertEquals("quran", SearchFold.applyMode("ضعقشى", SearchFold.KeyMode.Latin))
+        assertEquals("quran 1", SearchFold.applyMode("ضعقشى 1", SearchFold.KeyMode.Latin), "digits and spaces stay")
+        assertEquals("bein", SearchFold.applyMode("bein", SearchFold.KeyMode.Latin), "already Latin: unchanged (idempotent while typing)")
+        assertEquals("quran", SearchFold.applyMode(SearchFold.applyMode("ضعقشى", SearchFold.KeyMode.Latin), SearchFold.KeyMode.Latin))
+    }
+    @Test fun arabicModeTurnsLatinSlipsIntoArabic() {
+        assertEquals("ضعقشى", SearchFold.applyMode("quran", SearchFold.KeyMode.Arabic)); assertEquals("ضعقشى 7", SearchFold.applyMode("Quran 7", SearchFold.KeyMode.Arabic))
+        assertEquals("قناة", SearchFold.applyMode("قناة", SearchFold.KeyMode.Arabic), "already Arabic: unchanged")
+    }
+    @Test fun autoLeavesTextAlone() { assertEquals("ضعقشى quran", SearchFold.applyMode("ضعقشى quran", SearchFold.KeyMode.Auto)) }
+}
