@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,8 +92,9 @@ fun GuideScreen(app: UrtvApp, cat: CatalogState, onPlay: (List<Channel>, Channel
             }
         }
         val listState = rememberLazyListState()
+        val rowKeys = remember(rows) { uniqueKeys(rows.map { it.url }) }
         LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 8.dp)) {
-            items(rows, key = { it.url }) { ch ->
+            itemsIndexed(rows, key = { i, _ -> rowKeys[i] }) { _, ch ->
                 Row(Modifier.fillMaxWidth().height(ROW_H).drawBehind { drawLine(C.hairline, Offset(0f, 0f), Offset(size.width, 0f), 1f) }.padding(vertical = 4.dp)) {
                     Row(Modifier.width(NAME_W).fillMaxSize().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("${com.urtv.player.data.Browse.numberOf(cat.channels, ch)}", style = T.tiny, modifier = Modifier.width(48.dp))

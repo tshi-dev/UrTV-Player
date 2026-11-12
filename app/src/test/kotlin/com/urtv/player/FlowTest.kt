@@ -115,10 +115,10 @@ class FlowTest {
     }
 
     // ---- seeded playlist helper for the screen-level tests
-    private fun seedPlaylist() {
+    private fun seedPlaylist(sameUrl: Boolean = false) {
         app.store.addPlaylist(com.urtv.player.data.PlaylistDef("demo", "demo", "m3u", url = "http://example.com/list.m3u"))
         val dir = java.io.File(app.filesDir, "cache").apply { mkdirs() }
-        java.io.File(dir, "ch_demo.tsv").writeText((1..60).joinToString("\n") { i -> listOf("c$i", "قناة تجريبية $i", "http://example.com/s/$i.m3u8", "أخبار", "", "", "").joinToString("\t") } + "\n")
+        java.io.File(dir, "ch_demo.tsv").writeText((1..60).joinToString("\n") { i -> listOf("c$i", "قناة تجريبية $i", "http://example.com/s/${if (sameUrl) 1 else i}.m3u8", "أخبار", "", "", "").joinToString("\t") } + "\n")
         app.catalog.open("demo")
         val end = System.currentTimeMillis() + 10_000
         while (app.catalog.state.value.channels.isEmpty() || !app.store.ready.value) { check(System.currentTimeMillis() < end) { "playlist did not load" }; shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(30) }
@@ -211,10 +211,13 @@ class FlowTest {
             com.urtv.player.ui.HomeScreen(app, tab.value, { tab.value = it }, { _, _ -> }, {}, {}, restoreKey = rk.value, onRestored = { rk.value = null })
         }
         until(10_000) { focusedTexts().any { it == "قناة تجريبية 5" } }
-        rule.onNode(hasText(app.getString(R.string.tab_home), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        rule.onNode(hasText(app.getString(R.string.tab_live), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
         settle(); settle()
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionRight) }              // right-to-left: Home is to the right of Live
+        settle(); settle(); settle()
+        assertTrue(focusedTexts().any { it == app.getString(R.string.tab_home) }, "on the Home tab: ${focusedTexts()}")
         val before = focusedTexts()
-        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionLeft) }              // right-to-left: the Live tab is to the left of Home
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionLeft) }              // and back: the Live tab
         settle(); settle(); settle()
         assertTrue(focusedTexts().any { it == app.getString(R.string.tab_live) }, "the focus stays on the tab, was $before, got ${focusedTexts()}")
     }
@@ -249,5 +252,36 @@ class FlowTest {
         for (r in 1..6) { if (texts().none { it == "قناة تجريبية 9" }) break; settle(500) }
         assertTrue(texts().none { it == "قناة تجريبية 9" }, "the Home tab is showing, not the channel list: focus=${focusedTexts()} ${texts()}")
         assertTrue(back(), "Back on the Home tab leaves")
+    }
+
+    @Test fun twoChannelsWithTheSameStreamUrlDoNotCrashTheListAndMoveWithKeys() {
+        seedPlaylist(sameUrl = true)                               // real playlists repeat URLs: every row used to need a different one
+        app.handOverSearch(com.urtv.player.PendingSearch("", ""))
+        show { com.urtv.player.ui.AppRoot(app) {} }
+        until(10_000) { texts().any { it == "قناة تجريبية 9" } }
+        rule.onNode(hasText(app.getString(R.string.tab_live), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        settle(); settle()
+        for (i in 1..4) { rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionDown) }; settle(); settle() }
+        assertTrue(texts().any { it.startsWith("قناة تجريبية") }, "still alive after moving through the list")
+    }
+
+    @Test fun uniqueKeysKeepTheFirstUrlAndSuffixTheCopies() {
+        assertEquals(listOf("a", "b", "a#2", "a#3", "b#2"), com.urtv.player.ui.uniqueKeys(listOf("a", "b", "a", "a", "b")))
+        assertEquals(emptyList(), com.urtv.player.ui.uniqueKeys(emptyList()))
+    }
+
+    @Test fun upFromAPageLandsOnTheCurrentTabNotTheLastOneUsed() {
+        seedPlaylist()
+        show {
+            val tab = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.urtv.player.ui.Tab.Settings) }
+            com.urtv.player.ui.HomeScreen(app, tab.value, { tab.value = it }, { _, _ -> }, {}, {}, restoreKey = null, onRestored = {})
+        }
+        settle(); settle()
+        rule.onNode(hasText(app.getString(R.string.tab_settings), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        settle(); settle()
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionDown) }; settle(); settle()      // into the page
+        assertTrue(focusedTexts().none { it == app.getString(R.string.tab_settings) }, "focus is in the page: ${focusedTexts()}")
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionUp) }; settle(); settle()
+        assertTrue(focusedTexts().any { it == app.getString(R.string.tab_settings) }, "UP returns to the current tab, got ${focusedTexts()}")
     }
 }

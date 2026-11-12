@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -75,6 +76,12 @@ import androidx.compose.runtime.produceState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+/** One unique key per list entry even when a playlist repeats a stream URL (a LazyList crashes on a repeated key): the first keeps the URL, later copies get a suffix. */
+fun uniqueKeys(urls: List<String>): List<String> {
+    val seen = HashMap<String, Int>(urls.size * 2)
+    return urls.map { u -> val n = (seen[u] ?: 0) + 1; seen[u] = n; if (n == 1) u else "$u#$n" }
+}
 
 enum class Tab { Home, Live, Movies, Series, Guide, Settings }
 
@@ -132,7 +139,7 @@ fun HomeScreen(
                 if (app.integrity == com.urtv.player.data.Integrity.Status.Debug) { Spacer(Modifier.width(10.dp)); Chip(stringResource(R.string.debug_label)) }
             }
             Spacer(Modifier.weight(1f))
-            Row(Modifier.clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(Modifier.focusProperties { enter = { tabFocus } }.focusGroup().clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {     // UP from any page lands on the CURRENT tab, whichever pill was used last
                 for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true }) {
                     val label = stringResource(when (t) { Tab.Home -> R.string.tab_home; Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
                     Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties {
@@ -206,8 +213,9 @@ private fun HomeRows(
         if (list.isEmpty()) return
         val fr = if (!firstTaken) { firstTaken = true; first } else null
         RowTitle(stringResource(titleRes))
+        val keys = remember(list) { uniqueKeys(list.map { it.url }) }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
-            itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
+            itemsIndexed(list, key = { i, _ -> keys[i] }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
                 Tv({ onPlay(list, c) }, Modifier.width(300.dp).height(88.dp), Rd(14), restColor = C.surface, focusRequester = if (i == 0) fr else null) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -279,8 +287,9 @@ private fun HomeRows(
                         if (gl.isNotEmpty()) {
                             val fr = if (!firstTaken) { firstTaken = true; first } else null
                             Text(if (g == Browse.OTHER) stringResource(R.string.group_other) else g, style = T.title.copy(fontSize = 26.sp), modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
+                            val keys = remember(gl) { uniqueKeys(gl.map { it.url }) }
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
-                                itemsIndexed(gl, key = { _, c -> c.url }) { i, c ->
+                                itemsIndexed(gl, key = { i, _ -> keys[i] }) { i, c ->
                                     val (now, _) = epg.nowNext(c.epgId, nowMs)
                                     Tv({ onPlay(gl, c) }, Modifier.width(300.dp).height(88.dp), Rd(14), restColor = C.surface, focusRequester = if (i == 0) fr else null) {
                                         Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -440,8 +449,9 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                         } else Text(stringResource(when { query.isNotBlank() -> R.string.no_results; group == Browse.FAV -> R.string.empty_favs; group == Browse.RECENT -> R.string.empty_recents; else -> R.string.empty_group }), style = T.body.copy(color = C.muted), modifier = Modifier.width(520.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                     else -> androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides (if (Bisect.on("springscroll")) SpringBringIntoView else InstantBringIntoView)) {
+                      val rowKeys = remember(list) { uniqueKeys(list.map { it.url }) }
                       LazyColumn(Modifier.fillMaxSize(), listState, contentPadding = PaddingValues(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        itemsIndexed(list, key = { _, c -> c.url }) { i, ch ->
+                        itemsIndexed(list, key = { i, _ -> rowKeys[i] }) { i, ch ->
                             val k = chKey(pid, ch)
                             ChannelRow(ch, numbers[ch.url] ?: (i + 1), epg.nowNext(ch.epgId, nowMs).first, nowMs, k in favs,
                                 onClick = { onPlay(list, ch) }, onLong = { menuFor = ch },

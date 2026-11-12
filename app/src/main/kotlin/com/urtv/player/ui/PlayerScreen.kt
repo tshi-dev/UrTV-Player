@@ -267,6 +267,7 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     // one focus requester per row, created as rows appear: the actions column sends the focus back to the row you LEFT (not the nearest one)
+    val listKeys = remember(list) { uniqueKeys(list.map { it.url }) }     // a playlist may repeat a stream URL: every row needs its own key
     val rowRq = remember { HashMap<Int, FocusRequester>() }
     val lastRow = remember { intArrayOf(idx) }
     val fr = rowRq.getOrPut(idx) { FocusRequester() }
@@ -279,7 +280,7 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
     // one D-pad move (toward the video) from wherever the list is, however far down the current channel is.
     Row(Modifier.fillMaxHeight().width(940.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE6080909), Color.Transparent)))) {
         LazyColumn(Modifier.weight(1f).fillMaxHeight(), state, contentPadding = PaddingValues(start = 40.dp, end = 12.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            itemsIndexed(list, key = { _, c -> c.url }) { i, c ->
+            itemsIndexed(list, key = { i, _ -> listKeys[i] }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)
                 Tv({ onPick(c) }, Modifier.fillMaxWidth().height(72.dp), Rd(12), selected = i == idx, focusRequester = rowRq.getOrPut(i) { FocusRequester() }, onFocus = { if (it) lastRow[0] = i }, lift = 1.02f, flat = true) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {

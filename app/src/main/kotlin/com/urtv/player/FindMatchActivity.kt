@@ -43,7 +43,7 @@ class FindMatchActivity : ComponentActivity() {
         setContent {
             val look by app.store.appearance.collectAsState(); val scale by app.store.textScale.collectAsState()
             UrtvTheme(look, scale) {
-                FindMatchRoot(app, req, onPlayed = { setResult(RESULT_OK) }, onSearch = { text, hint -> (application as UrtvApp).handOverSearch(PendingSearch(text.take(MatchFinder.MAX_LEN), hint.take(MatchFinder.MAX_LEN * 2))); startActivity(Intent(this, MainActivity::class.java)); finish() }, onClose = { finish() })
+                FindMatchRoot(app, req, onPlayed = { setResult(RESULT_OK) }, onSearch = { text, hint -> (application as UrtvApp).handOverSearch(PendingSearch(text.take(MatchFinder.MAX_LEN), hint.take(MatchFinder.MAX_LEN * 2))); startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)); finish(); overridePendingTransition(0, 0) }, onClose = { finish() })
             }
         }
     }
