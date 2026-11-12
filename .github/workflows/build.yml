@@ -13,6 +13,14 @@ on:
         description: "Cut a signed release with this tag, e.g. v0.9.0 (empty = just build and test)"
         required: false
         default: ""
+      notes_ar:
+        description: "Release note in Arabic (2-4 short lines)"
+        required: false
+        default: ""
+      notes_en:
+        description: "Release note in English (2-4 short lines)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -152,6 +160,8 @@ jobs:
       - name: Publish release assets with a sha256 file
         env:
           GH_TOKEN: ${{ github.token }}
+          NOTES_AR: ${{ inputs.notes_ar }}
+          NOTES_EN: ${{ inputs.notes_en }}
         run: |
           ver="${TAG#v}"
           # stable names (what the Player's self-update, UrTV and the direct link read) next to the versioned ones
@@ -162,9 +172,23 @@ jobs:
           sha256sum "urtv-player-${ver}.apk" > "urtv-player-${ver}.apk.sha256"
           # a tag with a suffix (v1.2.0-beta1) is a pre-release and never becomes "latest"; plain versions, 0.x included, do
           flag="--latest"; case "$ver" in *-*) flag="--prerelease";; esac
+          # short bilingual note (Arabic first, then English) and one signature line; the texts come from the run inputs, never interpolated into the script
+          ar="${NOTES_AR:-تحسينات وإصلاحات.}"; en="${NOTES_EN:-Improvements and fixes.}"
+          h=$(printf '%s' "$PLAYER_CERT_SHA256" | tr 'a-f' 'A-F' | tr -d ':')
+          sig="${h:0:2}:${h:2:2}:…:${h: -4:2}:${h: -2}"
+          printf '%s\n\n%s\n\nالتوقيع: %s\n' "$ar" "$en" "$sig" > release-notes.txt
           gh release create "$TAG" urtv-player.apk urtv-player.apk.sha256 urtv-player.version "urtv-player-${ver}.apk" "urtv-player-${ver}.apk.sha256" \
-            $flag --target "$GITHUB_SHA" --title "UrTV Player ${ver}" \
-            --notes "Signed official build. Signing certificate SHA-256: $PLAYER_CERT_SHA256. Install it from UrTV, from inside the app (Settings > About), or verify the sha256 file."
+            $flag --target "$GITHUB_SHA" --title "UrTV Player ${ver}" --notes-file release-notes.txt
+      - name: Keep only the newest release
+        if: ${{ !contains(env.TAG, '-') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # the new plain version is published: remove every older release together with its tag
+          for t in $(gh release list --limit 200 --json tagName --jq '.[].tagName'); do
+            [ "$t" = "$TAG" ] && continue
+            gh release delete "$t" --cleanup-tag -y || echo "::warning::could not delete $t"
+          done
       - name: Remove the key
         if: always()
         run: rm -f "$RUNNER_TEMP/player.jks"

@@ -42,9 +42,9 @@ Add these **repository secrets** (Settings, Secrets and variables, Actions) in `
 
 ## Publishing a release
 Tag a commit: `git tag v0.2.0 && git push origin v0.2.0`. The `release` job builds, signs (v2 + v3), verifies, enforces the 4 MB budget
-and attaches `urtv-player-0.2.0.apk` and `urtv-player-0.2.0.apk.sha256` to a GitHub release whose notes carry the signing
-certificate SHA-256. The version code is the CI run number (always increasing). The repository is private, so downloading the
-asset needs a token; if UrTV must fetch it anonymously, publish the asset to a public place (decision for the owner).
+and attaches `urtv-player-0.2.0.apk` and `urtv-player-0.2.0.apk.sha256` to a GitHub release whose notes are a short Arabic text, the English text and one line with the signing
+certificate (first two and last two bytes). For a manual run, give the texts in the `notes_ar` and `notes_en` inputs (empty = a generic line).
+After a plain (non-pre-release) version is published, the job deletes every older release together with its tag, so only the newest remains. The version code is the CI run number (always increasing).
 
 Verify by hand: `sha256sum -c urtv-player-0.2.0.apk.sha256` and `apksigner verify --print-certs urtv-player-0.2.0.apk`.
 
