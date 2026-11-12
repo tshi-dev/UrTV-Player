@@ -234,4 +234,17 @@ class FlowTest {
         settle(); settle(); settle()
         assertTrue(focusedTexts().any { it == app.getString(R.string.tab_home) }, "the focus stays on Home, got ${focusedTexts()}")
     }
+
+    @Test fun backFromTheLiveTabWithTheFocusOnTheTabBarGoesToHomeFirstAndLeavesOnlyFromThere() {
+        seedPlaylist()
+        app.handOverSearch(com.urtv.player.PendingSearch("", ""))
+        show { com.urtv.player.ui.AppRoot(app) {} }
+        until(10_000) { texts().any { it == "قناة تجريبية 9" } }
+        rule.onNode(hasText(app.getString(R.string.tab_live), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        settle(); settle()
+        fun back(): Boolean { var done = false; scenario!!.onActivity { a -> a.onBackPressedDispatcher.onBackPressed(); done = a.isFinishing }; settle(); settle(); return done }
+        assertTrue(!back(), "the first Back does not leave the app")
+        assertTrue(texts().none { it == "قناة تجريبية 9" }, "the Home tab is showing, not the channel list: ${texts()}")
+        assertTrue(back(), "Back on the Home tab leaves")
+    }
 }

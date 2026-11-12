@@ -111,3 +111,11 @@ Reading it: `anim+compose` is the Choreographer animation callback, which is whe
 
 - Pressing towards the end of the tab bar from «الرئيسية» (and from the server button at the other end) no longer jumps into the channel list: the beam search had a wide list row as a candidate. Both ends now cancel that direction.
 - The late frame per key (7.7–10.7 % janky at spaced keys while draw on the key frame is 2–4 ms) is not in the draw stage. Candidates left: the preview/info pane update that lands about 90 ms after the key, and composing one new row at the list edge. No safe change was made without a trace; next step is a Perfetto/`gfxinfo` capture of one spaced key to see which frame is late.
+
+### v0.9.12: preview pane
+
+- The tester's trace (preview on 27 % janky, off 3 %) put the late frames in the preview pane: two big frames per key, the video surface being created (composition and attach) and destroyed on every focus change. The surface is now created once when the first preview starts and stays while previews are on; an opaque cover hides it until the new channel's own first frame, so a stale frame never shows.
+- The pane already follows focus 90 ms behind it and a preview starts only after the focus rested 500 ms; a held key starts nothing.
+- Not changed: the player's own start work still runs on the main thread (ExoPlayer is used from the application looper). To re-measure: preview on and off, 10 DOWN 1 s apart.
+- Back from a tab with the focus on the tab bar goes to «الرئيسية» (and the focus follows to that tab); only Back there leaves. A test covers both presses.
+- Package names: the player is `com.urtv.player`; `sa.urtv.home.player` is only the content authority of UrTV's update provider.

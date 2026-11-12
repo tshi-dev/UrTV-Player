@@ -115,6 +115,8 @@ fun HomeScreen(
     val tabFocus = remember { FocusRequester() }
     val nowMs by rememberNow()
     val contentEntry = remember { mutableStateOf<FocusRequester?>(null) }
+    val barFocused = remember { mutableStateOf(false) }
+    LaunchedEffect(tab) { if (tab == Tab.Home && barFocused.value) runCatching { tabFocus.requestFocus() } }     // Back from a tab: the focus follows the selection to «الرئيسية»
     androidx.compose.runtime.CompositionLocalProvider(LocalTabFocus provides tabFocus, LocalContentEntry provides contentEntry) {
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
@@ -136,7 +138,7 @@ fun HomeScreen(
                     Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties {
                         down = if (t == Tab.Live) (contentEntry.value ?: FocusRequester.Default) else FocusRequester.Default
                         if (t == Tab.Home) start = FocusRequester.Cancel     // the end of the bar: the beam search must not jump into the list
-                    }, RoundedCornerShape(50), selected = t == tab, onFocus = { if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
+                    }, RoundedCornerShape(50), selected = t == tab, onFocus = { barFocused.value = it; if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
                         Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp))
                     }
                 }
@@ -610,18 +612,22 @@ private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Chan
     val followed by produceState<Channel?>(null, focusedState) { snapshotFlow { focusedState.value }.collectLatest { c -> if (value != null) delay(90); value = c } }
     val ch = followed ?: first
     var shownUrl by remember { mutableStateOf<String?>(null) }
+    var surfaceUp by remember { mutableStateOf(false) }     // the video surface is created once and kept while previews are on: creating and destroying it on every key were the two big frames
     val pst by ctrl.status.collectAsState()
+    val firstFrame by ctrl.firstFrame.collectAsState()
+    LaunchedEffect(enabled) { if (!enabled) { surfaceUp = false; shownUrl = null } }
     LaunchedEffect(ch?.url, enabled) {
         if (ch == null || !enabled) { return@LaunchedEffect }
         if (shownUrl != null && shownUrl != ch.url) { shownUrl = null; ctrl.idlePreview() }   // focus moved: stop decoding the old one at once (keeps the player)
         delay(PREVIEW_REST_MS)                                                                 // a key held down moves faster than this, so nothing starts
-        shownUrl = ch.url; ctrl.playPreview(ch)
+        surfaceUp = true; shownUrl = ch.url; ctrl.playPreview(ch)
     }
     DisposableEffect(Unit) { onDispose { if (ctrl.isPreview) ctrl.stop() } }   // never kill a full-screen channel that just started
     Column(modifier.clip(Rd(18)).background(C.surface).padding(16.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Rd(12)).background(if (enabled && ch != null && shownUrl == ch.url) Color.Black else C.surfaceHi)) {
             // the video surface exists only while a preview is actually running: scrolling past channels composes no surface at all
-            if (enabled && ch != null && shownUrl == ch.url) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
+            if (enabled && surfaceUp) AndroidView({ android.view.SurfaceView(it).also(ctrl::attach) }, Modifier.fillMaxSize(), onRelease = { ctrl.detach(it) })
+            if (enabled && surfaceUp && !(ch != null && shownUrl == ch.url && firstFrame)) Box(Modifier.fillMaxSize().background(if (ch != null && shownUrl == ch.url) Color.Black else C.surfaceHi))     // covers the surface until this channel's own first frame
             if (ch != null) Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color(0x80000000)).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }
             }

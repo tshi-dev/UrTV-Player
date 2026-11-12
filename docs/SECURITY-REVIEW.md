@@ -72,7 +72,7 @@ Residual: a debug-signed UrTV is rejected by design.
 
 | # | Threat | Fix |
 |---|---|---|
-| U1 | An app posing as UrTV answers the update question or receives the install call | The provider `sa.urtv.home.player` is trusted only if it belongs to package `sa.urtv.home` signed by exactly UrTV's pinned release certificate; the install intent is explicit (package `sa.urtv.home`) and sent with `startActivityForResult`. Anything else: «التحديث من تلفزيونك» and nothing more |
+| U1 | An app posing as UrTV answers the update question or receives the install call | The provider `sa.urtv.home.player` (the content authority of UrTV's update provider; this player's own package is `com.urtv.player`) is trusted only if it belongs to package `sa.urtv.home` signed by exactly UrTV's pinned release certificate; the install intent is explicit (package `sa.urtv.home`) and sent with `startActivityForResult`. Anything else: «التحديث من تلفزيونك» and nothing more |
 | U2 | The Player downloading or installing code itself | It never does. UrTV fetches the file, checks sha256 and certificate and hands it to Android's installer; the Player has no install permission and no network path for APKs. Only the official build asks |
 | U3 | Hostile provider row | `version_code` must be newer, `version_name` is matched against a strict pattern, notes are stripped of control characters and capped at 120 chars; any exception or null answer is treated as «updates come from your TV» |
 | U4 | Update question while watching, or too often | Once per 24 h, 5 s after a cold start, off the main thread, skipped while anything plays [`UpdateTest`] |
