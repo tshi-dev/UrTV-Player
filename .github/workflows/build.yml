@@ -33,10 +33,10 @@ jobs:
       # optional secret: a token that can read tshi-dev/urtv-fonts (empty on forks and PRs, then Plex is used)
       FONTS_TOKEN: ${{ secrets.FONTS_TOKEN }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Thmanyah's licence allows its files only inside a built product: they live in the private tshi-dev/urtv-fonts
       # and are put in place here, never committed to this repository. Without the secret the open IBM Plex Sans Arabic is used.
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.FONTS_TOKEN != '' }}
         with:
           repository: tshi-dev/urtv-fonts
@@ -113,8 +113,8 @@ jobs:
       - name: Tag must look like vMAJOR.MINOR.PATCH (optionally -suffix)
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::bad release tag"; exit 1; }
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.FONTS_TOKEN != '' }}
         with:
           repository: tshi-dev/urtv-fonts
