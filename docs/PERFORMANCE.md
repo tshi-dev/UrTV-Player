@@ -119,3 +119,12 @@ Reading it: `anim+compose` is the Choreographer animation callback, which is whe
 - Not changed: the player's own start work still runs on the main thread (ExoPlayer is used from the application looper). To re-measure: preview on and off, 10 DOWN 1 s apart.
 - Back from a tab with the focus on the tab bar goes to «الرئيسية» (and the focus follows to that tab); only Back there leaves. A test covers both presses.
 - Package names: the player is `com.urtv.player`; `sa.urtv.home.player` is only the content authority of UrTV's update provider.
+
+### v0.9.13: preview, second round
+
+TV result of v0.9.12: preview on 28.6 % janky vs 6.5 % off; frames over 30 ms were start delays (57–70 ms: the UI thread busy before the frame) and heavy draws when the pane changed.
+
+- ExoPlayer already runs its playback work (renderers, loading, decoding) on its own thread, so `setPlaybackLooper` would not move what is left: building the media source, the player listener and surface calls, which must stay on the application looper. Nothing safe to move today; not changed.
+- The pane no longer changes size per key: name, programme title, time, progress bar, description and the "next" list are fixed-height blocks, so a key changes only text inside them.
+- The live preview is OFF by default on devices under 2600 MB RAM (and on low-RAM devices). It stays one switch in Settings; an existing explicit choice is kept.
+- To re-measure on the TV: preview on vs off, 10 DOWN 1 s apart; tell which frames are still over 30 ms.

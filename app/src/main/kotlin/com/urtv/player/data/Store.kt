@@ -195,7 +195,7 @@ class Store(ctx: Context) {
     private val _homeRows = MutableStateFlow(sp.getString("homeRows", "continue\nfavs\nrecent")!!.split('\n').filter { it.isNotEmpty() })
     val homeRows: StateFlow<List<String>> = _homeRows   // ids in display order; hidden rows are simply absent
     fun setHomeRows(l: List<String>) { _homeRows.value = l; sp.edit().putString("homeRows", l.joinToString("\n")).apply() }
-    private val _preview = MutableStateFlow(if (sp.contains("preview")) sp.getBoolean("preview", true) else !(ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice)
+    private val _preview = MutableStateFlow(if (sp.contains("preview")) sp.getBoolean("preview", true) else previewDefault(ctx))
     val livePreview: StateFlow<Boolean> = _preview
     fun setLivePreview(v: Boolean) { _preview.value = v; sp.edit().putBoolean("preview", v).apply() }
     fun isWatched(key: String) = sp.getBoolean("w_$key", false)
@@ -317,4 +317,11 @@ class Store(ctx: Context) {
         val s = _locked.value.toMutableSet(); if (!s.add(key)) s.remove(key)
         _locked.value = s; sp.edit().putStringSet("locked", s).apply()
     }
+}
+
+/** The live preview decodes a second stream beside the list: off by default on low-RAM devices and on anything under 2600 MB (the owner can still switch it on in Settings). */
+internal fun previewDefault(ctx: Context): Boolean {
+    val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+    val mem = android.app.ActivityManager.MemoryInfo().also(am::getMemoryInfo)
+    return !am.isLowRamDevice && mem.totalMem >= 2600L * 1024 * 1024
 }

@@ -635,20 +635,31 @@ private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Chan
             if (enabled && ch != null && shownUrl == ch.url && pst == com.urtv.player.player.PlayStatus.Failed) Text(stringResource(R.string.preview_dead), style = T.bodyBold.copy(color = Color.White), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.align(Alignment.Center).background(Color(0xCC000000), Rd(10)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
         if (ch != null) {
+            // Fixed-size blocks: a key press changes the text inside them, never the size of the pane, so nothing around the pane is measured again.
             val (now, _) = remember(ch.epgId, epg, nowMs / 60_000) { epg.nowNext(ch.epgId, nowMs) }
-            Text(ch.name, style = T.title.copy(fontSize = 30.sp), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp))
-            if (now != null) {
-                Text(now.title, style = T.row.copy(fontSize = 22.sp), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
-                Text("${fmtTime(now.startMs)} – ${fmtTime(now.stopMs)}", style = T.small, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-                ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1), Modifier.padding(horizontal = 4.dp))
-                if (now.description.isNotBlank()) Text(now.description, style = T.small, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, top = 12.dp, end = 4.dp))
+            Box(Modifier.fillMaxWidth().height(84.dp).padding(top = 16.dp, start = 4.dp, end = 4.dp)) {
+                Text(ch.name, style = T.title.copy(fontSize = 30.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Box(Modifier.fillMaxWidth().height(64.dp).padding(start = 4.dp, top = 4.dp)) {
+                if (now != null) Text(now.title, style = T.row.copy(fontSize = 22.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Box(Modifier.fillMaxWidth().height(34.dp).padding(start = 4.dp, bottom = 8.dp)) {
+                if (now != null) Text("${fmtTime(now.startMs)} – ${fmtTime(now.stopMs)}", style = T.small)
+            }
+            Box(Modifier.fillMaxWidth().height(10.dp).padding(horizontal = 4.dp)) {
+                if (now != null) ProgressBar((nowMs - now.startMs).toFloat() / (now.stopMs - now.startMs).coerceAtLeast(1), Modifier)
+            }
+            Box(Modifier.fillMaxWidth().height(84.dp).padding(start = 4.dp, top = 12.dp, end = 4.dp)) {
+                if (now != null && now.description.isNotBlank()) Text(now.description, style = T.small, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
             val upcoming = remember(ch.epgId, epg, now?.stopMs) { epg.forChannel(ch.epgId).filter { it.startMs >= (now?.stopMs ?: nowMs) }.take(3) }
-            if (upcoming.isNotEmpty()) Column(Modifier.padding(start = 4.dp, top = 18.dp, end = 4.dp)) {
-                Text(stringResource(R.string.next), style = T.tiny)
-                for (u in upcoming) Row(Modifier.padding(top = 6.dp)) {
-                    Text(fmtTime(u.startMs), style = T.small, modifier = Modifier.width(72.dp))
-                    Text(u.title, style = T.small.copy(color = C.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.fillMaxWidth().height(132.dp).padding(start = 4.dp, top = 18.dp, end = 4.dp)) {
+                if (upcoming.isNotEmpty()) {
+                    Text(stringResource(R.string.next), style = T.tiny)
+                    for (u in upcoming) Row(Modifier.padding(top = 6.dp)) {
+                        Text(fmtTime(u.startMs), style = T.small, modifier = Modifier.width(72.dp))
+                        Text(u.title, style = T.small.copy(color = C.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }

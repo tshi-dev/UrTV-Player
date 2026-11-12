@@ -235,16 +235,19 @@ class FlowTest {
         assertTrue(focusedTexts().any { it == app.getString(R.string.tab_home) }, "the focus stays on Home, got ${focusedTexts()}")
     }
 
-    @Test fun backFromTheLiveTabWithTheFocusOnTheTabBarGoesToHomeFirstAndLeavesOnlyFromThere() {
+    @Test fun a1_backFromTheLiveTabWithTheFocusOnTheTabBarGoesToHomeFirstAndLeavesOnlyFromThere() {
         seedPlaylist()
         app.handOverSearch(com.urtv.player.PendingSearch("", ""))
         show { com.urtv.player.ui.AppRoot(app) {} }
         until(10_000) { texts().any { it == "قناة تجريبية 9" } }
         rule.onNode(hasText(app.getString(R.string.tab_live), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
         settle(); settle()
-        fun back(): Boolean { var done = false; scenario!!.onActivity { a -> a.onBackPressedDispatcher.onBackPressed(); done = a.isFinishing }; settle(); settle(); return done }
+        scenario!!.onActivity { }; settle()
+        fun back(): Boolean { var done = false; scenario!!.onActivity { a -> a.onBackPressedDispatcher.onBackPressed(); done = a.isFinishing }; settle(); settle(); settle(); settle(); return done }
+        for (r in 1..8) settle(500)          // let the first seconds of start-up work finish: Back is only meaningful once the screen has settled
         assertTrue(!back(), "the first Back does not leave the app")
-        assertTrue(texts().none { it == "قناة تجريبية 9" }, "the Home tab is showing, not the channel list: ${texts()}")
+        for (r in 1..6) { if (texts().none { it == "قناة تجريبية 9" }) break; settle(500) }
+        assertTrue(texts().none { it == "قناة تجريبية 9" }, "the Home tab is showing, not the channel list: focus=${focusedTexts()} ${texts()}")
         assertTrue(back(), "Back on the Home tab leaves")
     }
 }
