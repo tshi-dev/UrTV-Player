@@ -65,3 +65,9 @@ fun localized(base: Context, fresh: Boolean = true): Context {
     val cfg = Configuration(base.resources.configuration).apply { setLocale(loc); setLayoutDirection(loc) }
     return base.createConfigurationContext(cfg)
 }
+
+/**
+ * For a screen UrTV starts (FindMatch): UrTV is running and answers at once, so it is asked right here (bounded wait). Without this the
+ * screen used the remembered answer only, which does not exist until the Player has been opened once, and showed the TV's own language.
+ */
+fun localizedForCaller(base: Context): Context = localized(base, fresh = true)

@@ -28,7 +28,11 @@ object Language {
     /** UrTV's language if the UrTV home app is installed and exposes it; otherwise null. Call off the main thread. */
     private const val URTV_AUTHORITY = "sa.urtv.home.lang"
 
+    /** Only ever set by unit tests, and only honoured in debug builds: stands in for UrTV's provider. */
+    @Volatile internal var readerForTests: ((Context) -> String?)? = null
+
     fun readUrtv(ctx: Context): String? = runCatching {
+        if (com.urtv.player.BuildConfig.DEBUG) readerForTests?.let { return@runCatching it(ctx) }
         // only trust the answer if the provider belongs to sa.urtv.home signed by UrTV's release certificate
         val owner = ctx.packageManager.resolveContentProvider(URTV_AUTHORITY, 0)?.packageName
         if (owner != "sa.urtv.home" || !Integrity.callerAllowed(owner, Integrity.certDigestsOf(ctx, owner))) return@runCatching null

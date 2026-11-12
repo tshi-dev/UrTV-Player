@@ -23,7 +23,7 @@ import com.urtv.player.ui.UrtvTheme
  * Extras: home_ar, home_en, away_ar, away_en, competition_ar, competition_en (String), kickoff (Long, epoch ms), channels (String[]).
  */
 class FindMatchActivity : ComponentActivity() {
-    override fun attachBaseContext(base: Context) = super.attachBaseContext(localized(base, fresh = false))
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(localizedForCaller(base))
 
     private fun callerIsUrtv(): Boolean {
         val pkg = callingPackage ?: return false

@@ -55,4 +55,19 @@ class FindMatchActivityTest {
         assertTrue(I.callerAllowed("sa.urtv.home", listOf(real.uppercase())))
         assertEquals(false, I.callerAllowed("sa.urtv.home", listOf("13ade7d009a07f5ba5bab0b7734bd449df10dd47b53868dfa28e44cd8069dfea")), "the Player's own key is not UrTV's")
     }
+
+    @Test fun theScreenUsesUrtvsLanguageEvenBeforeThePlayerWasEverOpened() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        ctx.getSharedPreferences("urtv", 0).edit().clear().commit()          // nothing remembered about UrTV, language on Auto, the TV itself is English
+        val L = com.urtv.player.data.Language
+        try {
+            L.readerForTests = { "ar" }
+            assertEquals("en", localized(ctx, fresh = false).resources.configuration.locales[0].language, "(what the screen used to do: the TV's language)")
+            assertEquals("ar", localizedForCaller(ctx).resources.configuration.locales[0].language, "UrTV is Arabic: so is this screen")
+            L.readerForTests = { "en" }
+            assertEquals("en", localizedForCaller(ctx).resources.configuration.locales[0].language)
+            L.readerForTests = { null }
+            assertEquals("en", localizedForCaller(ctx).resources.configuration.locales[0].language, "no answer: the remembered one or the TV's")
+        } finally { L.readerForTests = null }
+    }
 }
