@@ -44,11 +44,12 @@ class TvInputTest {
     @Test fun aTextFieldIsOnlyEditableAfterOkNotJustFocused() {
         scenario = ActivityScenario.launch(ComponentActivity::class.java).also { sc -> sc.onActivity { a -> a.setContent { androidx.compose.runtime.CompositionLocalProvider(com.urtv.player.ui.LocalAutoLeaveEdit provides false) { UrtvTheme(com.urtv.player.data.Appearance(), 100) { var v by remember { mutableStateOf("abc") }; FocusField(v, { v = it }, "label") } } } } }
         rule.mainClock.autoAdvance = false       // the focus animations never settle in the test environment: drive the clock by hand
-        rule.mainClock.advanceTimeBy(300)
+        fun settle(ms: Long = 300) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms); Thread.sleep(40) }
+        settle(); settle()
         rule.onNodeWithText("abc").assertIsDisplayed()
         assertEquals(0, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size, "no editor (and so no keyboard) before OK")
         rule.onNodeWithText("abc").performClick()                  // OK / D-pad centre
-        rule.mainClock.advanceTimeBy(300); Thread.sleep(80); rule.mainClock.advanceTimeBy(300)
+        settle(); settle(); settle()
         assertEquals(1, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size, "OK opens the editor")
     }
 
