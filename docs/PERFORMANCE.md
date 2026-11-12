@@ -106,3 +106,8 @@ Reading it: `anim+compose` is the Choreographer animation callback, which is whe
 - Coming back from the player restores the remembered row once; going between tabs no longer jumps the focus into the content (the Home rows no longer take focus on their own).
 - The OK panel remembers the row it was opened from, so RIGHT/LEFT back from the actions returns to that row.
 - To re-measure on the TV: `adb shell setprop debug.urtv.bisect keytrace`, press keys about 400 ms apart, `adb logcat -s UrTVKeyTrace`. Targets: draw stage at most 2 ms, total at most 12 ms on the focus-change frame.
+
+### v0.9.11: tab bar ends, and the one late frame
+
+- Pressing towards the end of the tab bar from «الرئيسية» (and from the server button at the other end) no longer jumps into the channel list: the beam search had a wide list row as a candidate. Both ends now cancel that direction.
+- The late frame per key (7.7–10.7 % janky at spaced keys while draw on the key frame is 2–4 ms) is not in the draw stage. Candidates left: the preview/info pane update that lands about 90 ms after the key, and composing one new row at the list edge. No safe change was made without a trace; next step is a Perfetto/`gfxinfo` capture of one spaced key to see which frame is late.

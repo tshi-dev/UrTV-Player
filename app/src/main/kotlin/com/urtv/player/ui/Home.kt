@@ -100,6 +100,7 @@ fun rememberNow(): State<Long> = produceState(System.currentTimeMillis()) { whil
 fun leftText(p: Programme, nowMs: Long) = stringResource(R.string.min_left, ((p.stopMs - nowMs) / 60_000L).toInt().coerceAtLeast(1))
 
 @Composable
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 fun HomeScreen(
     app: UrtvApp, tab: Tab, onTab: (Tab) -> Unit,
     onPlay: (List<Channel>, Channel) -> Unit, onAdd: () -> Unit, onLanguage: () -> Unit,
@@ -132,12 +133,15 @@ fun HomeScreen(
             Row(Modifier.clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true }) {
                     val label = stringResource(when (t) { Tab.Home -> R.string.tab_home; Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
-                    Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties { down = if (t == Tab.Live) (contentEntry.value ?: FocusRequester.Default) else FocusRequester.Default }, RoundedCornerShape(50), selected = t == tab, onFocus = { if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
+                    Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties {
+                        down = if (t == Tab.Live) (contentEntry.value ?: FocusRequester.Default) else FocusRequester.Default
+                        if (t == Tab.Home) start = FocusRequester.Cancel     // the end of the bar: the beam search must not jump into the list
+                    }, RoundedCornerShape(50), selected = t == tab, onFocus = { if (it) onTab(t) }, focusRequester = if (t == tab) tabFocus else null, lift = 1f) {
                         Text(label, style = if (t == tab) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp))
                     }
                 }
                 // Home media server (Jellyfin, Emby, Plex): opens its own screen.
-                Tv({ onServer() }, Modifier.height(48.dp), RoundedCornerShape(50), lift = 1f) {
+                Tv({ onServer() }, Modifier.height(48.dp).focusProperties { end = FocusRequester.Cancel }, RoundedCornerShape(50), lift = 1f) {
                     Text(stringResource(R.string.srv_tab_server), style = T.body.copy(color = C.muted), maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center).padding(horizontal = 22.dp))
                 }
             }

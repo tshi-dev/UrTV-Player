@@ -218,4 +218,20 @@ class FlowTest {
         settle(); settle(); settle()
         assertTrue(focusedTexts().any { it == app.getString(R.string.tab_live) }, "the focus stays on the tab, was $before, got ${focusedTexts()}")
     }
+
+    @Test fun pressingTowardsTheEndOfTheTabBarFromHomeDoesNotJumpIntoTheList() {
+        seedPlaylist()
+        val key = com.urtv.player.ui.chKey("demo", com.urtv.player.core.Channel("c5", "", "http://example.com/s/5.m3u8"))
+        show {
+            val tab = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.urtv.player.ui.Tab.Home) }
+            com.urtv.player.ui.HomeScreen(app, tab.value, { tab.value = it }, { _, _ -> }, {}, {}, restoreKey = null, onRestored = {})
+        }
+        settle(); settle()
+        rule.onNode(hasText(app.getString(R.string.tab_home), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        settle(); settle()
+        // right-to-left: Home is the rightmost tab, so RIGHT is the end of the bar
+        rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionRight) }
+        settle(); settle(); settle()
+        assertTrue(focusedTexts().any { it == app.getString(R.string.tab_home) }, "the focus stays on Home, got ${focusedTexts()}")
+    }
 }
