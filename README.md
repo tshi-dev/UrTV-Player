@@ -23,6 +23,7 @@ The Player works on its own. UrTV is optional.
    · checksum: `.../releases/latest/download/urtv-player.apk.sha256`
 2. **With Downloader** (or any browser app on the TV): enter the link above, let it download, open the file and allow
    «install unknown apps» for that app once.
+   Shortest way: install **Downloader** from the TV store, type the code **8035253** → Install. Or open «تطبيقات مقترحة» (suggested apps) inside UrTV.
 3. Open UrTV Player, add your own playlist (from your phone with the QR code, or by typing the link), done.
 
 **Updates come from inside the app**: Settings > About shows «Update available» when a newer signed release exists (checked at most once a day,
@@ -80,6 +81,7 @@ In lists, hold OK on a channel to add it to favourites, or on a group to lock it
 1. **تنزيل مباشر** (آخر إصدار موقّع): <https://github.com/tshi-dev/UrTV-Player/releases/latest/download/urtv-player.apk>
    · ملف التحقق: `.../releases/latest/download/urtv-player.apk.sha256`
 2. **بتطبيق Downloader** (أو أي متصفح على التلفاز): اكتب الرابط أعلاه، نزّل الملف، افتحه، واسمح بـ«تثبيت التطبيقات غير المعروفة» لذلك التطبيق مرة واحدة.
+   الأسهل: ثبّت تطبيق Downloader من متجر التلفزيون، واكتب فيه الرمز **8035253** ← تثبيت. أو من «تطبيقات مقترحة» داخل UrTV.
 3. افتح UrTV Player وأضف قائمتك (من جوالك برمز QR أو بكتابة الرابط).
 
 **التحديث من داخل التطبيق**: الإعدادات ثم «عن التطبيق» يعرض «تحديث متوفر» إذا وُجد إصدار موقّع أحدث (يُفحص مرة في اليوم على الأكثر، وليس أثناء المشاهدة، وليس بصمت).
