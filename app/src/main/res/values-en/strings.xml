@@ -281,4 +281,25 @@
     <string name="opening_channel">Opening…</string>
     <string name="preview_dead">The channel isn\'t answering</string>
     <string name="fm_for_match">For the match: %1$s</string>
+    <string name="cm_entry">Commentary mix</string>
+    <string name="cm_title">Commentary mix</string>
+    <string name="cm_sub">Picture from the current channel, sound from a second channel of your own list.</string>
+    <string name="cm_original">Channel sound</string>
+    <string name="cm_original_sub">Original sound: %1$s</string>
+    <string name="cm_pick">Choose a channel for the sound</string>
+    <string name="cm_pick_sub">Opens your list or search</string>
+    <string name="cm_video">Picture: %1$s (muted)</string>
+    <string name="cm_audio_from">The sound comes from this channel</string>
+    <string name="cm_delay">Delay</string>
+    <string name="cm_sec">s</string>
+    <string name="cm_earlier">Sound earlier</string>
+    <string name="cm_later">Sound later</string>
+    <string name="cm_back_orig">Back to the original sound</string>
+    <string name="cm_close">Close</string>
+    <string name="cm_fail_one">Your subscription allows one connection, so two channels cannot play together</string>
+    <string name="cm_fail_unreach">This channel could not be played for the sound</string>
+    <string name="cm_fail_seek">This channel does not allow a delay</string>
+    <string name="cm_fail_kept">The channel\'s own sound is unchanged.</string>
+    <string name="cm_search">Search for a channel for the sound</string>
+    <string name="cm_loading">Preparing the sound…</string>
 </resources>

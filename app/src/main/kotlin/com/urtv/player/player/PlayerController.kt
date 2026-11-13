@@ -330,6 +330,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     fun rememberPosition() { if (vod) player?.currentPosition?.takeIf { it > 0 }?.let { startAtMs = it } }
 
     private fun startPlay(ch: Channel, startMs: Long, isVod: Boolean) {
+        onSessionEnd?.invoke()      // a new channel ends a commentary session (the second sound belongs to the old picture)
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
         _firstFrame.value = false; LoadTrace.begin(); measuredFps = 0f; lastRenderedAt = 0L
@@ -348,7 +349,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         active = true
         loadStartMs = System.currentTimeMillis(); readySince = false
         if (_attempt.value == 0) { rebuffers.reset(); p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoBitrate(Int.MAX_VALUE).build(); _stats.value = _stats.value.copy(capped = false) }
-        p.volume = if (preview) 0f else 1f
+        p.volume = if (preview || commentaryMuted) 0f else 1f
         _status.value = if (_attempt.value > 0) PlayStatus.Reconnecting else PlayStatus.Loading
         val isHls = forceHls || ch.url.contains(".m3u8", true)
         val item = MediaItem.Builder().setUri(Uri.parse(ch.url)).apply {
@@ -424,11 +425,27 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private fun saveBandwidth() { meter?.bitrateEstimate?.takeIf { it > 0 }?.let { prefs.edit().putLong("bw", it).apply() } }
 
     fun release() {
+        onSessionEnd?.invoke()
         saveBandwidth(); watchdog?.cancel(); retryJob?.cancel(); watchdog = null
         player?.release(); player = null; _status.value = PlayStatus.Idle; active = false
     }
 
     fun stop() { release(); current = null }
+
+    // ---- «دمج التعليق»: the picture is muted through the player's OWN volume only; the TV's volume and mute are never touched
+    @Volatile var commentaryMuted = false; private set
+    /** Called when the channel changes or playback is released: the commentary controller stops its second player. */
+    @Volatile var onSessionEnd: (() -> Unit)? = null
+    val currentChannel: Channel? get() = current
+    fun setCommentaryMuted(v: Boolean) { commentaryMuted = v; player?.volume = if (preview || v) 0f else 1f }
+    /** Holds the picture back (positive) or moves it toward live (negative). False when this stream has no window to seek in. */
+    fun seekBackBy(ms: Long): Boolean {
+        val p = player ?: return false
+        if (ms == 0L) return true
+        if (!p.isCurrentMediaItemSeekable) return false
+        p.seekTo((p.currentPosition - ms).coerceAtLeast(0L)); return true
+    }
+    fun backToLive() { player?.let { if (it.isCurrentMediaItemLive) it.seekToDefaultPosition() } }
 
     /** The list focus moved: stop decoding the preview right away but keep the player, so the next preview starts quickly. */
     fun idlePreview() {

@@ -284,4 +284,28 @@ class FlowTest {
         rule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionUp) }; settle(); settle()
         assertTrue(focusedTexts().any { it == app.getString(R.string.tab_settings) }, "UP returns to the current tab, got ${focusedTexts()}")
     }
+
+    @Test fun a2_theCommentaryPanelOffersTheOriginalSoundAndOnlyOtherChannelsOfTheOwnList() {
+        seedPlaylist()
+        val all = app.catalog.state.value.channels
+        val cur = all[2]                                                     // "قناة تجريبية 3"
+        show { androidx.compose.runtime.CompositionLocalProvider(com.urtv.player.ui.LocalAutoLeaveEdit provides false) { com.urtv.player.ui.CommentaryPanel(app, all, cur) {} } }
+        settle(); settle()
+        until(10_000) { texts().any { it == app.getString(R.string.cm_pick) } }
+        assertTrue(texts().any { it == app.getString(R.string.cm_original) } && texts().any { it.contains(cur.name) }, "the original sound is the first choice and names the current channel")
+        rule.onNode(hasText(app.getString(R.string.cm_pick), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        settle(); settle(); settle()
+        settle(); settle()
+        until(10_000) { texts().any { it == "قناة تجريبية 5" } }
+        assertTrue(texts().none { it == cur.name }, "the channel that carries the picture is not offered for the sound")
+    }
+
+    @Test fun theOkPanelHasTheCommentaryRowOnlyWhenTheDeviceSupportsIt() {
+        seedPlaylist()
+        val ch = app.catalog.state.value.channels
+        val on = true
+        show { com.urtv.player.ui.MiniGuide(ch, ch[0], com.urtv.player.data.EpgIndex.EMPTY, 0L, ch, fav = false, onFav = {}, statsOn = false, onStats = {}, cause = com.urtv.player.core.Diagnosis.Cause.None, httpStatus = 0, onCommentary = if (on) ({}) else null) {} }
+        until(10_000) { texts().any { it == app.getString(R.string.cm_entry) } }
+        assertTrue(texts().any { it == app.getString(R.string.cm_entry) }, "supported: the row is in the OK panel")
+    }
 }

@@ -281,4 +281,25 @@
     <string name="opening_channel">جارٍ الفتح…</string>
     <string name="preview_dead">القناة لا ترد</string>
     <string name="fm_for_match">للمباراة: %1$s</string>
+    <string name="cm_entry">دمج التعليق</string>
+    <string name="cm_title">دمج التعليق</string>
+    <string name="cm_sub">الفيديو من القناة الحالية، والصوت من قناة ثانية من قائمتك.</string>
+    <string name="cm_original">صوت القناة</string>
+    <string name="cm_original_sub">الصوت الأصلي: %1$s</string>
+    <string name="cm_pick">اختر قناة للصوت</string>
+    <string name="cm_pick_sub">يفتح قائمتك أو البحث</string>
+    <string name="cm_video">الفيديو: %1$s (بدون صوت)</string>
+    <string name="cm_audio_from">الصوت من هذه القناة</string>
+    <string name="cm_delay">التأخير</string>
+    <string name="cm_sec">ث</string>
+    <string name="cm_earlier">قدّم الصوت</string>
+    <string name="cm_later">أخّر الصوت</string>
+    <string name="cm_back_orig">العودة للصوت الأصلي</string>
+    <string name="cm_close">إغلاق</string>
+    <string name="cm_fail_one">اشتراكك يسمح باتصال واحد، ما نقدر نشغّل قناتين مع بعض</string>
+    <string name="cm_fail_unreach">ما قدرنا نشغّل هذه القناة للصوت</string>
+    <string name="cm_fail_seek">هذه القناة ما تسمح بالتأخير</string>
+    <string name="cm_fail_kept">بقي صوت القناة الأصلي كما هو.</string>
+    <string name="cm_search">ابحث عن قناة للصوت</string>
+    <string name="cm_loading">نجهّز الصوت…</string>
 </resources>

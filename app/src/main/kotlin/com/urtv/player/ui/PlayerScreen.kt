@@ -68,7 +68,7 @@ import kotlinx.coroutines.delay
 
 internal val SLEEP_STEPS = listOf(0, 15, 30, 60, 90, 120)
 
-private enum class Overlay { None, Info, Guide, Options, Lists }
+private enum class Overlay { None, Info, Guide, Options, Lists, Commentary }
 
 @Composable
 fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Channel) -> Unit) {
@@ -140,7 +140,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { ctrl.release() }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { if (!blocked) ctrl.resume() }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
-    BackHandler { if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists) overlay = Overlay.None else if (overlay == Overlay.Info) overlay = Overlay.None else onExit(shown) }
+    BackHandler { if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists || overlay == Overlay.Commentary) overlay = Overlay.None else if (overlay == Overlay.Info) overlay = Overlay.None else onExit(shown) }
 
     val status by ctrl.status.collectAsState()
     val attempt by ctrl.attempt.collectAsState()
@@ -149,7 +149,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         Modifier.fillMaxSize().background(Color.Black).focusRequester(root).focusable().onPreviewKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             val code = e.nativeKeyEvent.keyCode
-            if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists) {
+            if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists || overlay == Overlay.Commentary) {
                 if (code == KeyEvent.KEYCODE_MENU) { overlay = Overlay.None; true } else false
             } else when (code) {
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> { step(-1); true }
@@ -229,7 +229,11 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         // mini guide
         AnimatedVisibility(overlay == Overlay.Guide, Modifier.align(Alignment.CenterStart), enter = fadeIn() + slideInVertically { 0 }, exit = fadeOut()) {
             val list = if (queue.any { it.url == shown.url }) queue else all
-            MiniGuide(list, shown, epg, nowMs, all, fav = chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, statsOn = store.statsOverlay.collectAsState().value, onStats = { store.setStatsOverlay(!store.statsOverlay.value) }, cause = cause, httpStatus = ctrl.lastHttpStatus) { goTo(it); overlay = Overlay.None }
+            MiniGuide(list, shown, epg, nowMs, all, fav = chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, statsOn = store.statsOverlay.collectAsState().value, onStats = { store.setStatsOverlay(!store.statsOverlay.value) }, cause = cause, httpStatus = ctrl.lastHttpStatus, onCommentary = if (app.commentarySupported && !shown.url.startsWith("file:", true)) ({ overlay = Overlay.Commentary }) else null) { goTo(it); overlay = Overlay.None }
+        }
+        // «دمج التعليق»: the second channel's sound
+        AnimatedVisibility(overlay == Overlay.Commentary, Modifier.align(Alignment.CenterEnd).padding(end = 56.dp), enter = fadeIn(), exit = fadeOut()) {
+            CommentaryPanel(app, all, shown) { overlay = Overlay.None }
         }
         // my lists picker
         AnimatedVisibility(overlay == Overlay.Lists, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
@@ -263,7 +267,7 @@ internal fun VideoSurface(ctrl: PlayerController) {
 }
 
 @Composable
-internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, onPick: (Channel) -> Unit) {
+internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.player.data.EpgIndex, nowMs: Long, all: List<Channel>, fav: Boolean, onFav: () -> Unit, statsOn: Boolean, onStats: () -> Unit, cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, onCommentary: (() -> Unit)? = null, onPick: (Channel) -> Unit) {
     val idx = list.indexOfFirst { it.url == current.url }.coerceAtLeast(0)
     val state = rememberLazyListState()
     // one focus requester per row, created as rows appear: the actions column sends the focus back to the row you LEFT (not the nearest one)
@@ -304,6 +308,9 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
             }
             Tv(onStats, Modifier.fillMaxWidth().height(60.dp).then(back), Rd(14), selected = statsOn, lift = 1f) {
                 Text(stringResource(R.string.set_stats), style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 18.dp))
+            }
+            if (onCommentary != null) Tv(onCommentary, Modifier.fillMaxWidth().height(60.dp).then(back), Rd(14), lift = 1f) {
+                Text(stringResource(R.string.cm_entry), style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 18.dp))
             }
             // «why is it choppy?» is always answered here, also when nothing is wrong
             Column(Modifier.padding(start = 6.dp, top = 8.dp)) {
