@@ -72,7 +72,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
     if ((tab == Tab.Movies || tab == Tab.Series) && !hasVod && vodNow.playlistId == cat.playlistId && playlists.isNotEmpty() && cat.playlistId != null) tab = Tab.Home
 
     // Open the active playlist once per process; optionally resume the last channel ("last" start screen or the resume setting).
-    LaunchedEffect(Unit) { android.view.Choreographer.getInstance().postFrameCallback { Perf.log("cold_start_first_frame", android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime(), "process start to the first drawn frame") } }
+    LaunchedEffect(Unit) { if (!Perf.inTests) android.view.Choreographer.getInstance().postFrameCallback { Perf.log("cold_start_first_frame", android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime(), "process start to the first drawn frame") } }
     LaunchedEffect(Unit) { if (cat.playlistId == null && !app.servers.homeOnly.value) app.catalog.open(store.activeId.value ?: store.playlists.value.firstOrNull()?.id) }
     LaunchedEffect(cat.channels, cat.playlistId) {
         if (!app.resumeHandled && cat.channels.isNotEmpty() && !homeOnly && screen == Screen.Home) {

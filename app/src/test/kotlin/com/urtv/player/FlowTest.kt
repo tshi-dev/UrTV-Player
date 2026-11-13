@@ -46,7 +46,8 @@ class FlowTest {
     private val app get() = ApplicationProvider.getApplicationContext<UrtvApp>()
 
     @Before fun setUp() { shadowOf(app.packageManager).addActivityIfNotPresent(ComponentName(app.packageName, ComponentActivity::class.java.name)) }
-    @After fun tearDown() { scenario?.close() }
+    // closing the screen must not decide the test: with the clock paused it may wait for animations that never end, so it gets a short wait and its failure is ignored
+    @After fun tearDown() { runCatching { androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(8, java.util.concurrent.TimeUnit.SECONDS); scenario?.close() } }
 
     private fun show(content: @androidx.compose.runtime.Composable () -> Unit) {
         scenario = ActivityScenario.launch(ComponentActivity::class.java).also { sc -> sc.onActivity { a -> a.setContent { UrtvTheme(com.urtv.player.data.Appearance(), 100) { content() } } } }

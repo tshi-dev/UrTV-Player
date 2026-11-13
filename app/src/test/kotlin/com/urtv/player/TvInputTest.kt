@@ -39,7 +39,8 @@ class TvInputTest {
         val app = ApplicationProvider.getApplicationContext<UrtvApp>()
         shadowOf(app.packageManager).addActivityIfNotPresent(ComponentName(app.packageName, ComponentActivity::class.java.name))
     }
-    @After fun tearDown() { scenario?.close() }
+    // closing the screen must not decide the test: with the clock paused it may wait for animations that never end, so it gets a short wait and its failure is ignored
+    @After fun tearDown() { runCatching { androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(8, java.util.concurrent.TimeUnit.SECONDS); scenario?.close() } }
 
     @Test fun aTextFieldIsOnlyEditableAfterOkNotJustFocused() {
         scenario = ActivityScenario.launch(ComponentActivity::class.java).also { sc -> sc.onActivity { a -> a.setContent { androidx.compose.runtime.CompositionLocalProvider(com.urtv.player.ui.LocalAutoLeaveEdit provides false) { UrtvTheme(com.urtv.player.data.Appearance(), 100) { var v by remember { mutableStateOf("abc") }; FocusField(v, { v = it }, "label") } } } } }
