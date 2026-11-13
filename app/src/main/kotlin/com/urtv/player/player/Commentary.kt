@@ -32,11 +32,14 @@ data class CommentaryState(val audio: Channel? = null, val delayMs: Long = 0L, v
  * Any failure restores the original sound. The second player stops when the channel changes, on stop and in the background.
  * Never touches the system volume or mute.
  */
-class CommentaryController(private val ctx: Context, private val main: PlayerController) {
+class CommentaryController(private val ctx: Context, private val main: PlayerController, private val lightest: Boolean = false) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val _state = MutableStateFlow(CommentaryState())
     val state: StateFlow<CommentaryState> = _state
     private var audio: ExoPlayer? = null
+    private var audioListener: Player.Listener? = null
+    /** True only while a second player exists: it lives exactly as long as the merge is on, nothing is kept warm. */
+    val audioPlayerAlive: Boolean get() = audio != null
     private var watch: Job? = null
     /** The delay chosen for each audio channel, kept for the session (the process), not on disk. */
     private val delays = HashMap<String, Long>()
@@ -56,12 +59,15 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
         val keep = delays[ch.url] ?: 0L
         _state.value = CommentaryState(audio = ch, delayMs = 0L)
         val http = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA)
+        // small devices: the smallest buffers that still play (a few seconds, a couple of MB)
+        val load = if (lightest) androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(3000, 5000, 1000, 2000).setTargetBufferBytes(2 * 1024 * 1024).build() else androidx.media3.exoplayer.DefaultLoadControl()
         val p = ExoPlayer.Builder(ctx)
+            .setLoadControl(load)
             .setRenderersFactory(DefaultRenderersFactory(ctx))
             .setMediaSourceFactory(DefaultMediaSourceFactory(ctx).setDataSourceFactory(http))
             .build()
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
-        p.addListener(object : Player.Listener {
+        val l = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY && !_state.value.ready) {
                     _state.value = _state.value.copy(ready = true)
@@ -72,7 +78,8 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
                 val http = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode ?: 0
                 fail(Commentary.failureFor(http, originalFailedSoon = false))
             }
-        })
+        }
+        audioListener = l; p.addListener(l)
         val item = MediaItem.Builder().setUri(Uri.parse(ch.url)).apply { if (ch.url.contains(".m3u8", true)) setMimeType(MimeTypes.APPLICATION_M3U8) }.build()
         p.volume = 1f; p.setMediaItem(item); p.prepare(); p.playWhenReady = true
         audio = p
@@ -118,7 +125,7 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
     private fun endAudio(keepFailure: Boolean) {
         watch?.cancel(); watch = null
         val had = audio != null || _state.value.audio != null
-        audio?.release(); audio = null
+        audio?.let { a -> audioListener?.let(a::removeListener); a.stop(); a.clearMediaItems(); a.release() }; audio = null; audioListener = null     // gone completely: player, buffers, listener
         if (had) { main.setCommentaryMuted(false); if (_state.value.delayMs < 0L) main.backToLive() }
         else main.setCommentaryMuted(false)
         if (!keepFailure) _state.value = CommentaryState()

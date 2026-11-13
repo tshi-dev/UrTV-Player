@@ -43,15 +43,25 @@ import com.urtv.player.data.Browse
  * the second channel with the live delay row, and the honest failure. Delay presses take effect at once; there is no «apply».
  */
 @Composable
-internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel, onClose: () -> Unit) {
+internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel, warn: Boolean = false, onClose: () -> Unit) {
     val cm = app.commentary
     val st by cm.state.collectAsState()
     var picking by remember { mutableStateOf(false) }
+    var asked by remember { mutableStateOf(!warn) }       // small TVs: «try it?» comes first, the focus on «cancel»
     BackHandler(picking) { picking = false }
     val first = remember { FocusRequester() }
-    LaunchedEffect(picking, st.audio?.url, st.failure) { runCatching { first.requestFocus() } }
+    LaunchedEffect(asked, picking, st.audio?.url, st.failure) { repeat(10) { if (runCatching { first.requestFocus(); true }.getOrDefault(false)) return@LaunchedEffect; kotlinx.coroutines.delay(30) } }
     Column(Modifier.fillMaxHeight().width(700.dp).padding(vertical = 56.dp).background(C.surface, Rd(22)).padding(40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(stringResource(R.string.cm_title), style = T.title.copy(fontSize = 34.sp))
+        if (!asked) {
+            Text(stringResource(R.string.cm_small_msg), style = T.body, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Tv({ asked = true }, Modifier.weight(1f).height(72.dp), Rd(14), restColor = C.surfaceHi) { Text(stringResource(R.string.cm_try), style = T.bodyBold, modifier = Modifier.align(Alignment.Center)) }
+                Tv(onClose, Modifier.weight(1f).height(72.dp), Rd(14), focusRequester = first, restColor = C.surfaceHi) { Text(stringResource(R.string.cm_cancel), style = T.bodyBold, modifier = Modifier.align(Alignment.Center)) }
+            }
+            return@Column
+        }
         if (picking) { Picker(all, current, first, onPick = { cm.start(it); picking = false }) ; return@Column }
         val f = st.failure
         if (f != null) {

@@ -302,4 +302,8 @@
     <string name="cm_fail_kept">The channel\'s own sound is unchanged.</string>
     <string name="cm_search">Search for a channel for the sound</string>
     <string name="cm_loading">Preparing the sound…</string>
+    <string name="cm_small_tv">Available for TVs with 2 GB or more</string>
+    <string name="cm_small_msg">Commentary mix is designed for TVs with 2 GB of memory or more. Yours has less, so it may be slow or stutter. Do you want to try it?</string>
+    <string name="cm_try">Try</string>
+    <string name="cm_cancel">Cancel</string>
 </resources>

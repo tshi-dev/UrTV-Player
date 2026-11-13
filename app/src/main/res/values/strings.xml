@@ -302,4 +302,8 @@
     <string name="cm_fail_kept">بقي صوت القناة الأصلي كما هو.</string>
     <string name="cm_search">ابحث عن قناة للصوت</string>
     <string name="cm_loading">نجهّز الصوت…</string>
+    <string name="cm_small_tv">متوفر لتلفزيونات 2 قيقا وأكثر</string>
+    <string name="cm_small_msg">دمج التعليق مصمّم لتلفزيونات بذاكرة 2 قيقا وأكثر. تلفزيونك أقل، وممكن يثقل أو يقطع. تبغى تجرّبه؟</string>
+    <string name="cm_try">جرّب</string>
+    <string name="cm_cancel">إلغاء</string>
 </resources>

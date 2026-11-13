@@ -24,11 +24,11 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     val catalog: Catalog by lazy { Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     val vod: Vod by lazy { Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     val player: PlayerController by lazy { PlayerController(this, store) }
-    val commentary: com.urtv.player.player.CommentaryController by lazy { com.urtv.player.player.CommentaryController(this, player) }
-    /** «دمج التعليق» needs two decoders and two connections: hidden under 2000 MB of RAM. */
-    val commentarySupported: Boolean by lazy {
+    val commentary: com.urtv.player.player.CommentaryController by lazy { com.urtv.player.player.CommentaryController(this, player, commentaryTier == com.urtv.player.core.Commentary.Tier.Warn) }
+    /** «دمج التعليق» needs two decoders and two connections: under 2000 MB of RAM the row stays, with a warning and the lightest second player. */
+    val commentaryTier: com.urtv.player.core.Commentary.Tier by lazy {
         val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        com.urtv.player.core.Commentary.supported(android.app.ActivityManager.MemoryInfo().also(am::getMemoryInfo).totalMem / (1024 * 1024), am.isLowRamDevice)
+        com.urtv.player.core.Commentary.tier(android.app.ActivityManager.MemoryInfo().also(am::getMemoryInfo).totalMem / (1024 * 1024), am.isLowRamDevice)
     }
     val servers: ServerManager by lazy { ServerManager(this) }
     /** Locked groups the user has unlocked with the PIN during this run. */

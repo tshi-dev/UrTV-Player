@@ -34,9 +34,10 @@ class CommentaryTest {
         assertEquals("+5", Commentary.label(5000)); assertEquals("+10", Commentary.label(40_000))
     }
 
-    @Test fun onlyDevicesWithEnoughMemoryGetTheFeature() {
-        assertEquals(true, Commentary.supported(2000, false)); assertEquals(false, Commentary.supported(1999, false))
-        assertEquals(false, Commentary.supported(4096, true), "low-RAM flag wins")
+    @Test fun theRowIsAlwaysThereAndSmallDevicesAreWarnedFirst() {
+        assertEquals(Commentary.Tier.Full, Commentary.tier(2000, false)); assertEquals(Commentary.Tier.Warn, Commentary.tier(1999, false))
+        assertEquals(Commentary.Tier.Warn, Commentary.tier(4096, true), "low-RAM flag wins")
+        assertEquals(Commentary.Tier.Full, Commentary.tier(8192, false))
     }
 
     @Test fun failuresAreNamedHonestly() {

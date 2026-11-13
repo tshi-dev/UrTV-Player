@@ -308,4 +308,24 @@ class FlowTest {
         until(10_000) { texts().any { it == app.getString(R.string.cm_entry) } }
         assertTrue(texts().any { it == app.getString(R.string.cm_entry) }, "supported: the row is in the OK panel")
     }
+
+    @Test fun a3_smallTvsAreAskedBeforeTheCommentaryPanelOpens() {
+        seedPlaylist()
+        val all = app.catalog.state.value.channels
+        show { androidx.compose.runtime.CompositionLocalProvider(com.urtv.player.ui.LocalAutoLeaveEdit provides false) { com.urtv.player.ui.CommentaryPanel(app, all, all[2], warn = true) {} } }
+        settle(); settle()
+        until(10_000) { texts().any { it == app.getString(R.string.cm_try) } }
+        assertTrue(texts().any { it == app.getString(R.string.cm_small_msg) } && texts().none { it == app.getString(R.string.cm_pick) }, "the question first, not the panel")
+        rule.onNode(hasText(app.getString(R.string.cm_try), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        settle(); settle(); settle()
+        until(10_000) { settle(); texts().any { it == app.getString(R.string.cm_pick) } }
+    }
+
+    @Test fun theOkPanelRowOnASmallTvCarriesTheSubLine() {
+        seedPlaylist()
+        val ch = app.catalog.state.value.channels
+        show { com.urtv.player.ui.MiniGuide(ch, ch[0], com.urtv.player.data.EpgIndex.EMPTY, 0L, ch, fav = false, onFav = {}, statsOn = false, onStats = {}, cause = com.urtv.player.core.Diagnosis.Cause.None, httpStatus = 0, onCommentary = {}, commentaryNote = true) {} }
+        until(10_000) { texts().any { it == app.getString(R.string.cm_small_tv) } }
+        assertTrue(texts().any { it == app.getString(R.string.cm_entry) }, "the row is not hidden")
+    }
 }

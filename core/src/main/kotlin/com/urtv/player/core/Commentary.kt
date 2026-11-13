@@ -10,10 +10,12 @@ object Commentary {
     const val MAX_MS = 10_000L
     /** The buttons of the delay row, in order: 0 resets. */
     val STEPS = listOf(-5000L, -1000L, -500L, 0L, 500L, 1000L, 5000L)
-    /** Under this much RAM the feature is hidden: two decoders and two connections are too much. */
+    /** Under this much RAM (or on a low-RAM device) the person is warned first: two decoders and two connections are heavy. */
     const val MIN_RAM_MB = 2000L
 
-    fun supported(totalRamMb: Long, lowRamDevice: Boolean) = !lowRamDevice && totalRamMb >= MIN_RAM_MB
+    /** Full: the normal panel. Warn: the row is shown with a note and a «try it?» question first, with the lightest second player. */
+    enum class Tier { Full, Warn }
+    fun tier(totalRamMb: Long, lowRamDevice: Boolean) = if (!lowRamDevice && totalRamMb >= MIN_RAM_MB) Tier.Full else Tier.Warn
 
     fun clamp(ms: Long) = ms.coerceIn(-MAX_MS, MAX_MS)
 
