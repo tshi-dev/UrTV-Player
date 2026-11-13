@@ -41,7 +41,15 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
     /** The delay chosen for each audio channel, kept for the session (the process), not on disk. */
     private val delays = HashMap<String, Long>()
 
-    init { main.onSessionEnd = { stop() } }
+    init {
+        main.onSessionEnd = { stop() }
+        // the state in one line for `adb logcat -s UrTVCommentary` (channel name only, never a URL): audio channel, delay, which stream waits, failure
+        scope.launch { _state.collect { st ->
+            val lag = Commentary.lagFor(st.delayMs)
+            val held = when { lag.audioMs > 0 -> "audio ${lag.audioMs} ms"; lag.videoMs > 0 -> "video ${lag.videoMs} ms"; else -> "none" }
+            android.util.Log.i("UrTVCommentary", "audio=${st.audio?.name ?: "original"} ready=${st.ready} delayMs=${st.delayMs} held=$held failure=${st.failure ?: "none"} mainMuted=${main.commentaryMuted}")
+        } }
+    }
 
     fun start(ch: Channel) {
         endAudio(keepFailure = false)
