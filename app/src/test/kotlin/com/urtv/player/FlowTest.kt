@@ -188,7 +188,7 @@ class FlowTest {
         assertTrue(focusedTexts().any { it.contains("قناة 60") }, "and one move back returns to the row you left (60), got ${focusedTexts()}")
     }
 
-    @Test fun zSearchHandedOverBeforeTheProcessDiedIsRestoredOnAColdStartAndOpensTheLiveTab() {
+    @Test fun a5_searchHandedOverBeforeTheProcessDiedIsRestoredOnAColdStartAndOpensTheLiveTab() {
         seedPlaylist()
         app.handOverSearch(com.urtv.player.PendingSearch("قناة تجريبية 9", "Team A – Team B"))       // what FindMatchActivity does before starting the main screen
         app.pendingSearch = null                                                                       // the process died: only the preferences remain
@@ -271,7 +271,7 @@ class FlowTest {
         assertEquals(emptyList(), com.urtv.player.ui.uniqueKeys(emptyList()))
     }
 
-    @Test fun upFromAPageLandsOnTheCurrentTabNotTheLastOneUsed() {
+    @Test fun a4_upFromAPageLandsOnTheCurrentTabNotTheLastOneUsed() {
         seedPlaylist()
         show {
             val tab = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.urtv.player.ui.Tab.Settings) }
