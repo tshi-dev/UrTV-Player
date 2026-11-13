@@ -52,7 +52,7 @@ android {
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/*.version", "DebugProbesKt.bin", "kotlin-tooling-metadata.json", "/kotlin/**", "/META-INF/com/android/build/gradle/app-metadata.properties") }
-    testOptions { unitTests { isReturnDefaultValues = true; isIncludeAndroidResources = true } }
+    testOptions { unitTests { isReturnDefaultValues = true; isIncludeAndroidResources = true; all { it.maxHeapSize = "2g"; it.setForkEvery(1); it.maxParallelForks = 2 } } }     // every test class in its own JVM: static state (the phone server, Compose test clocks) leaked between classes and made the UI tests depend on the order Gradle ran them in
 }
 
 dependencies {

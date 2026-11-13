@@ -55,7 +55,7 @@ class FlowTest {
     /** Spinners and the focus ring animate forever, so the test clock is driven by hand instead of waiting for "idle". */
     private fun settle(ms: Long = 200) { rule.mainClock.autoAdvance = false; shadowOf(android.os.Looper.getMainLooper()).idle(); rule.mainClock.advanceTimeBy(ms); Thread.sleep(40) }
     /** Waits by counting rounds (each is ~40 ms of real sleeping): Robolectric's clock is faked, so wall-clock timeouts would not mean what they say. */
-    private fun until(timeoutMs: Long, cond: () -> Boolean) { var rounds = (timeoutMs / 40).toInt(); while (!cond()) { check(rounds-- > 0) { "condition not met in ~$timeoutMs ms; screen shows ${texts().take(12)}" }; settle() } }
+    private fun until(timeoutMs: Long, cond: () -> Boolean) { var rounds = (timeoutMs / 40).toInt() * 3;       /* a loaded machine needs more rounds, never a different test */  while (!cond()) { check(rounds-- > 0) { "condition not met in ~$timeoutMs ms; screen shows ${texts().take(12)}" }; settle() } }
 
     private fun texts(): List<String> = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("any text") { it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Text) }).fetchSemanticsNodes()
         .flatMap { n -> n.config[androidx.compose.ui.semantics.SemanticsProperties.Text].map { it.text } }

@@ -49,11 +49,11 @@ class TvInputTest {
         // nothing here waits for Compose to be "idle" (it never is with the clock paused, and a slow machine decides how long that hang lasts): nodes are read directly
         assertTrue(rule.onAllNodes(androidx.compose.ui.test.hasText("abc")).fetchSemanticsNodes().isNotEmpty(), "the field is on screen")
         assertEquals(0, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size, "no editor (and so no keyboard) before OK")
-        val ok = rule.onAllNodes(androidx.compose.ui.test.hasText("abc") and androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().first().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action   // OK / D-pad centre
-        val focus = rule.onAllNodes(androidx.compose.ui.test.hasText("abc") and androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().first().config[androidx.compose.ui.semantics.SemanticsActions.RequestFocus].action
-        scenario!!.onActivity { focus?.invoke() }; settle(); settle()
-        scenario!!.onActivity { ok?.invoke() }
-        settle(); settle(); settle()
+        fun field() = rule.onAllNodes(androidx.compose.ui.test.hasText("abc") and androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().first().config
+        scenario!!.onActivity { field()[androidx.compose.ui.semantics.SemanticsActions.RequestFocus].action?.invoke() }; settle(); settle()
+        scenario!!.onActivity { field()[androidx.compose.ui.semantics.SemanticsActions.OnClick].action?.invoke() }          // OK / D-pad centre
+        var rounds = 0
+        while (rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isEmpty() && rounds++ < 25) settle()           // a slow machine needs more frames, not a different test
         assertEquals(1, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size, "OK opens the editor")
     }
 

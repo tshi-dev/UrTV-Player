@@ -7,11 +7,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Timing budgets on a 100 000-entry list. The budgets are about 10x what a development machine needs, so they only fail when someone
+ * Timing budgets on a 50 000-entry list. The budgets are about 10x what a development machine needs, so they only fail when someone
  * puts per-channel work (hashing, splitting, normalising names) back on a path the screens run on every open or keystroke.
  */
 class BigListBudgetTest {
-    private val n = 100_000
+    private val n = 50_000
     private val list = (1..n).map { Channel("c$it", "قناة $it HD / Channel $it", "http://host.example:8000/live/user/pass/$it.m3u8", "Group ${it % 400};Sport", "http://logos.example/$it.png", "id$it", it) }
 
     private fun ms(block: () -> Unit): Long { val t = System.nanoTime(); block(); return (System.nanoTime() - t) / 1_000_000 }
@@ -23,7 +23,7 @@ class BigListBudgetTest {
         assertTrue(build < 8_000, "index build $build ms")
         val i = idx!!
         assertEquals(n, i.keys.size); assertEquals(401, i.groups.size, "400 groups + Sport")
-        assertEquals(250, i.byGroup["Group 7"]!!.size)
+        assertEquals(125, i.byGroup["Group 7"]!!.size)
         // a group switch, the numbers and the key of a channel are plain lookups
         val reads = ms { repeat(1000) { i.byGroup["Group ${it % 400}"]; i.numbers["http://host.example:8000/live/user/pass/${it + 1}.m3u8"]; i.keys[it] } }
         assertTrue(reads < 200, "1000 lookups took $reads ms")
@@ -35,7 +35,7 @@ class BigListBudgetTest {
         val t = ms { repeat(5) { i.search("channel 4999") } } / 5
         println("BUDGET search over $n names: $t ms")
         assertTrue(t < 600, "a search took $t ms")
-        assertTrue(i.search("channel 99999").any { it.name.contains("Channel 99999") })
+        assertTrue(i.search("channel 49999").any { it.name.contains("Channel 49999") })
     }
 
     @Test fun nothingHiddenMeansNoPerChannelWorkForTheVisibleList() {

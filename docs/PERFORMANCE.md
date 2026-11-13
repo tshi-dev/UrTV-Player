@@ -144,3 +144,13 @@ Fixed: the per-channel key is computed only when something is hidden; the by-key
 ### Sound without a picture
 
 A stream can carry a video track (for example HEVC 2160p or 10-bit) that the TV has no decoder for. The player drops it silently and plays the sound only. The player now says so in a line («هذا التلفزيون ما يقدر يشغّل صورة هذه القناة (4K HEVC)…») and the problem report carries `picture no_picture_<size>_<codec>_decoders<N>`. Decoder fallback (hardware first, then software) was already on.
+
+### v0.9.16: the Channels tab reads one prepared index
+
+When a list is loaded, a background thread builds a `ChannelIndex`: the groups, the channels of each group, the channel numbers, the favourite key of every channel and the prepared (normalised) names for search. The screens only read it, so opening the Channels tab, switching a group and typing a letter no longer do per-channel work on the main thread. On a 50 000-entry list (development machine): index build 0.6 s off the main thread (100 000 entries: 0.64 s), a search over all names 25 ms warm, a group switch is a map lookup. `BigListBudgetTest` pins budgets about 10 times looser than that, so it only fails if per-channel work is put back on those paths.
+
+`adb logcat -s UrTVPerf` prints one line per step: `cold_start_first_frame`, `tab_open_<Tab>` (to the second frame after the switch), `list_build`, `search` and `first_frame` (time to the first picture of a channel). Numbers and counts only.
+
+Playback: after 6 s of sound with no rendered frame the player rebuilds itself with the software decoders first (once per channel); if there is still no picture after 10 s the «can't show the picture» line appears. Quality switches that would force the decoder to be rebuilt are not allowed (strict boxes wedge on them).
+
+Xtream: a pasted `get.php?username=..&password=..` link is detected (only those query keys, one login) and the provider's API is asked first; if it answers, the playlist becomes an Xtream account (the original link is kept, favourites and recents follow their channels by stream id) and «أفلام» / «مسلسلات» appear. Anything else stays an M3U; there, entries whose URL has /movie/ or /series/ (or a video file with a movie or series group) are split out of the live list into those tabs, with episodes grouped by show name when the title says «Name S01 E02».

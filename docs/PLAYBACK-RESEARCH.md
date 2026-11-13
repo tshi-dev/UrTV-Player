@@ -1,0 +1,13 @@
+# How the established IPTV players handle these cases (research notes)
+
+Open-source code and documentation only; the closed apps (TiviMate, IPTV Smarters, OTT Navigator, Televizo, Sparkle) could be checked only through third-party guides, so those points are unverified.
+
+| Question | What they do | What UrTV Player does |
+|---|---|---|
+| Xtream vs M3U | iptvnator treats a pasted URL as Xtream when the path ends in get.php / player_api.php / panel_api.php, there is no fragment and the only query keys are username, password, type and output (one login). Other open apps do the same by string handling and call player_api.php; some try get.php first and remember the answer per login. | Same strict rule (`XtreamLink`); the API is asked first, the M3U is the fallback; the original link is kept. |
+| Mixed M3U | Classify by explicit type, then by Xtream URL layout (/movie/, /series/, /live/), then group-name keywords, live by default. Episodes: «S01E02» patterns only for items already classified as series, one card per show. | Same order (`M3uVod`); a live stream is never a movie because of its group name. |
+| Huge lists | The larger apps stream-parse into Room/SQLite with FTS and Paging; others keep everything in memory. | Stream parse, one in-memory index built off the main thread (a database was not needed at 50k to 100k entries: build 0.6 s, search 25 ms). |
+| 4K / HEVC / 10-bit | Decoder fallback on, hardware-first decoder order with a user switch for software, exceed-capabilities allowed, no non-seamless quality switches; «audio but no video» without an error is a known silent failure (androidx/media issue 2711) that apps detect themselves. Some use a second engine (libVLC: LGPL, tens of MB; Media3's FFmpeg module is audio-only and you must build FFmpeg yourself). | Decoder fallback, exceed-capabilities, no non-seamless switches, software-first retry after 6 s without a frame, and an honest line instead of silent sound. No second engine (size and maintenance). |
+| Buffers / zapping | Media3 defaults are 50 s min and max, 1 s to start; IPTV apps use 15-60 s with 2.5-5 s to start; Media3's retry policy is 3 tries with a linear back-off; some providers need a player-like User-Agent. | Own tuned values (`PlaybackTuning`), prefetch of neighbouring channels, one player reused. |
+
+Common features users expect (not built here): catch-up via Xtream tv_archive (we already play it for Xtream live), a grid EPG, favourites sync between devices, a per-playlist User-Agent, external-player hand-off, global search across live, movies and series, scheduled background refresh.
