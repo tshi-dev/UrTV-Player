@@ -46,9 +46,13 @@ class TvInputTest {
         rule.mainClock.autoAdvance = false       // the focus animations never settle in the test environment: drive the clock by hand
         fun settle(ms: Long = 300) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms); Thread.sleep(40) }
         settle(); settle()
-        rule.onNodeWithText("abc").assertIsDisplayed()
+        // nothing here waits for Compose to be "idle" (it never is with the clock paused, and a slow machine decides how long that hang lasts): nodes are read directly
+        assertTrue(rule.onAllNodes(androidx.compose.ui.test.hasText("abc")).fetchSemanticsNodes().isNotEmpty(), "the field is on screen")
         assertEquals(0, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size, "no editor (and so no keyboard) before OK")
-        rule.onNodeWithText("abc").performClick()                  // OK / D-pad centre
+        val ok = rule.onAllNodes(androidx.compose.ui.test.hasText("abc") and androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().first().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action   // OK / D-pad centre
+        val focus = rule.onAllNodes(androidx.compose.ui.test.hasText("abc") and androidx.compose.ui.test.hasClickAction()).fetchSemanticsNodes().first().config[androidx.compose.ui.semantics.SemanticsActions.RequestFocus].action
+        scenario!!.onActivity { focus?.invoke() }; settle(); settle()
+        scenario!!.onActivity { ok?.invoke() }
         settle(); settle(); settle()
         assertEquals(1, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size, "OK opens the editor")
     }

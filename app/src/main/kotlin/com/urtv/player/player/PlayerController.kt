@@ -203,10 +203,11 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         meter = bm
         val (mw, mh) = PlaybackTuning.maxVideoSize(displaySize().first, displaySize().second)
         val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx).apply {
-            setParameters(buildUponParameters().setMaxVideoSize(mw, mh).setViewportSizeToPhysicalDisplaySize(ctx, true).setTunnelingEnabled(store.tunneling.value).setAllowVideoMixedMimeTypeAdaptiveness(true))
+            // a quality switch that forces the decoder to be rebuilt is what wedges strict boxes: only seamless switches (and the first pick) are allowed
+            setParameters(buildUponParameters().setMaxVideoSize(mw, mh).setViewportSizeToPhysicalDisplaySize(ctx, true).setTunnelingEnabled(store.tunneling.value).setAllowVideoMixedMimeTypeAdaptiveness(true).setAllowVideoNonSeamlessAdaptiveness(false).setExceedRendererCapabilitiesIfNecessary(true).setExceedVideoConstraintsIfNecessary(true))
         }
         val p = ExoPlayer.Builder(ctx)
-            .setRenderersFactory(DefaultRenderersFactory(ctx).setEnableDecoderFallback(true))   // hardware decoder first, software if it fails
+            .setRenderersFactory(DefaultRenderersFactory(ctx).setEnableDecoderFallback(true).setMediaCodecSelector(selector()))   // hardware decoder first, software if it fails (or software first after a silent hardware failure, see checkPicture)
             .setMediaSourceFactory(DefaultMediaSourceFactory(ctx, extractors).setDataSourceFactory(http))
             .setLoadControl(load).setBandwidthMeter(bm).setTrackSelector(selector)
             .setHandleAudioBecomingNoisy(true)
@@ -223,7 +224,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
 
     private val listener = object : Player.Listener {
         override fun onRenderedFirstFrame() {
-            _firstFrame.value = true
+            _firstFrame.value = true; _videoBlock.value = ""
             LoadTrace.finish()?.let { b -> _stats.value = _stats.value.copy(trace = b.line) }
             val t = System.currentTimeMillis() - loadStartMs
             if (loadStartMs > 0 && t in 1..60_000) { android.util.Log.i("UrTVPerf", "first_frame ${t} ms${if (preview) " (preview)" else ""}"); ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
@@ -264,6 +265,36 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             val c = current
             if (c != null && !forceHls && e.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) { forceHls = true; load(c); return }
             scheduleReconnect()
+        }
+    }
+
+    // ---- a picture that never comes: the hardware decoder accepted the stream and shows nothing (known on some boxes, and the player raises no error)
+    @Volatile private var softwareFirst = false
+    private var noPictureSec = 0
+    private fun selector() = androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mime, secure, tunneling ->
+        val l = androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT.getDecoderInfos(mime, secure, tunneling)
+        if (softwareFirst && mime.startsWith("video/")) l.sortedBy { it.hardwareAccelerated } else l     // false (software) sorts first; the hardware ones stay as the fallback
+    }
+
+    private fun checkPicture(p: ExoPlayer) {
+        if (preview || _paused.value) { noPictureSec = 0; return }
+        val f = p.videoFormat
+        val dc = p.videoDecoderCounters; dc?.ensureUpdated()
+        val rendered = dc?.renderedOutputBufferCount ?: 0
+        if (p.playbackState == Player.STATE_READY && p.playWhenReady && f != null && rendered == 0) noPictureSec++ else { noPictureSec = 0; return }
+        if (noPictureSec == 6 && !softwareFirst) {
+            // sound but no frame for 6 s: try the software decoders first, once for this channel
+            softwareFirst = true; noPictureSec = 0
+            com.urtv.player.data.Diag.videoBlock = "hw_decoder_no_frames_retry_software"
+            val c = current
+            p.release(); if (player === p) player = null
+            if (c != null) load(c)
+        } else if (noPictureSec >= 10 && softwareFirst) {
+            val n = runCatching { androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(f?.sampleMimeType ?: "", false, false).size }.getOrDefault(-1)
+            if (_videoBlock.value.isEmpty()) {
+                _videoBlock.value = com.urtv.player.core.VideoSupport.label(f?.sampleMimeType, f?.width ?: 0, f?.height ?: 0).ifEmpty { "HD+" }
+                com.urtv.player.data.Diag.videoBlock = com.urtv.player.core.VideoSupport.reportToken(f?.sampleMimeType, f?.width ?: 0, f?.height ?: 0, n) + "_sw_tried"
+            }
         }
     }
 
@@ -347,7 +378,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         onSessionEnd?.invoke()      // a new channel ends a commentary session (the second sound belongs to the old picture)
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
-        _videoBlock.value = ""; com.urtv.player.data.Diag.videoBlock = ""
+        _videoBlock.value = ""; com.urtv.player.data.Diag.videoBlock = ""; softwareFirst = false; noPictureSec = 0
         _firstFrame.value = false; LoadTrace.begin(); measuredFps = 0f; lastRenderedAt = 0L
         triedAlt.clear(); _altNote.value = null; errorKind = Diagnosis.ErrorKind.None; lastHttpStatus = 0; _cause.value = Diagnosis.Cause.None; if (!preview) tracker.clear()
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f
@@ -416,6 +447,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
                 if (store.statsOverlay.value) sampleStats()
                 val p = player ?: continue
                 diagnose(p, System.currentTimeMillis())
+                checkPicture(p)
                 if (current == null || _paused.value || _status.value == PlayStatus.Failed || retryJob?.isActive == true) continue
                 when (p.playbackState) {
                     Player.STATE_BUFFERING -> { frozenSec = 0; stableSec = 0; if (++stallSec >= STALL_LIMIT_SEC) { stallSec = 0; scheduleReconnect() } }
