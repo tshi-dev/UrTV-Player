@@ -13,7 +13,7 @@ object PlaybackTuning {
     fun buffers(mode: BufferMode, live: Boolean, lowRam: Boolean): Buffers {
         val b = if (live) when (mode) {
             BufferMode.Low -> Buffers(2_000, 8_000, 800, 2_000, -1)
-            BufferMode.Normal -> Buffers(5_000, 20_000, 1_000, 3_000, -1)
+            BufferMode.Normal -> Buffers(4_000, 15_000, 600, 2_000, 32 * 1024 * 1024)     // zapping first: a picture after 0.6 s of media, a modest cushion, bounded memory
             BufferMode.High -> Buffers(15_000, 50_000, 1_500, 5_000, -1)
         } else Buffers(15_000, 50_000, 2_500, 5_000, -1)
         return if (lowRam) b.copy(maxMs = minOf(b.maxMs, 15_000), minMs = minOf(b.minMs, 10_000), targetBytes = 8 * 1024 * 1024) else b

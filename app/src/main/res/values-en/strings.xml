@@ -308,4 +308,6 @@
     <string name="cm_cancel">Cancel</string>
     <string name="no_picture">This TV cannot show the picture of this channel (%1$s). Try an HD copy of the channel</string>
     <string name="xtream_hint">For movies and series with posters and details, add your subscription as Xtream (server, username and password)</string>
+    <string name="preview_off_hint">Preview is off to keep the app light. Turn it on in Settings</string>
+    <string name="preview_no_picture">This TV cannot show the picture of this channel (%1$s)</string>
 </resources>

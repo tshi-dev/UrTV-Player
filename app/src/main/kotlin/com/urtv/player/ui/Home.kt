@@ -132,7 +132,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
     LaunchedEffect(tab) { Backdrop.url = null }
-    LaunchedEffect(tab) { val t0 = System.nanoTime(); androidx.compose.runtime.withFrameNanos { }; androidx.compose.runtime.withFrameNanos { }; Perf.log("tab_open_${tab.name}", (System.nanoTime() - t0) / 1_000_000, "to the second frame after the switch") }
+    LaunchedEffect(tab) { Perf.afterTwoFrames("tab_open_${tab.name}", "to the second frame after the switch") }
     LaunchedEffect(tab) { Bisect.refresh() }
     Box(Modifier.fillMaxSize().background(if (Bisect.on("nobackdrop")) androidx.compose.ui.graphics.SolidColor(C.bg) else C.bgBrush)) {
     if (!Bisect.on("nobackdrop")) PosterBackdrop()
@@ -657,6 +657,10 @@ private fun PreviewPane(app: UrtvApp, focusedState: State<Channel?>, first: Chan
                 Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(C.accent)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.live), style = T.tiny.copy(color = Color.White, fontSize = 15.sp)) }
             }
             if (!enabled || shownUrl != ch?.url) Box(Modifier.align(Alignment.Center)) { if (ch != null) Logo(ch, 132) }
+            val noPic by ctrl.videoBlock.collectAsState()
+            // the logo alone must never look like a broken preview: say why it is a logo
+            if (!enabled) Text(stringResource(R.string.preview_off_hint), style = T.tiny.copy(color = Color.White), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 10.dp, vertical = 4.dp))
+            else if (noPic.isNotEmpty() && shownUrl == ch?.url) Text(stringResource(R.string.preview_no_picture, noPic), style = T.tiny.copy(color = Color.White), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 10.dp, vertical = 4.dp))
             if (enabled && ch != null && shownUrl == ch.url && pst == com.urtv.player.player.PlayStatus.Failed) Text(stringResource(R.string.preview_dead), style = T.bodyBold.copy(color = Color.White), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.align(Alignment.Center).background(Color(0xCC000000), Rd(10)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
         if (ch != null) {

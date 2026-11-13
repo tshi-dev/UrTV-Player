@@ -215,6 +215,9 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         p.videoChangeFrameRateStrategy = C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS      // 24/25/50/60 matching where the TV can switch without a black screen
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
         p.addListener(listener)
+        p.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onVideoDecoderInitialized(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) { lastDecoder = decoderName.filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }.take(40) }
+        })
         surface?.let { p.setVideoSurfaceView(it) }
         if (serverMode && audioLangs.isNotEmpty()) p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setPreferredAudioLanguages(*audioLangs.toTypedArray()).build()
         builtFor = buffer; builtLive = live; builtServer = serverMode
@@ -276,7 +279,23 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         if (softwareFirst && mime.startsWith("video/")) l.sortedBy { it.hardwareAccelerated } else l     // false (software) sorts first; the hardware ones stay as the fallback
     }
 
+    // ---- UrTVPerf: one line every 10 s of playing, so the tester can tell a network stutter from a decoder that cannot keep up
+    @Volatile private var lastDecoder = ""
+    private var perfRebuffers = 0; private var perfDropped = 0; private var perfSecs = 0; private var perfLastBuffering = false
+    private fun perfSecond(p: ExoPlayer) {
+        if (preview) return
+        val buffering = p.playbackState == Player.STATE_BUFFERING && readySince
+        if (buffering && !perfLastBuffering) perfRebuffers++
+        perfLastBuffering = buffering
+        perfDropped += droppedPerSec.toInt()
+        if (++perfSecs < 10) return
+        val f = p.videoFormat
+        android.util.Log.i("UrTVPerf", "playback 10s: rebuffers=$perfRebuffers dropped=$perfDropped decoder=${lastDecoder.ifEmpty { "none" }} ${f?.sampleMimeType?.removePrefix("video/") ?: "audio"} ${f?.width ?: 0}x${f?.height ?: 0}@${(f?.frameRate ?: measuredFps).toInt()}fps stream=${((f?.bitrate ?: 0) / 1000)}kbps received=${((meter?.bitrateEstimate ?: 0L) / 1000)}kbps buffered=${p.totalBufferedDuration}ms")
+        perfRebuffers = 0; perfDropped = 0; perfSecs = 0
+    }
+
     private fun checkPicture(p: ExoPlayer) {
+        perfSecond(p)
         if (preview || _paused.value) { noPictureSec = 0; return }
         val f = p.videoFormat
         val dc = p.videoDecoderCounters; dc?.ensureUpdated()
@@ -436,7 +455,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             triedAlt += c.url
             alternates?.invoke(c)?.firstOrNull { it.url !in triedAlt }?.let { alt -> target = alt; current = alt; _altNote.value = alt.name; _attempt.value = 1; errorKind = Diagnosis.ErrorKind.None }
         }
-        retryJob = scope.launch { delay(minOf(1000L shl (n - 1), 12_000L)); load(target) }
+        retryJob = scope.launch { delay(minOf(600L shl (n - 1), 8_000L)); load(target) }     // live: the first retry is quick (0.6 s), then 1.2 s, 2.4 s ... at most 8 s
     }
 
     private fun startWatchdog() {
@@ -502,5 +521,5 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         _status.value = PlayStatus.Idle
     }
 
-    companion object { @Volatile var active = false; const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 15; const val FROZEN_LIMIT_SEC = 8 }
+    companion object { @Volatile var active = false; const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 10; const val FROZEN_LIMIT_SEC = 8 }
 }

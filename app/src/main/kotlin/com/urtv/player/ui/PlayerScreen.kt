@@ -140,7 +140,8 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { ctrl.release() }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { if (!blocked) ctrl.resume() }
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
-    BackHandler { if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists || overlay == Overlay.Commentary) overlay = Overlay.None else if (overlay == Overlay.Info) overlay = Overlay.None else onExit(shown) }
+    // one Back leaves the channel (the info banner is not a panel: it never takes a Back); only a real panel is closed first
+    BackHandler { if (overlay == Overlay.Guide || overlay == Overlay.Options || overlay == Overlay.Lists || overlay == Overlay.Commentary) overlay = Overlay.None else onExit(shown) }
 
     val status by ctrl.status.collectAsState()
     val attempt by ctrl.attempt.collectAsState()
