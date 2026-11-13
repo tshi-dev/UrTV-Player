@@ -49,7 +49,7 @@ import com.urtv.player.core.VodInfo
 import com.urtv.player.data.PlaylistDef
 
 /** One movie or series in a poster grid. */
-data class Poster(val id: String, val title: String, val image: String?, val category: String, val meta: String?)
+data class Poster(val id: String, val title: String, val image: String?, val category: String, val meta: String?, val added: Long = 0)
 
 /** What the VOD player plays: [key] is where the resume position is stored; [kind] non-empty feeds "Continue watching". */
 data class VodPlay(
@@ -59,26 +59,28 @@ data class VodPlay(
 )
 
 private const val ALL = "\u0000all"
+private const val LATEST = "\u0000latest"
 fun vodKey(pid: String, id: String) = "vod|$pid|$id"
 
 @Composable
 fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
     val vod by app.vod.state.collectAsState()
     val items = remember(vod.movies, vod.series, movies) {
-        if (movies) vod.movies.map { Poster(it.id, it.name, it.poster, it.category, it.rating) } else vod.series.map { Poster(it.id, it.name, it.poster, it.category, it.rating) }
+        if (movies) vod.movies.map { Poster(it.id, it.name, it.poster, it.category, it.rating, it.added) } else vod.series.map { Poster(it.id, it.name, it.poster, it.category, it.rating, it.added) }
     }
-    val cats = remember(items) { items.map { it.category }.distinct().filter { it.isNotBlank() } }
+    // the provider's category order (from its category list), then any category only seen on items; «recently added» is a first entry of its own
+    val cats = remember(items, vod.movieCats, vod.seriesCats) { val seen = items.map { it.category }.distinct().filter { it.isNotBlank() }; val order = (if (movies) vod.movieCats else vod.seriesCats).filter { it in seen }; order + seen.filter { it !in order } }
     val counts = remember(items) { items.groupingBy { it.category }.eachCount() }
-    var cat by remember(movies) { mutableStateOf(ALL) }
+    var cat by remember(movies) { mutableStateOf(LATEST) }
     var query by remember(movies) { mutableStateOf("") }
-    val list = remember(items, cat, query) { items.filter { (cat == ALL || it.category == cat) && (query.isBlank() || it.title.contains(query.trim(), true)) } }
+    val list = remember(items, cat, query) { (if (cat == LATEST) items.sortedByDescending { it.added }.take(200) else items).filter { (cat == ALL || cat == LATEST || it.category == cat) && (query.isBlank() || it.title.contains(query.trim(), true)) } }     // everything else keeps the server's order
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         LazyColumn(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
-            items(listOf(ALL) + cats, key = { it }) { c ->
+            items(listOf(LATEST, ALL) + cats, key = { it }) { c ->
                 Tv({ cat = c }, Modifier.fillMaxWidth().height(52.dp), selected = c == cat, onFocus = { if (it) cat = c }) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (c == ALL) stringResource(R.string.all_categories) else c, style = if (c == cat) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text("${if (c == ALL) items.size else counts[c] ?: 0}", style = T.tiny)
+                        Text(if (c == ALL) stringResource(R.string.all_categories) else if (c == LATEST) stringResource(R.string.vod_latest) else c, style = if (c == cat) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text("${if (c == ALL) items.size else if (c == LATEST) minOf(items.size, 200) else counts[c] ?: 0}", style = T.tiny)
                     }
                 }
             }

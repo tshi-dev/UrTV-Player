@@ -297,7 +297,10 @@ class FlowTest {
         rule.onNode(hasText(app.getString(R.string.cm_pick), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         settle(); settle(); settle()
         settle(); settle()
-        until(10_000) { texts().any { it == "قناة تجريبية 5" } }
+        until(10_000) { texts().any { it == "أخبار" } }                       // the subscription's groups first
+        rule.onNode(hasText("أخبار", substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        settle(); settle()
+        until(10_000) { texts().any { it == "قناة تجريبية 5" } }              // then the channels inside the folder
         assertTrue(texts().none { it == cur.name }, "the channel that carries the picture is not offered for the sound")
     }
 

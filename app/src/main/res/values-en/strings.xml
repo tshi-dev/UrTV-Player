@@ -313,4 +313,7 @@
     <string name="opt_group_media">Sound and picture</string>
     <string name="opt_group_channel">Channel</string>
     <string name="opt_group_tools">Tools</string>
+    <string name="vod_no_seek">The server does not allow seeking in this video</string>
+    <string name="vod_latest">Recently added</string>
+    <string name="pick_all_groups">All channels</string>
 </resources>

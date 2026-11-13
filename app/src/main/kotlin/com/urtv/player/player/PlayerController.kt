@@ -185,7 +185,10 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     fun bandwidthEstimate(): Long = meter?.bitrateEstimate?.takeIf { it > 0 } ?: PlaybackTuning.seedBitrate(prefs.getLong("bw", 0))
 
     private fun build(live: Boolean): ExoPlayer {
-        val okhttp = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA)
+        val okhttp = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA).apply {
+            // a film is fetched in ranges to seek: a compressed answer has no usable length or offsets, so ask for the file as it is
+            if (!live) setDefaultRequestProperties(mapOf("Accept-Encoding" to "identity"))
+        }
         val origin = serverOrigin; val hdrs = serverHeaders
         val http: androidx.media3.datasource.DataSource.Factory = if (!serverMode) okhttp else androidx.media3.datasource.ResolvingDataSource.Factory(okhttp,
             object : androidx.media3.datasource.ResolvingDataSource.Resolver {
@@ -420,7 +423,8 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         val item = MediaItem.Builder().setUri(Uri.parse(ch.url)).apply {
             if (isHls) setMimeType(MimeTypes.APPLICATION_M3U8) else if (ch.url.contains(".mpd", true)) setMimeType(MimeTypes.APPLICATION_MPD)
             // live: gently speed up (max 1.04x) to stay close to the live edge after a stall
-            if (!vod) setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setMaxPlaybackSpeed(1.04f).build())
+            // never speed the picture up to catch the live edge: it eats the buffer and brings the stutter back (speed 1.0 on both sides)
+            if (!vod) setLiveConfiguration(MediaItem.LiveConfiguration.Builder().setMinPlaybackSpeed(1.0f).setMaxPlaybackSpeed(1.0f).build())
         }.build()
         val df = dataFactory
         if (isHls && df != null) {
@@ -469,7 +473,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
                 checkPicture(p)
                 if (current == null || _paused.value || _status.value == PlayStatus.Failed || retryJob?.isActive == true) continue
                 when (p.playbackState) {
-                    Player.STATE_BUFFERING -> { frozenSec = 0; stableSec = 0; if (++stallSec >= STALL_LIMIT_SEC) { stallSec = 0; scheduleReconnect() } }
+                    Player.STATE_BUFFERING -> { frozenSec = 0; stableSec = 0; if (++stallSec >= (if (vod) VOD_STALL_LIMIT_SEC else STALL_LIMIT_SEC)) { stallSec = 0; scheduleReconnect() } }
                     Player.STATE_READY -> {
                         stallSec = 0
                         val pos = p.currentPosition
@@ -521,5 +525,5 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         _status.value = PlayStatus.Idle
     }
 
-    companion object { @Volatile var active = false; const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 10; const val FROZEN_LIMIT_SEC = 8 }
+    companion object { @Volatile var active = false; const val MAX_ATTEMPTS = 8; const val STALL_LIMIT_SEC = 10; const val VOD_STALL_LIMIT_SEC = 40; const val FROZEN_LIMIT_SEC = 8 }
 }

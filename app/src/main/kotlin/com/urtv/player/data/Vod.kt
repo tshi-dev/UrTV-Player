@@ -22,6 +22,9 @@ data class VodState(
     val series: List<Series> = emptyList(),
     val loading: Boolean = false,
     val failed: Boolean = false,
+    /** The provider's category order (names), for the left list of the Movies and Series tabs. */
+    val movieCats: List<String> = emptyList(),
+    val seriesCats: List<String> = emptyList(),
 )
 
 /** Movies and series for Xtream playlists: cached on disk, fetched when stale. Details load on demand. */
@@ -52,7 +55,8 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
         val mf = File(dir, "movies_${def.id}.tsv"); val sf = File(dir, "series_${def.id}.tsv")
         job = scope.launch {
             val (m, s) = withContext(Dispatchers.IO) { readMovies(mf) to readSeries(sf) }
-            _state.value = VodState(def.id, m, s, loading = false)
+            val (mc0, sc0) = withContext(Dispatchers.IO) { readCats(File(dir, "mcats_${def.id}.txt")) to readCats(File(dir, "scats_${def.id}.txt")) }
+            _state.value = VodState(def.id, m, s, loading = false, movieCats = mc0, seriesCats = sc0)
             val maxAge = (store.refreshHours.value.takeIf { it > 0 } ?: 24) * 3_600_000L
             if (!fetch) return@launch
             fetched += def.id
@@ -63,14 +67,14 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             val acc = account(def)
             val mr = withContext(Dispatchers.IO) { runCatching {
                 val mc = runCatching { XtreamParser.parseCategories(Http.text(acc.vodCategoriesUrl())) }.getOrDefault(emptyMap())
-                Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) }.sortedByDescending { it.added }.also { writeMovies(mf, it) }
+                Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) }.also { writeMovies(mf, it); writeCats(File(dir, "mcats_${def.id}.txt"), mc.values.toList()) }     // the provider's own order, never re-sorted
             } }
-            if (mr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, movies = mr.getOrThrow())
+            if (mr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, movies = mr.getOrThrow(), movieCats = readCats(File(dir, "mcats_${def.id}.txt")))
             val sr = withContext(Dispatchers.IO) { runCatching {
                 val sc = runCatching { XtreamParser.parseCategories(Http.text(acc.seriesCategoriesUrl())) }.getOrDefault(emptyMap())
-                Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) }.sortedByDescending { it.added }.also { writeSeries(sf, it) }
+                Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) }.also { writeSeries(sf, it); writeCats(File(dir, "scats_${def.id}.txt"), sc.values.toList()) }
             } }
-            if (sr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, series = sr.getOrThrow())
+            if (sr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, series = sr.getOrThrow(), seriesCats = readCats(File(dir, "scats_${def.id}.txt")))
             (mr.exceptionOrNull() ?: sr.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }
             if (mr.isFailure && sr.isFailure) fetched -= def.id      // nothing came: the next visit to the tab asks again
             _state.value = _state.value.copy(loading = false, failed = mr.isFailure && sr.isFailure && _state.value.movies.isEmpty() && _state.value.series.isEmpty())
@@ -104,6 +108,8 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
         m3uEpisodes = eps
         _state.value = VodState(def.id, movies, series)
     }
+    private fun writeCats(f: File, l: List<String>) = runCatching { f.writeText(l.joinToString("\n") { s(it) }) }
+    private fun readCats(f: File): List<String> = runCatching { if (f.exists()) f.readLines().filter { it.isNotBlank() } else emptyList() }.getOrDefault(emptyList())
     private fun writeEpisodes(f: File, m: Map<String, List<Episode>>) = write(f, m.flatMap { (sid, l) -> l.map { listOf(s(sid), s(it.id), it.season.toString(), it.number.toString(), s(it.title), s(it.url), s(it.image)) } })
     private fun readEpisodes(f: File): Map<String, List<Episode>> = rows(f, 7).groupBy({ it[0] }) { Episode(it[1], it[2].toIntOrNull() ?: 1, it[3].toIntOrNull() ?: 0, it[4], it[5], "", it[6].ifEmpty { null }, 0) }
 

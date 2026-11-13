@@ -313,4 +313,7 @@
     <string name="opt_group_media">الصوت والصورة</string>
     <string name="opt_group_channel">القناة</string>
     <string name="opt_group_tools">أدوات</string>
+    <string name="vod_no_seek">هذا الفيديو لا يدعم التقديم والإرجاع من السيرفر</string>
+    <string name="vod_latest">آخر ما أُضيف</string>
+    <string name="pick_all_groups">كل القنوات</string>
 </resources>

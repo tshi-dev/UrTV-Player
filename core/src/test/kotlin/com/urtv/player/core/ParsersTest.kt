@@ -183,3 +183,13 @@ class XmltvWindowTest {
         assertEquals(0, XmltvParser.parse(xml.byteInputStream(), null, fromMs = base + 100 * h, toMs = base + 120 * h).size, "nothing in the window")
     }
 }
+
+class XtreamOrderTest {
+    @Test fun moviesAndSeriesKeepTheOrderTheServerSent() {
+        val acc = XtreamAccount("http://h", "u", "p")
+        val m = XtreamParser.parseMovies("""[{"stream_id":9,"name":"Z","added":"1"},{"stream_id":3,"name":"A","added":"999"},{"stream_id":5,"name":"M","added":"50"}]""", acc)
+        assertEquals(listOf("Z", "A", "M"), m.map { it.name })
+        val c = XtreamParser.parseCategories("""[{"category_id":"7","category_name":"Second"},{"category_id":"2","category_name":"First"}]""")
+        assertEquals(listOf("Second", "First"), c.values.toList(), "categories too")
+    }
+}

@@ -64,6 +64,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     var options by remember { mutableStateOf(false) }
     var firstStart by remember { mutableLongStateOf(startMs) }
     var seekStreak by remember { mutableStateOf(0) }
+    var noSeek by remember(idx) { mutableStateOf(false) }        // this stream cannot be seeked (the server does not answer range requests): said on the bar instead of doing nothing
     var dismissedNext by remember { mutableStateOf(-1) }
     val root = remember { FocusRequester() }
     var sleepMin by remember { mutableStateOf(0) }
@@ -105,6 +106,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
 
     fun seek(deltaMs: Long) {
         val p = ctrl.player ?: return
+        if (!p.isCurrentMediaItemSeekable) { noSeek = true; bar = true; tick++; android.util.Log.i("UrTVPerf", "vod seek: stream is not seekable"); return }
         val target = (p.currentPosition + deltaMs).coerceIn(0, if (dur > 0) dur - 1000 else Long.MAX_VALUE)
         p.seekTo(target); pos = target; bar = true; tick++
     }
@@ -145,6 +147,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
                     if (item.kind == "episode" && item.season > 0) Chip(stringResource(R.string.se_badge, item.season, item.episode))
                 }
                 if (item.episodeTitle.isNotBlank()) Text(item.episodeTitle, style = T.small)
+                if (noSeek) Text(stringResource(R.string.vod_no_seek), style = T.small.copy(color = C.accent))
                 Spacer(Modifier.height(12.dp))
                 ProgressBar(if (dur > 0) pos / dur.toFloat() else 0f)
                 Spacer(Modifier.height(8.dp))

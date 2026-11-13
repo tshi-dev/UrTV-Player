@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class PlaybackTuningTest {
     @Test fun liveStartsFastButRecoversIntoALargerCushion() {
         for (m in BufferMode.entries) { val b = PlaybackTuning.buffers(m, live = true, lowRam = false); assertTrue(b.startMs <= 1_500, "$m start"); assertTrue(b.rebufMs > b.startMs, "$m rebuffer > start") }
-        assertEquals(600, PlaybackTuning.buffers(BufferMode.Normal, true, false).startMs)
+        assertEquals(1_000, PlaybackTuning.buffers(BufferMode.Normal, true, false).startMs)
     }
 
     @Test fun onDemandBuffersMoreThanLive() = assertTrue(PlaybackTuning.buffers(BufferMode.Low, false, false).startMs > PlaybackTuning.buffers(BufferMode.Low, true, false).startMs)
@@ -43,7 +43,7 @@ class PlaybackTuningTest {
 
     @Test fun liveEdgeCatchUpOnlyWhenFarBehindAndNotTooOften() {
         assertFalse(PlaybackTuning.shouldSeekToLive(8_000, 60_000)); assertFalse(PlaybackTuning.shouldSeekToLive(40_000, 5_000))
-        assertTrue(PlaybackTuning.shouldSeekToLive(40_000, 60_000))
+        assertTrue(PlaybackTuning.shouldSeekToLive(90_000, 60_000))
     }
 
     // ---- budgets that can be pinned without a TV (real first-frame and zap times need a device: docs/PERFORMANCE.md)

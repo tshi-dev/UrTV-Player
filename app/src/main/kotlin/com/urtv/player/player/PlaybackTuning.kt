@@ -13,7 +13,7 @@ object PlaybackTuning {
     fun buffers(mode: BufferMode, live: Boolean, lowRam: Boolean): Buffers {
         val b = if (live) when (mode) {
             BufferMode.Low -> Buffers(2_000, 8_000, 800, 2_000, -1)
-            BufferMode.Normal -> Buffers(4_000, 15_000, 600, 2_000, 32 * 1024 * 1024)     // zapping first: a picture after 0.6 s of media, a modest cushion, bounded memory
+            BufferMode.Normal -> Buffers(8_000, 30_000, 1_000, 3_500, 48 * 1024 * 1024)     // a picture after 1 s, then a real cushion (the 4/15 s of beta3 stuttered on jittery providers), bounded memory
             BufferMode.High -> Buffers(15_000, 50_000, 1_500, 5_000, -1)
         } else Buffers(15_000, 50_000, 2_500, 5_000, -1)
         return if (lowRam) b.copy(maxMs = minOf(b.maxMs, 15_000), minMs = minOf(b.minMs, 10_000), targetBytes = 8 * 1024 * 1024) else b
@@ -46,6 +46,6 @@ object PlaybackTuning {
     }
 
     /** Live playback that has drifted this far behind the live edge (after a stall) is brought back to it. */
-    const val LIVE_BEHIND_MAX_MS = 25_000L
+    const val LIVE_BEHIND_MAX_MS = 60_000L     // a jump to the live edge empties the buffer and stutters again: only when really far behind
     fun shouldSeekToLive(offsetMs: Long, sinceLastSeekMs: Long): Boolean = offsetMs > LIVE_BEHIND_MAX_MS && sinceLastSeekMs > 15_000L
 }

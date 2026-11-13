@@ -48,7 +48,8 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
     val st by cm.state.collectAsState()
     var picking by remember { mutableStateOf(false) }
     var asked by remember { mutableStateOf(!warn) }       // small TVs: «try it?» comes first, the focus on «cancel»
-    BackHandler(picking) { picking = false }
+    var pickGroup by remember { mutableStateOf<String?>(null) }     // the folder (a group of the subscription) opened in the picker
+    BackHandler(picking) { if (pickGroup != null) pickGroup = null else picking = false }
     val first = remember { FocusRequester() }
     LaunchedEffect(asked, picking, st.audio?.url, st.failure) { repeat(10) { if (runCatching { first.requestFocus(); true }.getOrDefault(false)) return@LaunchedEffect; kotlinx.coroutines.delay(30) } }
     Column(Modifier.fillMaxHeight().width(700.dp).padding(vertical = 56.dp).background(C.surface, Rd(22)).padding(40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -62,7 +63,7 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
             }
             return@Column
         }
-        if (picking) { Picker(all, current, first, app.catalog.state.collectAsState().value.index, onPick = { cm.start(it); picking = false }) ; return@Column }
+        if (picking) { Picker(all, current, first, app.catalog.state.collectAsState().value.index, pickGroup, { pickGroup = it }, onPick = { cm.start(it); picking = false; pickGroup = null }) ; return@Column }
         val f = st.failure
         if (f != null) {
             Column(Modifier.fillMaxWidth().background(Color(0xFF2A1D1F), Rd(14)).padding(26.dp)) {
@@ -127,14 +128,28 @@ private fun OriginalRow(current: Channel, selected: Boolean, focus: FocusRequest
 
 /** The person's own list with a search box: the typed text filters the names (Arabic and Latin, layout slips included). */
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Channel>, current: Channel, first: FocusRequester, index: com.urtv.player.data.ChannelIndex, onPick: (Channel) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Channel>, current: Channel, first: FocusRequester, index: com.urtv.player.data.ChannelIndex, group: String?, onGroup: (String?) -> Unit, onPick: (Channel) -> Unit) {
     var q by remember { mutableStateOf("") }
-    // the WHOLE list, not its first entries: typing narrows it (the prepared search index when it matches this list), and the list scrolls lazily
-    val hits = remember(all, q) { (if (q.isBlank()) all else if (index.channels === all) index.search(q) else Browse.filter(all, Browse.ALL, q)).filter { it.url != current.url } }
+    val fast = index.channels === all
+    // a folder first (the groups of the subscription, in its order), then the channels inside it; typing searches the folder, or everything when none is open
+    val folders = remember(index) { if (fast) index.groups.map { it to (index.byGroup[it]?.size ?: 0) } else emptyList() }
+    val inFolder = remember(all, group, index) { if (group == null) all else if (fast) index.byGroup[group].orEmpty() else Browse.filter(all, group, "") }
+    val hits = remember(inFolder, q, all, index) { (if (q.isBlank()) inFolder else if (fast && group == null) index.search(q) else Browse.filter(inFolder, Browse.ALL, q)).filter { it.url != current.url } }
+    val showFolders = group == null && q.isBlank() && folders.isNotEmpty()
     val keys = remember(hits) { uniqueKeys(hits.map { it.url }) }
+    if (group != null) Text(if (group == Browse.OTHER) stringResource(R.string.group_other) else group, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     FocusField(q, { q = it }, stringResource(R.string.cm_search), Modifier.fillMaxWidth(), focusRequester = first)
     LazyColumn(Modifier.fillMaxWidth().weight(1f), state = rememberLazyListState(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        itemsIndexed(hits, key = { i, _ -> keys[i] }) { _, ch ->
+        if (showFolders) {
+            itemsIndexed(folders, key = { _, f -> "g|" + f.first }) { _, f ->
+                Tv({ onGroup(f.first) }, Modifier.fillMaxWidth().height(64.dp), Rd(12), restColor = C.surfaceHi, flat = true) {
+                    Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (f.first == Browse.OTHER) stringResource(R.string.group_other) else f.first, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text("${f.second}", style = T.tiny)
+                    }
+                }
+            }
+        } else itemsIndexed(hits, key = { i, _ -> keys[i] }) { _, ch ->
             Tv({ onPick(ch) }, Modifier.fillMaxWidth().height(64.dp), Rd(12), restColor = C.surfaceHi, flat = true) {
                 Text(ch.name, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 22.dp))
             }
