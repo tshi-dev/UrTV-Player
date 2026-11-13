@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -337,8 +339,9 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     val audio = tracks.audio.firstOrNull { it.selected }
     val text = tracks.text.firstOrNull { it.selected }
-    Column(Modifier.fillMaxHeight().width(620.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE0080909), Color(0xF2080909)))).padding(start = 110.dp, end = 60.dp, top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
+    PanelCard {
         Text(title, style = T.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        GroupTitle(stringResource(R.string.opt_group_media))
         OptRow(stringResource(R.string.opt_audio), audio?.label ?: stringResource(R.string.none), fr) {
             if (tracks.audio.size > 1) ctrl.selectAudio(tracks.audio[(tracks.audio.indexOf(audio) + 1) % tracks.audio.size])
         }
@@ -347,20 +350,31 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
             if (l.isNotEmpty()) { val i = if (text == null) -1 else l.indexOf(text); ctrl.selectText(if (i + 1 >= l.size) null else l[i + 1]) }
         }
         OptRow(stringResource(R.string.opt_aspect), stringResource(when (aspect) { AspectMode.Fit -> R.string.aspect_fit; AspectMode.Fill -> R.string.aspect_fill; AspectMode.Stretch -> R.string.aspect_stretch; AspectMode.R16x9 -> R.string.aspect_169; AspectMode.R4x3 -> R.string.aspect_43 })) { ctrl.cycleAspect() }
+        GroupTitle(stringResource(R.string.opt_group_channel))
         if (fav != null) OptRow(stringResource(R.string.opt_fav), stringResource(if (fav) R.string.on else R.string.off)) { onFav() }
         if (onGuide != null) OptRow(stringResource(R.string.opt_list), "") { onGuide() }
         if (onLists != null) OptRow(stringResource(R.string.opt_my_lists), "") { onLists() }
+        GroupTitle(stringResource(R.string.opt_group_tools))
         OptRow(stringResource(R.string.opt_sleep), if (sleepMin == 0) stringResource(R.string.off) else stringResource(R.string.min_n, sleepMin)) { onSleep() }
         OptRow(stringResource(R.string.opt_reload), "") { onReload(); onClose() }
     }
 }
 
+/** The card every in-player panel sits in: the app's surface colour and radius, scrolls instead of clipping on a small screen. */
+@Composable
+internal fun PanelCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxHeight().padding(vertical = 40.dp, horizontal = 56.dp).width(640.dp).background(C.surface, Rd(22)).verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(32.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+}
+
+@Composable
+private fun GroupTitle(text: String) { Text(text, style = T.small.copy(color = C.muted), modifier = Modifier.padding(start = 6.dp, top = 12.dp)) }
+
 @Composable
 private fun OptRow(label: String, value: String, fr: FocusRequester? = null, onClick: () -> Unit) {
-    Tv(onClick, Modifier.fillMaxWidth().height(60.dp), Rd(12), focusRequester = fr) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+    Tv(onClick, Modifier.fillMaxWidth().height(64.dp), Rd(14), focusRequester = fr, restColor = C.surfaceHi) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = T.body, modifier = Modifier.weight(1f))
-            Text(value, style = T.bodyBold.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, style = T.bodyBold.copy(color = C.accent), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 260.dp))     // the current value, aligned at the end
         }
     }
 }
@@ -375,7 +389,7 @@ private fun ListsPicker(app: UrtvApp, pid: String, key: String, onBack: () -> Un
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     androidx.activity.compose.BackHandler(onBack = onBack)
     val base = stringResource(R.string.list_default_name)
-    Column(Modifier.fillMaxHeight().width(620.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Color(0xE0080909), Color(0xF2080909)))).padding(start = 110.dp, end = 60.dp, top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
+    PanelCard {
         Text(stringResource(R.string.opt_my_lists), style = T.title)
         names.forEachIndexed { i, n ->
             val on = key in (lists["$pid|$n"] ?: emptySet())
