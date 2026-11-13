@@ -59,6 +59,15 @@ class Store(ctx: Context) {
     }
 
     fun addPlaylist(p: PlaylistDef) { writePlaylists(_playlists.value + p); setActive(p.id) }
+    /** A pasted M3U link that turned out to be an Xtream login: the account becomes Xtream (the original link is kept) and the favourites, recents, hidden channels and own lists follow their channels to the new stream URLs. */
+    fun convertToXtream(id: String, acc: com.urtv.player.core.XtreamAccount, keyMap: Map<String, String>) {
+        writePlaylists(_playlists.value.map { if (it.id == id) it.copy(kind = PlaylistDef.KIND_XTREAM, server = acc.server, user = acc.user, pass = acc.pass) else it })
+        fun m(k: String) = keyMap[k] ?: k
+        val f = _favs.value.map(::m).toSet(); _favs.value = f; sp.edit().putStringSet("favs", f).apply()
+        val r = _recents.value.map(::m).distinct(); _recents.value = r; sp.edit().putString("recents", r.joinToString("\n")).apply()
+        val h = _hiddenCh.value.map(::m).toSet(); _hiddenCh.value = h; sp.edit().putStringSet("hiddenCh", h).apply()
+        saveLists(_lists.value.mapValues { (k, v) -> if (k.startsWith("$id|")) v.map(::m).toSet() else v })
+    }
     fun removePlaylist(id: String) {
         writePlaylists(_playlists.value.filter { it.id != id })
         if (_active.value == id) setActive(_playlists.value.firstOrNull()?.id)

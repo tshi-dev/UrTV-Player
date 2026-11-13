@@ -21,7 +21,7 @@ data class PendingSearch(val text: String, val hint: String)
 class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     lateinit var store: Store; private set
     // Everything below is created on first use, so process start does the bare minimum.
-    val catalog: Catalog by lazy { Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+    val catalog: Catalog by lazy { Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)).also { c -> c.onVod = { def, split -> vod.setFromM3u(def, split) } } }
     val vod: Vod by lazy { Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     val player: PlayerController by lazy { PlayerController(this, store) }
     val commentary: com.urtv.player.player.CommentaryController by lazy { com.urtv.player.player.CommentaryController(this, player, commentaryTier == com.urtv.player.core.Commentary.Tier.Warn) }

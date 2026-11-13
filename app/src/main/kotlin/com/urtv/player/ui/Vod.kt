@@ -84,6 +84,12 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
             }
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
+            // an M3U list: said once that the Xtream login gives posters, plots and episodes
+            val hint = remember { app.store.playlists.value.firstOrNull { it.id == vod.playlistId }?.isXtream == false && !app.getSharedPreferences("urtv", 0).getBoolean("xtreamHint", false) }
+            if (hint) {
+                LaunchedEffect(Unit) { app.getSharedPreferences("urtv", 0).edit().putBoolean("xtreamHint", true).apply() }
+                Text(stringResource(R.string.xtream_hint), style = T.small, modifier = Modifier.padding(bottom = 12.dp))
+            }
             FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.fillMaxWidth(), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true)
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {

@@ -67,7 +67,9 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
     // movies and series: at start only the cached lists are read; the provider is asked when Movies or Series is opened
     LaunchedEffect(cat.playlistId, def?.isXtream) { if (!homeOnly) app.vod.open(def, fetch = false) }
     LaunchedEffect(tab, cat.playlistId) { if (!homeOnly && (tab == Tab.Movies || tab == Tab.Series)) app.vod.open(def) }
-    if ((tab == Tab.Movies || tab == Tab.Series) && def?.isXtream != true && playlists.isNotEmpty() && cat.playlistId != null) tab = Tab.Home
+    val vodNow by app.vod.state.collectAsState()
+    val hasVod = def?.isXtream == true || vodNow.movies.isNotEmpty() || vodNow.series.isNotEmpty()
+    if ((tab == Tab.Movies || tab == Tab.Series) && !hasVod && vodNow.playlistId == cat.playlistId && playlists.isNotEmpty() && cat.playlistId != null) tab = Tab.Home
 
     // Open the active playlist once per process; optionally resume the last channel ("last" start screen or the resume setting).
     LaunchedEffect(Unit) { androidx.compose.runtime.withFrameNanos { }; Perf.log("cold_start_first_frame", android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime(), "process start to the first drawn frame") }

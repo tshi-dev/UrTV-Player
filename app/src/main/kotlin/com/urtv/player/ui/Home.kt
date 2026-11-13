@@ -145,7 +145,8 @@ fun HomeScreen(
             }
             Spacer(Modifier.weight(1f))
             Row(Modifier.focusProperties { enter = { tabFocus } }.focusGroup().clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {     // UP from any page lands on the CURRENT tab, whichever pill was used last
-                for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true }) {
+                val vodHere by app.vod.state.collectAsState()
+                for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true || vodHere.movies.isNotEmpty() || vodHere.series.isNotEmpty() }) {
                     val label = stringResource(when (t) { Tab.Home -> R.string.tab_home; Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
                     Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties {
                         down = if (t == Tab.Live) (contentEntry.value ?: FocusRequester.Default) else FocusRequester.Default

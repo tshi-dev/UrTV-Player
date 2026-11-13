@@ -5,6 +5,7 @@ import com.urtv.player.core.Channel
 import com.urtv.player.core.M3uParser
 import com.urtv.player.core.XmltvParser
 import com.urtv.player.core.XtreamAccount
+import com.urtv.player.core.XtreamLink
 import com.urtv.player.core.XtreamParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,8 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 val r = withContext(Dispatchers.IO) { runCatching { fetch(def) } }
                 r.onSuccess { (list, urls) ->
                     epgUrls = urls
+                    detected?.let { acc -> convertDetected(def, acc, list, cached); detected = null }
+                    vodSplit?.let { sp -> vodSplit = null; withContext(Dispatchers.IO) { onVod?.invoke(def, sp) } }
                     if (list.isEmpty()) _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Empty else null)
                     else {
                         // the list is on screen first; the (encrypted) cache is written afterwards, off the critical path
@@ -79,6 +82,14 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         }
     }
 
+    /** Keeps favourites, recents, hidden channels and own lists: old M3U stream URLs are matched to the Xtream ones by stream id. */
+    private fun convertDetected(def: PlaylistDef, acc: XtreamAccount, list: List<Channel>, old: List<Channel>) {
+        val newByStream = HashMap<String, Channel>(list.size * 2).also { m -> for (c in list) c.streamId?.let { m[it] = c } }
+        val map = HashMap<String, String>()
+        for (c in old) { val sid = XtreamLink.streamIdOf(c.url) ?: continue; val n = newByStream[sid] ?: continue; map[com.urtv.player.ui.chKey(def.id, c)] = com.urtv.player.ui.chKey(def.id, n) }
+        store.convertToXtream(def.id, acc, map)
+    }
+
     fun refreshActive() = open(_state.value.playlistId, force = true)
 
     fun forget(id: String) { chFile(id).delete(); epgFile(id).delete(); File(dir, "epgurls_$id.txt").delete() }
@@ -86,19 +97,36 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     private fun chFile(id: String) = File(dir, "ch_$id.tsv")
     private fun epgFile(id: String) = File(dir, "epg_$id.xml")
 
+    private fun fetchXtream(acc: XtreamAccount): Pair<List<Channel>, List<String>> {
+        val cats = XtreamParser.parseCategories(Http.text(acc.categoriesUrl()))
+        val parsed = Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) }
+        return parsed.channels to parsed.epgUrls
+    }
+
+    /** Set when a pasted M3U link answered like an Xtream account: the next steps convert the playlist (see [open]). */
+    @Volatile private var detected: XtreamAccount? = null
+    /** Movies and series split out of an M3U list while it was parsed (handed to [onVod] once the live list is on screen). */
+    @Volatile private var vodSplit: com.urtv.player.core.M3uVod.Split? = null
+    @Volatile var onVod: ((PlaylistDef, com.urtv.player.core.M3uVod.Split) -> Unit)? = null
+
     private fun fetch(def: PlaylistDef): Pair<List<Channel>, List<String>> {
-        if (def.isXtream) {
-            val acc = XtreamAccount(def.server, def.user, def.pass)
-            val cats = XtreamParser.parseCategories(Http.text(acc.categoriesUrl()))
-            val parsed = Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) }
-            return parsed.channels to parsed.epgUrls
+        if (def.isXtream) return fetchXtream(XtreamAccount(def.server, def.user, def.pass))
+        // a «get.php?username=..&password=..» link is really an Xtream account: ask its API first (live, movies and series then work with details);
+        // anything that does not answer like one falls back to the M3U exactly as before
+        val link = XtreamLink.parse(def.url)
+        if (link != null) {
+            val x = runCatching { fetchXtream(link) }.getOrNull()
+            if (x != null && x.first.isNotEmpty()) { detected = link; return x }
         }
+        detected = null; vodSplit = null
         var seen = 0
         val parsed = Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r ->
             // count entries as they stream in so the screen can say "N channels" instead of an empty wait
             M3uParser.parse(r.lineSequence().onEach { l -> if (l.startsWith("#EXTINF")) { seen++; if (seen % 25 == 0) _state.value = _state.value.copy(progress = seen) } })
         }
-        return parsed.channels to parsed.epgUrls
+        val sp = com.urtv.player.core.M3uVod.split(parsed.channels)
+        vodSplit = sp.takeIf { it.movies.isNotEmpty() || it.episodes.isNotEmpty() }
+        return sp.live to parsed.epgUrls
     }
 
     private suspend fun loadEpg(def: PlaylistDef, fetchNew: Boolean, urlsFromPlaylist: List<String>) {

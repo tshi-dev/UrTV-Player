@@ -140,3 +140,31 @@ class HostileInputTest {
         assertEquals(emptyMap(), XtreamParser.parseCategories("not json"))
     }
 }
+
+class XtreamLinkTest {
+    @Test fun aGetPhpLinkWithOnlyLoginKeysIsAnXtreamAccount() {
+        val a = XtreamLink.parse("http://host.example:8000/get.php?username=bob&password=p%40ss&type=m3u_plus&output=ts")!!
+        assertEquals("http://host.example:8000", a.server); assertEquals("bob", a.user); assertEquals("p@ss", a.pass)
+        assertEquals("https://h.example/sub", XtreamLink.parse("https://h.example/sub/player_api.php?username=u&password=p")!!.server)
+    }
+    @Test fun anythingElseStaysAPlainM3u() {
+        for (u in listOf("http://h/list.m3u", "http://h/get.php?username=u&password=p&token=abc", "http://h/get.php?username=u", "http://h/get.php?username=u&username=v&password=p",
+            "http://h/get.php?username=u&password=p#x", "ftp://h/get.php?username=u&password=p", "http://h/other.php?username=u&password=p", "http://h/get.php?username=&password=p", ""))
+            assertNull(XtreamLink.parse(u), u)
+    }
+    @Test fun streamIdsAreReadFromTheEndOfALiveUrl() {
+        assertEquals("123", XtreamLink.streamIdOf("http://h:80/u/p/123")); assertEquals("77", XtreamLink.streamIdOf("http://h/live/u/p/77.m3u8"))
+        assertEquals("5", XtreamLink.streamIdOf("http://h/live/u/p/5.ts?x=1")); assertNull(XtreamLink.streamIdOf("http://h/live/u/p/abc.m3u8"))
+    }
+}
+
+class XtreamEpisodesTest {
+    private val acc = XtreamAccount("http://h", "u", "p")
+    @Test fun episodesAsAMapOfSeasonsAsAListOfSeasonListsAndAsAFlatListAreAllRead() {
+        val ep = { id: Int, s: Int, n: Int -> """{"id":"$id","season":$s,"episode_num":$n,"title":"E$n","container_extension":"mkv"}""" }
+        val map = """{"episodes":{"1":[${ep(1, 1, 1)},${ep(2, 1, 2)}],"2":[${ep(3, 2, 1)}]}}"""
+        val lists = """{"episodes":[[${ep(1, 1, 1)},${ep(2, 1, 2)}],[${ep(3, 2, 1)}]]}"""
+        val flat = """{"episodes":[${ep(1, 1, 1)},${ep(2, 1, 2)},${ep(3, 2, 1)}]}"""
+        for (b in listOf(map, lists, flat)) assertEquals(listOf("1", "2", "3"), XtreamParser.parseEpisodes(b, acc).map { it.id }, b)
+    }
+}

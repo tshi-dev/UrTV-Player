@@ -39,7 +39,15 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
         if (fetch && !force && def != null && def.id in fetched && _state.value.playlistId == def.id) return
         if (fetch && def != null) fetched += def.id
         job?.cancel()
-        if (def == null || !def.isXtream) { _state.value = VodState(); return }
+        if (def == null) { _state.value = VodState(); return }
+        if (!def.isXtream) {      // an M3U list: its movies and series were split off when it was loaded; only the cached copy is read
+            job = scope.launch {
+                val (m, s) = withContext(Dispatchers.IO) { readMovies(File(dir, "movies_${def.id}.tsv")) to readSeries(File(dir, "series_${def.id}.tsv")) }
+                m3uEpisodes = withContext(Dispatchers.IO) { readEpisodes(File(dir, "m3uep_${def.id}.tsv")) }
+                _state.value = VodState(def.id, m, s)
+            }
+            return
+        }
         val mf = File(dir, "movies_${def.id}.tsv"); val sf = File(dir, "series_${def.id}.tsv")
         job = scope.launch {
             val (m, s) = withContext(Dispatchers.IO) { readMovies(mf) to readSeries(sf) }
@@ -49,19 +57,20 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             val stale = force || !mf.exists() || System.currentTimeMillis() - mf.lastModified() > maxAge
             if (!stale) return@launch
             _state.value = _state.value.copy(loading = true, failed = false)
-            val r = withContext(Dispatchers.IO) {
-                runCatching {
-                    val acc = account(def)
-                    val mc = XtreamParser.parseCategories(Http.text(acc.vodCategoriesUrl()))
-                    val movies = Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) }.sortedByDescending { it.added }
-                    val sc = XtreamParser.parseCategories(Http.text(acc.seriesCategoriesUrl()))
-                    val series = Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) }.sortedByDescending { it.added }
-                    writeMovies(mf, movies); writeSeries(sf, series)
-                    movies to series
-                }
-            }
-            r.onSuccess { (mv, sr) -> _state.value = VodState(def.id, mv, sr) }
-                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it); _state.value = _state.value.copy(loading = false, failed = m.isEmpty() && s.isEmpty()) }
+            // movies and series are asked separately: one that fails or times out never empties the other
+            val acc = account(def)
+            val mr = withContext(Dispatchers.IO) { runCatching {
+                val mc = runCatching { XtreamParser.parseCategories(Http.text(acc.vodCategoriesUrl())) }.getOrDefault(emptyMap())
+                Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) }.sortedByDescending { it.added }.also { writeMovies(mf, it) }
+            } }
+            if (mr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, movies = mr.getOrThrow())
+            val sr = withContext(Dispatchers.IO) { runCatching {
+                val sc = runCatching { XtreamParser.parseCategories(Http.text(acc.seriesCategoriesUrl())) }.getOrDefault(emptyMap())
+                Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) }.sortedByDescending { it.added }.also { writeSeries(sf, it) }
+            } }
+            if (sr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, series = sr.getOrThrow())
+            (mr.exceptionOrNull() ?: sr.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }
+            _state.value = _state.value.copy(loading = false, failed = mr.isFailure && sr.isFailure && _state.value.movies.isEmpty() && _state.value.series.isEmpty())
         }
     }
 
@@ -69,11 +78,31 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
         runCatching { XtreamParser.parseVodInfo(Http.text(account(def).vodInfoUrl(id))) }.getOrDefault(VodInfo())
     }
 
-    suspend fun episodes(def: PlaylistDef, seriesId: String): List<Episode> = withContext(Dispatchers.IO) {
+    suspend fun episodes(def: PlaylistDef, seriesId: String): List<Episode> = if (seriesId.startsWith("m3u:")) m3uEpisodes[seriesId].orEmpty() else withContext(Dispatchers.IO) {
         runCatching { XtreamParser.parseEpisodes(Http.text(account(def).seriesInfoUrl(seriesId)), account(def)) }.getOrDefault(emptyList())
     }
 
-    fun forget(id: String) { File(dir, "movies_$id.tsv").delete(); File(dir, "series_$id.tsv").delete() }
+    fun forget(id: String) { File(dir, "movies_$id.tsv").delete(); File(dir, "series_$id.tsv").delete(); File(dir, "m3uep_$id.tsv").delete() }
+
+    @Volatile private var m3uEpisodes: Map<String, List<Episode>> = emptyMap()
+
+    /** The movies and series found inside an M3U list: grouped by show name where the titles say «Name S01 E02», otherwise one entry each. */
+    fun setFromM3u(def: PlaylistDef, split: com.urtv.player.core.M3uVod.Split) {
+        val movies = split.movies.mapIndexed { i, c -> Movie("m3u:$i", c.name, c.url, c.group, c.logo, null, null, 0) }
+        val shows = LinkedHashMap<String, MutableList<Pair<com.urtv.player.core.M3uVod.EpisodeRef?, com.urtv.player.core.Channel>>>()
+        for ((ref, c) in split.episodes) shows.getOrPut(if (ref != null) "m3u:" + ref.show.lowercase() else "m3u:one:" + c.url.hashCode()) { ArrayList() } += (ref to c)
+        val series = ArrayList<Series>(); val eps = HashMap<String, List<Episode>>()
+        for ((id, l) in shows) {
+            val first = l.first().second
+            series += Series(id, l.first().first?.show ?: first.name, first.group, l.firstNotNullOfOrNull { it.second.logo }, "", null, null, 0)
+            eps[id] = l.mapIndexed { i, (ref, c) -> Episode("$id#$i", ref?.season ?: 1, ref?.number ?: (i + 1), c.name, c.url, "", c.logo, 0) }.sortedWith(compareBy({ it.season }, { it.number }))
+        }
+        writeMovies(File(dir, "movies_${def.id}.tsv"), movies); writeSeries(File(dir, "series_${def.id}.tsv"), series); writeEpisodes(File(dir, "m3uep_${def.id}.tsv"), eps)
+        m3uEpisodes = eps
+        _state.value = VodState(def.id, movies, series)
+    }
+    private fun writeEpisodes(f: File, m: Map<String, List<Episode>>) = write(f, m.flatMap { (sid, l) -> l.map { listOf(s(sid), s(it.id), it.season.toString(), it.number.toString(), s(it.title), s(it.url), s(it.image)) } })
+    private fun readEpisodes(f: File): Map<String, List<Episode>> = rows(f, 7).groupBy({ it[0] }) { Episode(it[1], it[2].toIntOrNull() ?: 1, it[3].toIntOrNull() ?: 0, it[4], it[5], "", it[6].ifEmpty { null }, 0) }
 
     private fun s(x: String?) = (x ?: "").replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
     private fun writeMovies(f: File, l: List<Movie>) = write(f, l.map { listOf(s(it.id), s(it.name), s(it.url), s(it.category), s(it.poster), s(it.rating), it.added.toString()) })

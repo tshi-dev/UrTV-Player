@@ -120,7 +120,7 @@ object XtreamParser {
         val eps = root["episodes"]
         val groups: List<Pair<String?, JsonElement>> = when (eps) {
             is JsonObject -> eps.entries.map { it.key to it.value }
-            is JsonArray -> eps.map { null to it }   // some servers return a list of season arrays
+            is JsonArray -> if (eps.any { it is JsonObject }) listOf<Pair<String?, JsonElement>>(null to eps) else eps.map { null to it }   // a flat list of episodes, or a list of season arrays (both seen)
             else -> return emptyList()
         }
         val out = ArrayList<Episode>()
@@ -140,4 +140,34 @@ object XtreamParser {
 
     private fun JsonObject.str(k: String): String? =
         (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+}
+
+/**
+ * A pasted M3U link that is really an Xtream «get.php» link (host + username + password in the query): the account behind it, or null.
+ * Strict on purpose (the rule the established apps use): the path ends in get.php / player_api.php / panel_api.php, no fragment, and the
+ * only query keys are username, password, type and output, each username/password exactly once. Any other key (a provider token) keeps
+ * it a plain M3U. The caller still has to see the provider's API answer before trusting the guess.
+ */
+object XtreamLink {
+    private val FILES = listOf("/get.php", "/player_api.php", "/panel_api.php")
+    private val KEYS = setOf("username", "password", "type", "output")
+
+    fun parse(url: String): XtreamAccount? {
+        val u = url.trim()
+        if (!(u.startsWith("http://", true) || u.startsWith("https://", true)) || u.contains('#')) return null
+        val q = u.indexOf('?'); if (q < 0) return null
+        val path = u.substring(0, q); val query = u.substring(q + 1)
+        val file = FILES.firstOrNull { path.endsWith(it, true) } ?: return null
+        val server = path.dropLast(file.length)
+        if (server.substringAfter("://").isBlank()) return null
+        val pairs = query.split('&').filter { it.isNotEmpty() }.map { it.substringBefore('=') to runCatching { java.net.URLDecoder.decode(it.substringAfter('=', ""), "UTF-8") }.getOrDefault("") }
+        if (pairs.any { it.first.lowercase() !in KEYS }) return null
+        val users = pairs.filter { it.first.equals("username", true) }; val passes = pairs.filter { it.first.equals("password", true) }
+        if (users.size != 1 || passes.size != 1 || users[0].second.isBlank() || passes[0].second.isBlank()) return null
+        return XtreamAccount(server, users[0].second, passes[0].second)
+    }
+
+    /** The stream id at the end of a live URL («…/user/pass/123», «…/live/user/pass/123.ts», «…/123.m3u8»), to carry favourites over. */
+    fun streamIdOf(streamUrl: String): String? =
+        streamUrl.substringBefore('?').trimEnd('/').substringAfterLast('/').substringBefore('.').takeIf { it.isNotEmpty() && it.all { c -> c.isDigit() } }
 }
