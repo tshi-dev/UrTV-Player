@@ -82,3 +82,14 @@ class FrameRuleTest {
         assertEquals(0, FrameStats.of(emptyList<FrameStats.Frame>()).frames)
     }
 }
+
+class SearchIndexTest {
+    @Test fun theIndexedSearchAnswersExactlyLikeTheOneByOneSearch() {
+        val names = listOf("beIN Sports 1 HD", "بي ان سبورت ١", "MBC Drama", "إم بي سي دراما", "Rotana Cinema", "روتانا سينما", "Al Jazeera", "الجزيرة", "قناة السعودية", "Saudi TV")
+        val idx = SearchFold.Index(names)
+        for (q in listOf("bein", "بي ان", "mbc", "دراما", "rotana", "سينما", "jazeera", "الجزيرة", "saudi", "xyz", "", "sdi", "ghvh")) {
+            val one = names.indices.filter { SearchFold.matches(names[it], q) }
+            assertEquals(one, SearchFold.search(idx, q).toList(), "query '$q'")
+        }
+    }
+}

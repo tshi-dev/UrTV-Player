@@ -95,7 +95,10 @@ val LocalContentEntry = androidx.compose.runtime.staticCompositionLocalOf<androi
 private val keyMemo = java.util.concurrent.ConcurrentHashMap<String, String>()
 /** Favourite/recent key: playlist id + a hash of the stream URL, so credentials in URLs never land in preferences. */
 fun chKey(pid: String, c: Channel): String = keyMemo.getOrPut(c.url) {
-    java.security.MessageDigest.getInstance("SHA-256").digest(c.url.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
+    val d = java.security.MessageDigest.getInstance("SHA-256").digest(c.url.toByteArray())
+    val hex = "0123456789abcdef"; val sb = StringBuilder(24)     // the first 12 bytes as lower-case hex (a format() call per byte was most of the cost on 50 000 channels)
+    for (i in 0 until 12) { val b = d[i].toInt() and 0xff; sb.append(hex[b ushr 4]).append(hex[b and 15]) }
+    sb.toString()
 }.let { "$pid|$it" }
 fun groupKey(pid: String, g: String) = "$pid|$g"
 fun fmtTime(ms: Long): String = SimpleDateFormat("HH:mm", Locale.US).format(Date(ms))
@@ -129,6 +132,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) { if (restoreKey == null && playlists.isNotEmpty()) runCatching { tabFocus.requestFocus() } }
 
     LaunchedEffect(tab) { Backdrop.url = null }
+    LaunchedEffect(tab) { val t0 = System.nanoTime(); androidx.compose.runtime.withFrameNanos { }; androidx.compose.runtime.withFrameNanos { }; Perf.log("tab_open_${tab.name}", (System.nanoTime() - t0) / 1_000_000, "to the second frame after the switch") }
     LaunchedEffect(tab) { Bisect.refresh() }
     Box(Modifier.fillMaxSize().background(if (Bisect.on("nobackdrop")) androidx.compose.ui.graphics.SolidColor(C.bg) else C.bgBrush)) {
     if (!Bisect.on("nobackdrop")) PosterBackdrop()
@@ -346,7 +350,8 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val recents by store.recents.collectAsState()
     val lists by store.customLists.collectAsState()
     val epg by app.catalog.epg.collectAsState()
-    val allGroups = remember(cat.channels) { Browse.groups(cat.channels) }
+    val index = cat.index.takeIf { it.channels === cat.channels } ?: remember(cat.channels) { com.urtv.player.data.ChannelIndex(cat.channels, pid) }     // normally built when the list was loaded, off the main thread
+    val allGroups = index.groups
     val groups = remember(allGroups, order, hidden) { Browse.arrange(allGroups, order[pid].orEmpty(), hidden.filter { it.startsWith("$pid|") }.map { it.substringAfter('|') }.toSet()) }
     var group by remember(pid) { mutableStateOf(Browse.ALL) }
     var query by remember(pid) { mutableStateOf("") }
@@ -358,26 +363,27 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val gKey = groupKey(pid, group)
     val isLocked = group != Browse.ALL && gKey in locked && gKey !in app.unlocked
     val hiddenCh by store.hiddenChannels.collectAsState()
-    val visibleChannels = remember(cat.channels, groups, hiddenCh) { val g = groups.toSet(); cat.channels.filter { c -> Browse.groupsOf(c).any { it in g } && (hiddenCh.isEmpty() || chKey(pid, c) !in hiddenCh) } }     // the SHA-256 key of each channel is only needed when something is hidden
-    val numbers = remember(cat.channels) { HashMap<String, Int>(cat.channels.size * 2).also { m -> cat.channels.forEachIndexed { i, c -> m[c.url] = c.number ?: (i + 1) } } }
-    val byKeyL = remember(cat.channels) { lazy { cat.channels.associateBy { chKey(pid, it) } } }     // only the «recent» group needs it
+    val nothingHidden = groups.size == allGroups.size && hiddenCh.isEmpty()
+    val visibleChannels = remember(cat.channels, groups, hiddenCh) { if (nothingHidden) cat.channels else { val g = groups.toSet(); cat.channels.filterIndexed { i, c -> Browse.groupsOf(c).any { it in g } && (hiddenCh.isEmpty() || index.keys[i] !in hiddenCh) } } }     // nothing hidden (the usual case): no work at all; keys are only computed for hidden channels
+    val numbers = index.numbers
+    val byKeyL = remember(cat.channels) { lazy { HashMap<String, Channel>(cat.channels.size * 2).also { m -> cat.channels.forEachIndexed { i, c -> m[index.keys[i]] = c } } } }     // only the «recent» group needs it
     val searched = remember(pid) { mutableStateOf<List<Channel>?>(null) }
     // typing: filter 50k names off the main thread, a short debounce, the list shows the previous result meanwhile
     LaunchedEffect(visibleChannels, query) {
         if (query.isBlank()) { searched.value = null; return@LaunchedEffect }
         delay(140)
-        searched.value = withContext(kotlinx.coroutines.Dispatchers.Default) { Browse.filter(visibleChannels, Browse.ALL, query) }
+        searched.value = withContext(kotlinx.coroutines.Dispatchers.Default) { val t0 = System.nanoTime(); val hits = index.search(query); val r = if (nothingHidden) hits else { val vis = visibleChannels.toHashSet(); hits.filter { it in vis } }; Perf.log("search", (System.nanoTime() - t0) / 1_000_000, "${index.channels.size} names, ${r.size} hits"); r }
     }
-    val list = remember(cat.channels, visibleChannels, group, query, favs, recents, searched.value) {
+    val list = remember(cat.channels, visibleChannels, group, query, favs, recents, searched.value) { Perf.time("list_build", "${cat.channels.size} channels") {
         when {
             query.isNotBlank() -> searched.value ?: visibleChannels
             group == Browse.ALL -> visibleChannels
-            group == Browse.FAV -> cat.channels.filter { chKey(pid, it) in favs }
+            group == Browse.FAV -> if (favs.isEmpty()) emptyList() else cat.channels.filterIndexed { i, _ -> index.keys[i] in favs }
             group == Browse.RECENT -> recents.mapNotNull { byKeyL.value[it] }
-            group.startsWith(Browse.LIST) -> (lists["$pid|${group.removePrefix(Browse.LIST)}"] ?: emptySet()).let { ks -> cat.channels.filter { chKey(pid, it) in ks } }
-            else -> Browse.filter(visibleChannels, group, "")
+            group.startsWith(Browse.LIST) -> (lists["$pid|${group.removePrefix(Browse.LIST)}"] ?: emptySet()).let { ks -> if (ks.isEmpty()) emptyList() else cat.channels.filterIndexed { i, _ -> index.keys[i] in ks } }
+            else -> if (nothingHidden) (index.byGroup[group] ?: emptyList()) else Browse.filter(visibleChannels, group, "")
         }
-    }
+    } }
     val counts = remember(cat.channels) { HashMap<String, Int>().also { m -> for (c in cat.channels) for (g in Browse.groupsOf(c)) m[g] = (m[g] ?: 0) + 1 } }
     val arabicUi = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language == "ar"
 

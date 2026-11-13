@@ -92,6 +92,13 @@ object SearchFold {
         private val empty = query.isBlank()
         private val views = if (empty) emptyList() else queryViews(query.trim())
         private val skeletons = views.map { v -> skeleton(if (hasArabic(v)) translit(v) else v) }.filter { it.length >= 3 }.distinct()
+        internal fun matchesIndexed(i: Int, idx: Index): Boolean {
+            if (empty) return true
+            val n = idx.folded[i]
+            if (views.any { n.contains(it) }) return true
+            if (skeletons.isEmpty()) return false
+            return skeletons.any { idx.skeletonAny(i).contains(it) || idx.skeletonLatin(i).contains(it) }
+        }
         fun matches(name: String): Boolean {
             if (empty) return true
             val n = fold(name)
@@ -105,4 +112,25 @@ object SearchFold {
     }
 
     fun matches(name: String, query: String): Boolean = Query(query).matches(name)
+
+    /**
+     * The names of a big list prepared once (folded, and their skeletons on first need), so a keystroke over 100 000 names is a plain
+     * substring scan instead of a fresh normalisation of every name. Built off the main thread when the list is loaded.
+     */
+    class Index(private val names: List<String>) {
+        internal val folded: Array<String> = Array(names.size) { fold(names[it]) }
+        private val skelAny = arrayOfNulls<String>(names.size)
+        private val skelLatin = arrayOfNulls<String>(names.size)
+        val size get() = names.size
+        internal fun skeletonAny(i: Int): String = skelAny[i] ?: skeleton(if (hasArabic(names[i])) translit(names[i]) else folded[i]).also { skelAny[i] = it }
+        internal fun skeletonLatin(i: Int): String = skelLatin[i] ?: skeleton(folded[i]).also { skelLatin[i] = it }
+    }
+
+    /** Indexes (into the list the [Index] was built from) of the names that match [query], in list order. */
+    fun search(index: Index, query: String): IntArray {
+        val q = Query(query)
+        val out = IntArray(index.size); var n = 0
+        for (i in 0 until index.size) if (q.matchesIndexed(i, index)) out[n++] = i
+        return out.copyOf(n)
+    }
 }

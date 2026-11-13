@@ -226,7 +226,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             _firstFrame.value = true
             LoadTrace.finish()?.let { b -> _stats.value = _stats.value.copy(trace = b.line) }
             val t = System.currentTimeMillis() - loadStartMs
-            if (loadStartMs > 0 && t in 1..60_000) { ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
+            if (loadStartMs > 0 && t in 1..60_000) { android.util.Log.i("UrTVPerf", "first_frame ${t} ms${if (preview) " (preview)" else ""}"); ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
         }
         override fun onPlaybackStateChanged(state: Int) {
             // a stall after playback had started: after 3 in a minute, switch to a lower variant

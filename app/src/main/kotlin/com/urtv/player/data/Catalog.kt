@@ -18,6 +18,8 @@ import java.io.File
 data class CatalogState(
     val playlistId: String? = null,
     val channels: List<Channel> = emptyList(),
+    /** Groups, per-group lists, numbers and search names of [channels], built off the main thread. */
+    val index: ChannelIndex = ChannelIndex.EMPTY,
     val loading: Boolean = false,
     val error: LoadError? = null,
     val epgLoading: Boolean = false,
@@ -45,11 +47,11 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         val def = store.playlists.value.firstOrNull { it.id == id }
         if (def == null) { _state.value = CatalogState(settled = true); _epg.value = EpgIndex.EMPTY; return }
         val sameList = _state.value.playlistId == id
-        _state.value = CatalogState(playlistId = id, channels = if (sameList) _state.value.channels else emptyList(), loading = true)
+        _state.value = CatalogState(playlistId = id, channels = if (sameList) _state.value.channels else emptyList(), index = if (sameList) _state.value.index else ChannelIndex.EMPTY, loading = true)
         job = scope.launch {
             val cacheFile = chFile(def.id)
             val cached = withContext(Dispatchers.IO) { readCache(cacheFile) }
-            if (cached.isNotEmpty()) _state.value = _state.value.copy(channels = cached, loading = false, settled = true)
+            if (cached.isNotEmpty()) _state.value = _state.value.copy(channels = cached, index = withContext(Dispatchers.Default) { ChannelIndex(cached, def.id) }, loading = false, settled = true)
             val maxAgeMs = store.refreshHours.value * 3_600_000L
             val stale = !cacheFile.exists() || cached.isEmpty() || (maxAgeMs > 0 && System.currentTimeMillis() - cacheFile.lastModified() > maxAgeMs)
             var epgUrls = emptyList<String>()
@@ -62,7 +64,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                     if (list.isEmpty()) _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Empty else null)
                     else {
                         // the list is on screen first; the (encrypted) cache is written afterwards, off the critical path
-                        _state.value = _state.value.copy(channels = list, loading = false, settled = true, error = null, progress = 0)
+                        _state.value = _state.value.copy(channels = list, index = withContext(Dispatchers.Default) { ChannelIndex(list, def.id) }, loading = false, settled = true, error = null, progress = 0)
                         val t1 = System.currentTimeMillis()
                         withContext(Dispatchers.IO) { writeCache(cacheFile, list) }
                         timings = LoadTimings(t1 - t0, System.currentTimeMillis() - t1, list.size)
