@@ -88,7 +88,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         if (def.isXtream) {
             val acc = XtreamAccount(def.server, def.user, def.pass)
             val cats = XtreamParser.parseCategories(Http.text(acc.categoriesUrl()))
-            val parsed = XtreamParser.parseStreams(Http.text(acc.streamsUrl()), acc, cats)
+            val parsed = Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) }
             return parsed.channels to parsed.epgUrls
         }
         var seen = 0

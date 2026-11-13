@@ -128,3 +128,19 @@ TV result of v0.9.12: preview on 28.6 % janky vs 6.5 % off; frames over 30 ms we
 - The pane no longer changes size per key: name, programme title, time, progress bar, description and the "next" list are fixed-height blocks, so a key changes only text inside them.
 - The live preview is OFF by default on devices under 2600 MB RAM (and on low-RAM devices). It stays one switch in Settings; an existing explicit choice is kept.
 - To re-measure on the TV: preview on vs off, 10 DOWN 1 s apart; tell which frames are still over 30 ms.
+
+### Big provider lists (50 000 entries, measured on a development machine; a TV is about 5-10 times slower)
+
+| Step | Cold | Warm | Where |
+|---|---|---|---|
+| M3U parse | 0.73 s | | background thread |
+| Xtream JSON parse | 0.50 s | | background thread |
+| Groups | 112 ms | 12 ms | main thread, once per list |
+| Visible list with a SHA-256 key per channel | 612 ms | 44 ms | main thread (this was the worst) |
+| Search over 50 000 names | 209 ms | 31 ms | main thread per keystroke (this was the second worst) |
+
+Fixed: the per-channel key is computed only when something is hidden; the by-key index is built only when the «recent» group needs it; typing searches on a background thread after a 140 ms pause and the list keeps the previous result meanwhile; the movie and series lists are read from the cache at start and downloaded only when Movies or Series is opened (once per run); the big Xtream arrays are parsed from the stream one entry at a time instead of as one string plus one tree. Logos load only for visible rows (unchanged).
+
+### Sound without a picture
+
+A stream can carry a video track (for example HEVC 2160p or 10-bit) that the TV has no decoder for. The player drops it silently and plays the sound only. The player now says so in a line («هذا التلفزيون ما يقدر يشغّل صورة هذه القناة (4K HEVC)…») and the problem report carries `picture no_picture_<size>_<codec>_decoders<N>`. Decoder fallback (hardware first, then software) was already on.

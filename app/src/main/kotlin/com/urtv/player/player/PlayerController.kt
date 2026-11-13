@@ -68,6 +68,9 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private val _firstFrame = MutableStateFlow(false)
     /** True once the CURRENT channel has drawn its first picture (false from the moment a new channel is asked for). */
     val firstFrame: StateFlow<Boolean> = _firstFrame
+    private val _videoBlock = MutableStateFlow("")
+    /** Non-empty (for example «4K HEVC») while the stream has a picture this TV cannot decode. */
+    val videoBlock: StateFlow<String> = _videoBlock
 
     private val _ended = MutableStateFlow(false)
     val ended: StateFlow<Boolean> = _ended
@@ -240,7 +243,18 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             }
         }
         override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) _status.value = PlayStatus.Playing }
-        override fun onTracksChanged(tracks: Tracks) { _tracks.value = readTracks(tracks) }
+        override fun onTracksChanged(tracks: Tracks) {
+            _tracks.value = readTracks(tracks)
+            // a video track the TV has no decoder for is dropped silently by the player: say so instead of playing sound alone
+            val vids = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO && it.length > 0 }.map { g -> g.getTrackFormat(0).let { f -> com.urtv.player.core.VideoSupport.Track(f.sampleMimeType, f.width, f.height, g.isSelected) } }
+            val b = com.urtv.player.core.VideoSupport.blocked(vids)
+            if (b == null) { _videoBlock.value = ""; com.urtv.player.data.Diag.videoBlock = "" }
+            else {
+                _videoBlock.value = com.urtv.player.core.VideoSupport.label(b.mime, b.width, b.height).ifEmpty { "HD+" }
+                val n = runCatching { androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(b.mime ?: "", false, false).size }.getOrDefault(-1)
+                com.urtv.player.data.Diag.videoBlock = com.urtv.player.core.VideoSupport.reportToken(b.mime, b.width, b.height, n)
+            }
+        }
         override fun onCues(cueGroup: CueGroup) { _cue.value = cueGroup.cues.mapNotNull { it.text?.toString() }.joinToString("\n") }
         override fun onVideoSizeChanged(v: VideoSize) { _video.value = if (v.width > 0 && v.height > 0) v.width * v.pixelWidthHeightRatio / v.height else 0f }
         override fun onPlayerError(e: PlaybackException) {
@@ -333,6 +347,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         onSessionEnd?.invoke()      // a new channel ends a commentary session (the second sound belongs to the old picture)
         vod = isVod; startAtMs = startMs; _ended.value = false
         current = ch; forceHls = false; _attempt.value = 0; _paused.value = false
+        _videoBlock.value = ""; com.urtv.player.data.Diag.videoBlock = ""
         _firstFrame.value = false; LoadTrace.begin(); measuredFps = 0f; lastRenderedAt = 0L
         triedAlt.clear(); _altNote.value = null; errorKind = Diagnosis.ErrorKind.None; lastHttpStatus = 0; _cause.value = Diagnosis.Cause.None; if (!preview) tracker.clear()
         _tracks.value = TrackState(); _cue.value = ""; _video.value = 0f

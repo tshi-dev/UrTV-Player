@@ -179,6 +179,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         // status
         val paused by ctrl.paused.collectAsState()
         val firstFrame by ctrl.firstFrame.collectAsState()
+        val noPicture by ctrl.videoBlock.collectAsState()
         // A new channel (or a reconnect) must never look like the old picture froze: black it out at once; the banner below names the new channel.
         val opening = !blocked && (status == PlayStatus.Reconnecting || (status == PlayStatus.Loading && !firstFrame))
         if (opening) Box(Modifier.fillMaxSize().background(Color.Black))
@@ -189,6 +190,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
                 status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(10.dp)); WhyLine(cause, ctrl.lastHttpStatus) }
                 status == PlayStatus.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); WhyLine(cause, ctrl.lastHttpStatus) }
                 paused -> Text("❚❚", style = T.display)
+                noPicture.isNotEmpty() -> Text(stringResource(R.string.no_picture, noPicture), style = T.title, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 240.dp).background(Color(0xB0000000), Rd(16)).padding(28.dp))
             }
         }
 

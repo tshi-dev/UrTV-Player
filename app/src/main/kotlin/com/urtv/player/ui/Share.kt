@@ -47,7 +47,7 @@ private fun collect(app: UrtvApp): Report.Info {
         brand = android.os.Build.MANUFACTURER.orEmpty(), ram = if (lowRam) "low" else "normal",
         language = app.store.resolvedLang(), theme = look.theme.name, accent = look.accent.name,
         playlists = app.store.playlists.value, homeServers = app.servers.servers.value.size,
-        codec = app.player.stats.value.codec.substringBefore(' '), lastPlayerError = Diag.lastPlayerError, recentErrors = Diag.recent(5),
+        codec = app.player.stats.value.codec.substringBefore(' '), lastPlayerError = Diag.lastPlayerError, recentErrors = Diag.recent(5), videoBlock = Diag.videoBlock,
     )
 }
 

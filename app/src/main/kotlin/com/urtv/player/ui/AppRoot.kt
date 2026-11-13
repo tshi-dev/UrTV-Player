@@ -64,7 +64,9 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
     val def = playlists.firstOrNull { it.id == cat.playlistId }
     // Home server only: nothing of IPTV is loaded or reachable.
     LaunchedEffect(homeOnly) { if (homeOnly && screen != Screen.Server) screen = Screen.Server }
-    LaunchedEffect(cat.playlistId, def?.isXtream) { if (!homeOnly) app.vod.open(def) }
+    // movies and series: at start only the cached lists are read; the provider is asked when Movies or Series is opened
+    LaunchedEffect(cat.playlistId, def?.isXtream) { if (!homeOnly) app.vod.open(def, fetch = false) }
+    LaunchedEffect(tab, cat.playlistId) { if (!homeOnly && (tab == Tab.Movies || tab == Tab.Series)) app.vod.open(def) }
     if ((tab == Tab.Movies || tab == Tab.Series) && def?.isXtream != true && playlists.isNotEmpty() && cat.playlistId != null) tab = Tab.Home
 
     // Open the active playlist once per process; optionally resume the last channel ("last" start screen or the resume setting).

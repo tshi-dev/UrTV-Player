@@ -306,4 +306,5 @@
     <string name="cm_small_msg">Commentary mix is designed for TVs with 2 GB of memory or more. Yours has less, so it may be slow or stutter. Do you want to try it?</string>
     <string name="cm_try">Try</string>
     <string name="cm_cancel">Cancel</string>
+    <string name="no_picture">This TV cannot show the picture of this channel (%1$s). Try an HD copy of the channel</string>
 </resources>

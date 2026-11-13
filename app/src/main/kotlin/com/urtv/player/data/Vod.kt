@@ -33,7 +33,11 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
 
     fun account(def: PlaylistDef) = XtreamAccount(def.server, def.user, def.pass)
 
-    fun open(def: PlaylistDef?, force: Boolean = false) {
+    /** [fetch] false: only the cached lists are read (start-up: nothing is downloaded or parsed until Movies or Series is opened). */
+    private val fetched = HashSet<String>()     // playlists already asked in this run: switching between Movies and Series does not ask again
+    fun open(def: PlaylistDef?, force: Boolean = false, fetch: Boolean = true) {
+        if (fetch && !force && def != null && def.id in fetched && _state.value.playlistId == def.id) return
+        if (fetch && def != null) fetched += def.id
         job?.cancel()
         if (def == null || !def.isXtream) { _state.value = VodState(); return }
         val mf = File(dir, "movies_${def.id}.tsv"); val sf = File(dir, "series_${def.id}.tsv")
@@ -41,6 +45,7 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             val (m, s) = withContext(Dispatchers.IO) { readMovies(mf) to readSeries(sf) }
             _state.value = VodState(def.id, m, s, loading = false)
             val maxAge = (store.refreshHours.value.takeIf { it > 0 } ?: 24) * 3_600_000L
+            if (!fetch) return@launch
             val stale = force || !mf.exists() || System.currentTimeMillis() - mf.lastModified() > maxAge
             if (!stale) return@launch
             _state.value = _state.value.copy(loading = true, failed = false)
@@ -48,9 +53,9 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
                 runCatching {
                     val acc = account(def)
                     val mc = XtreamParser.parseCategories(Http.text(acc.vodCategoriesUrl()))
-                    val movies = XtreamParser.parseMovies(Http.text(acc.vodStreamsUrl()), acc, mc).sortedByDescending { it.added }
+                    val movies = Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) }.sortedByDescending { it.added }
                     val sc = XtreamParser.parseCategories(Http.text(acc.seriesCategoriesUrl()))
-                    val series = XtreamParser.parseSeriesList(Http.text(acc.seriesUrl()), sc).sortedByDescending { it.added }
+                    val series = Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) }.sortedByDescending { it.added }
                     writeMovies(mf, movies); writeSeries(sf, series)
                     movies to series
                 }

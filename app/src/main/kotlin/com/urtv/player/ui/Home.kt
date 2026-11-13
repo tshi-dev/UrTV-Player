@@ -70,6 +70,7 @@ import com.urtv.player.data.CatalogState
 import com.urtv.player.data.LoadError
 import com.urtv.player.data.WatchItem
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.produceState
@@ -204,7 +205,7 @@ private fun HomeRows(
     val recents by store.recents.collectAsState()
     val vod by app.vod.state.collectAsState()
     val epg by app.catalog.epg.collectAsState()
-    val byKey = remember(cat.channels) { cat.channels.associateBy { chKey(pid, it) } }
+    val byKeyL = remember(cat.channels) { lazy { cat.channels.associateBy { chKey(pid, it) } } }
     val first = remember { FocusRequester() }
     var firstTaken = false
 
@@ -278,7 +279,7 @@ private fun HomeRows(
                         Text(stringResource(R.string.cont_hint), style = T.tiny, modifier = Modifier.padding(horizontal = 4.dp))
                     }
                     id == "favs" -> channelRow(R.string.tab_favs, cat.channels.filter { chKey(pid, it) in favs })
-                    id == "recent" -> channelRow(R.string.recent_channels, recents.mapNotNull { byKey[it] }.take(20))
+                    id == "recent" -> channelRow(R.string.recent_channels, recents.mapNotNull { byKeyL.value[it] }.take(20))
                     id == "movies" -> posterRow(R.string.tab_movies, vod.movies.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenMovie)
                     id == "series" -> posterRow(R.string.tab_series, vod.series.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenSeries)
                     id.startsWith("group:") -> {
@@ -357,15 +358,22 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
     val gKey = groupKey(pid, group)
     val isLocked = group != Browse.ALL && gKey in locked && gKey !in app.unlocked
     val hiddenCh by store.hiddenChannels.collectAsState()
-    val visibleChannels = remember(cat.channels, groups, hiddenCh) { val g = groups.toSet(); cat.channels.filter { c -> Browse.groupsOf(c).any { it in g } && chKey(pid, c) !in hiddenCh } }
+    val visibleChannels = remember(cat.channels, groups, hiddenCh) { val g = groups.toSet(); cat.channels.filter { c -> Browse.groupsOf(c).any { it in g } && (hiddenCh.isEmpty() || chKey(pid, c) !in hiddenCh) } }     // the SHA-256 key of each channel is only needed when something is hidden
     val numbers = remember(cat.channels) { HashMap<String, Int>(cat.channels.size * 2).also { m -> cat.channels.forEachIndexed { i, c -> m[c.url] = c.number ?: (i + 1) } } }
-    val byKey = remember(cat.channels) { cat.channels.associateBy { chKey(pid, it) } }
-    val list = remember(cat.channels, visibleChannels, group, query, favs, recents) {
+    val byKeyL = remember(cat.channels) { lazy { cat.channels.associateBy { chKey(pid, it) } } }     // only the «recent» group needs it
+    val searched = remember(pid) { mutableStateOf<List<Channel>?>(null) }
+    // typing: filter 50k names off the main thread, a short debounce, the list shows the previous result meanwhile
+    LaunchedEffect(visibleChannels, query) {
+        if (query.isBlank()) { searched.value = null; return@LaunchedEffect }
+        delay(140)
+        searched.value = withContext(kotlinx.coroutines.Dispatchers.Default) { Browse.filter(visibleChannels, Browse.ALL, query) }
+    }
+    val list = remember(cat.channels, visibleChannels, group, query, favs, recents, searched.value) {
         when {
-            query.isNotBlank() -> Browse.filter(visibleChannels, Browse.ALL, query)
+            query.isNotBlank() -> searched.value ?: visibleChannels
             group == Browse.ALL -> visibleChannels
             group == Browse.FAV -> cat.channels.filter { chKey(pid, it) in favs }
-            group == Browse.RECENT -> recents.mapNotNull { byKey[it] }
+            group == Browse.RECENT -> recents.mapNotNull { byKeyL.value[it] }
             group.startsWith(Browse.LIST) -> (lists["$pid|${group.removePrefix(Browse.LIST)}"] ?: emptySet()).let { ks -> cat.channels.filter { chKey(pid, it) in ks } }
             else -> Browse.filter(visibleChannels, group, "")
         }

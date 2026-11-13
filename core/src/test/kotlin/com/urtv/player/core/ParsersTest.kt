@@ -47,6 +47,15 @@ class XtreamTest {
         assertEquals(1, r.channels.size); assertEquals(2, r.skipped)
         assertEquals("رياضة", r.channels[0].group); assertNull(r.channels[0].epgId)
     }
+    @Test fun streamingParseKeepsWhatWasReadWhenTheAnswerIsCut() {
+        val acc2 = XtreamAccount("http://h", "u", "p")
+        val body = """[{"stream_id":1,"name":"A"},{"stream_id":"2","name":"B"},{"stream_id":3,"na"""
+        val r = XtreamParser.parseStreams(body.byteInputStream(), acc2)
+        assertEquals(listOf("1", "2"), r.channels.map { it.id }, "the entries before the cut are kept")
+        val big = "[" + (1..2000).joinToString(",") { """{"stream_id":$it,"name":"C$it","category_id":"1"}""" } + "]"
+        assertEquals(2000, XtreamParser.parseStreams(big.byteInputStream(), acc2).channels.size)
+        assertEquals(2000, XtreamParser.parseMovies(big.byteInputStream(), acc2).size)
+    }
     @Test fun badJson() {
         assertTrue(XtreamParser.parseCategories("<html>").isEmpty())
         assertTrue(XtreamParser.parseStreams("{}", acc).channels.isEmpty())

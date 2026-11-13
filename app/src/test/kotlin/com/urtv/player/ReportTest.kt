@@ -71,4 +71,11 @@ class ReportTest {
         assertEquals(text, String(buf, 0, n, Charsets.UTF_8))
         assertTrue(link.length < 700, "short enough for a clean QR: ${link.length}")
     }
+
+    @Test fun aStreamWhosePictureCannotBeShownIsNamedInTheProblemReport() {
+        val text = Report.build(Report.Kind.Problem, "", info().copy(videoBlock = "no_picture_4K_HEVC_3840x2160_decoders0 ://"))
+        kotlin.test.assertTrue(text.contains("picture no_picture_4K_HEVC_3840x2160_decoders0"), text)
+        kotlin.test.assertTrue(!text.contains("://"), "only token characters survive")
+        kotlin.test.assertTrue(Report.build(Report.Kind.Problem, "", info()).contains("picture ok"))
+    }
 }

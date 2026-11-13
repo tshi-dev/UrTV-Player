@@ -21,7 +21,7 @@ object Report {
         val androidRelease: String, val sdk: Int, val brand: String, val ram: String,   // ram: low | normal
         val language: String, val theme: String, val accent: String,
         val playlists: List<PlaylistDef>, val homeServers: Int,
-        val codec: String, val lastPlayerError: String, val recentErrors: List<String>,
+        val codec: String, val lastPlayerError: String, val recentErrors: List<String>, val videoBlock: String = "",
     )
 
     /** ASCII letters, digits and ._- only, capped: whatever else is in [s] is dropped. */
@@ -42,7 +42,7 @@ object Report {
             add("Extras: language ${tok(i.language, 3)}, theme ${tok(i.theme)}, accent ${tok(i.accent)}")
             add("Extras: playlists ${i.playlists.size} (m3u $m3u, xtream $xt), home servers ${i.homeServers.coerceIn(0, 99)}")
             if (kind == Kind.Problem) {
-                add("Extras: codec ${tok(i.codec, 24).ifEmpty { "none" }}, last player error ${i.lastPlayerError.takeIf { CODE.matches(it) } ?: "none"}")
+                add("Extras: codec ${tok(i.codec, 24).ifEmpty { "none" }}, last player error ${i.lastPlayerError.takeIf { CODE.matches(it) } ?: "none"}, picture ${tok(i.videoBlock, 60).ifEmpty { "ok" }}")
                 val errs = i.recentErrors.map { ident(it) }.filter { it.isNotEmpty() }.take(5)
                 add("Extras: recent errors ${if (errs.isEmpty()) "none" else errs.joinToString(", ")}")
             }

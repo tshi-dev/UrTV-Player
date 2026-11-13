@@ -9,6 +9,8 @@ import java.util.ArrayDeque
 object Diag {
     private val ring = ArrayDeque<String>()
     @Volatile var lastPlayerError: String = ""; private set
+    /** Set while a stream has a video track this TV cannot show (codec, size, number of decoders); empty otherwise. Report line only. */
+    @Volatile var videoBlock: String = ""
 
     private val CLASS = Regex("[A-Za-z][A-Za-z0-9_]{0,48}")
 

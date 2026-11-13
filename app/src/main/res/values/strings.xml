@@ -306,4 +306,5 @@
     <string name="cm_small_msg">دمج التعليق مصمّم لتلفزيونات بذاكرة 2 قيقا وأكثر. تلفزيونك أقل، وممكن يثقل أو يقطع. تبغى تجرّبه؟</string>
     <string name="cm_try">جرّب</string>
     <string name="cm_cancel">إلغاء</string>
+    <string name="no_picture">هذا التلفزيون ما يقدر يشغّل صورة هذه القناة (%1$s). جرّب نسخة HD من القناة</string>
 </resources>

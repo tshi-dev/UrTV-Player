@@ -51,10 +51,27 @@ object XtreamParser {
         return out
     }
 
-    fun parseStreams(body: String, account: XtreamAccount, categories: Map<String, String> = emptyMap()): ParsedPlaylist {
-        val arr = runCatching { json.parseToJsonElement(body).jsonArray }.getOrNull() ?: return ParsedPlaylist(emptyList(), skipped = 1)
+    /**
+     * The objects of a top-level JSON array, one at a time straight from the stream: a 50 000-entry answer is never held as one string
+     * plus one tree (3-5x its size). Garbage or a cut connection ends the sequence early; what was read so far is kept.
+     */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    fun objects(input: java.io.InputStream): Sequence<JsonObject> = elements(input).filterIsInstance<JsonObject>()
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun elements(input: java.io.InputStream): Sequence<JsonElement> = sequence {
+        val it = runCatching { json.decodeToSequence(input, JsonElement.serializer(), kotlinx.serialization.json.DecodeSequenceMode.ARRAY_WRAPPED).iterator() }.getOrNull() ?: return@sequence
+        while (true) {
+            val e = runCatching { if (it.hasNext()) it.next() else null }.getOrNull() ?: break
+            yield(e)
+        }
+    }
+
+    fun parseStreams(body: String, account: XtreamAccount, categories: Map<String, String> = emptyMap()) = parseStreams(body.byteInputStream(), account, categories)
+
+    fun parseStreams(input: java.io.InputStream, account: XtreamAccount, categories: Map<String, String> = emptyMap()): ParsedPlaylist {
         val ch = ArrayList<Channel>(); var skipped = 0
-        for (e in arr) {
+        for (e in elements(input)) {
             val o = e as? JsonObject
             val sid = o?.str("stream_id")
             if (o == null || sid == null) { skipped++; continue }
@@ -68,23 +85,27 @@ object XtreamParser {
                 archiveDays = if (o.str("tv_archive") == "1") (o.str("tv_archive_duration")?.toIntOrNull() ?: 0) else 0,
             )
         }
-        return ParsedPlaylist(ch, listOf(account.xmltvUrl()), skipped)
+        return ParsedPlaylist(ch, listOf(account.xmltvUrl()), if (ch.isEmpty() && skipped == 0) 1 else skipped)
     }
 
-    fun parseMovies(body: String, account: XtreamAccount, categories: Map<String, String> = emptyMap()): List<Movie> =
-        array(body).mapNotNull { o ->
+    fun parseMovies(body: String, account: XtreamAccount, categories: Map<String, String> = emptyMap()): List<Movie> = parseMovies(body.byteInputStream(), account, categories)
+
+    fun parseMovies(input: java.io.InputStream, account: XtreamAccount, categories: Map<String, String> = emptyMap()): List<Movie> =
+        objects(input).mapNotNull { o ->
             val id = o.str("stream_id") ?: return@mapNotNull null
             Movie(id, o.str("name") ?: id, account.movieUrl(id, o.str("container_extension") ?: ""),
                 o.str("category_id")?.let { categories[it] } ?: "", o.str("stream_icon")?.ifBlank { null },
                 o.str("rating")?.ifBlank { null }, null, o.str("added")?.toLongOrNull() ?: 0)
-        }
+        }.toList()
 
-    fun parseSeriesList(body: String, categories: Map<String, String> = emptyMap()): List<Series> =
-        array(body).mapNotNull { o ->
+    fun parseSeriesList(body: String, categories: Map<String, String> = emptyMap()): List<Series> = parseSeriesList(body.byteInputStream(), categories)
+
+    fun parseSeriesList(input: java.io.InputStream, categories: Map<String, String> = emptyMap()): List<Series> =
+        objects(input).mapNotNull { o ->
             val id = o.str("series_id") ?: return@mapNotNull null
             Series(id, o.str("name") ?: id, o.str("category_id")?.let { categories[it] } ?: "", o.str("cover")?.ifBlank { null },
                 o.str("plot") ?: "", o.str("rating")?.ifBlank { null }, o.str("releaseDate")?.take(4)?.ifBlank { null }, o.str("last_modified")?.toLongOrNull() ?: 0)
-        }
+        }.toList()
 
     fun parseVodInfo(body: String): VodInfo {
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return VodInfo()
