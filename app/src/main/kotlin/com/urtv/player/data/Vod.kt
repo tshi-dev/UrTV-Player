@@ -36,8 +36,9 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
     /** [fetch] false: only the cached lists are read (start-up: nothing is downloaded or parsed until Movies or Series is opened). */
     private val fetched = HashSet<String>()     // playlists already asked in this run: switching between Movies and Series does not ask again
     fun open(def: PlaylistDef?, force: Boolean = false, fetch: Boolean = true) {
+        // the cache-only open at start must never cancel a fetch in progress or replace lists that are already showing (this made the lists vanish after loading)
+        if (!fetch && def != null && _state.value.playlistId == def.id && (_state.value.loading || _state.value.movies.isNotEmpty() || _state.value.series.isNotEmpty())) return
         if (fetch && !force && def != null && def.id in fetched && _state.value.playlistId == def.id) return
-        if (fetch && def != null) fetched += def.id
         job?.cancel()
         if (def == null) { _state.value = VodState(); return }
         if (!def.isXtream) {      // an M3U list: its movies and series were split off when it was loaded; only the cached copy is read
@@ -54,6 +55,7 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             _state.value = VodState(def.id, m, s, loading = false)
             val maxAge = (store.refreshHours.value.takeIf { it > 0 } ?: 24) * 3_600_000L
             if (!fetch) return@launch
+            fetched += def.id
             val stale = force || !mf.exists() || System.currentTimeMillis() - mf.lastModified() > maxAge
             if (!stale) return@launch
             _state.value = _state.value.copy(loading = true, failed = false)
@@ -70,6 +72,7 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             } }
             if (sr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, series = sr.getOrThrow())
             (mr.exceptionOrNull() ?: sr.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }
+            if (mr.isFailure && sr.isFailure) fetched -= def.id      // nothing came: the next visit to the tab asks again
             _state.value = _state.value.copy(loading = false, failed = mr.isFailure && sr.isFailure && _state.value.movies.isEmpty() && _state.value.series.isEmpty())
         }
     }

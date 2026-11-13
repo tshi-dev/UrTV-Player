@@ -78,6 +78,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                     _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Network else null)
                 }
             } else _state.value = _state.value.copy(loading = false, settled = true)
+            if (android.os.Build.FINGERPRINT != "robolectric") kotlinx.coroutines.delay(3_000)       // the guide waits until the screen has settled: it is the heaviest background job
             loadEpg(def, force || stale, epgUrls)
         }
     }
@@ -141,6 +142,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         _state.value = _state.value.copy(epgLoading = true)
         try {
             withContext(Dispatchers.IO) {
+                runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND) }     // the guide must never compete with the screen for the CPU
                 val maxAge = (store.refreshHours.value.takeIf { it > 0 } ?: 24) * 3_600_000L
                 if (urls.isNotEmpty() && (fetchNew && urls.isNotEmpty() || !file.exists() || System.currentTimeMillis() - file.lastModified() > maxAge)) {
                     val tmp = File(file.path + ".tmp")
@@ -151,13 +153,14 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 }
                 if (file.exists()) {
                     val now = System.currentTimeMillis()
-                    val list = file.inputStream().buffered().use { XmltvParser.parse(it, keep) }
                     val off = (store.epgOffsetMin.value[def.id] ?: 0) * 60_000L
+                    // only what the screens show (the running programme and the next hours), a handful per channel: never the whole week of a big provider
+                    val list = file.inputStream().buffered().use { XmltvParser.parse(it, keep, fromMs = now - 2 * 3_600_000L - off, toMs = now + 14 * 3_600_000L - off, perChannelMax = 12) }
                     val shifted = if (off == 0L) list else list.map { it.copy(startMs = it.startMs + off, stopMs = it.stopMs + off) }
                     _epg.value = EpgIndex.build(shifted, now - 3 * 3_600_000L, now + 36 * 3_600_000L)
                 }
             }
-        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Throwable) { /* guide is optional */ }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Throwable) { /* guide is optional (also when memory runs out: the app keeps running without it) */ }
         _state.value = _state.value.copy(epgLoading = false)
     }
 

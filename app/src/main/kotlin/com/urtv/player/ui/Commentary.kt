@@ -62,7 +62,7 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
             }
             return@Column
         }
-        if (picking) { Picker(all, current, first, onPick = { cm.start(it); picking = false }) ; return@Column }
+        if (picking) { Picker(all, current, first, app.catalog.state.collectAsState().value.index, onPick = { cm.start(it); picking = false }) ; return@Column }
         val f = st.failure
         if (f != null) {
             Column(Modifier.fillMaxWidth().background(Color(0xFF2A1D1F), Rd(14)).padding(26.dp)) {
@@ -127,9 +127,10 @@ private fun OriginalRow(current: Channel, selected: Boolean, focus: FocusRequest
 
 /** The person's own list with a search box: the typed text filters the names (Arabic and Latin, layout slips included). */
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Channel>, current: Channel, first: FocusRequester, onPick: (Channel) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Channel>, current: Channel, first: FocusRequester, index: com.urtv.player.data.ChannelIndex, onPick: (Channel) -> Unit) {
     var q by remember { mutableStateOf("") }
-    val hits = remember(all, q) { Browse.filter(all, Browse.ALL, q).filter { it.url != current.url }.take(80) }
+    // the WHOLE list, not its first entries: typing narrows it (the prepared search index when it matches this list), and the list scrolls lazily
+    val hits = remember(all, q) { (if (q.isBlank()) all else if (index.channels === all) index.search(q) else Browse.filter(all, Browse.ALL, q)).filter { it.url != current.url } }
     val keys = remember(hits) { uniqueKeys(hits.map { it.url }) }
     FocusField(q, { q = it }, stringResource(R.string.cm_search), Modifier.fillMaxWidth(), focusRequester = first)
     LazyColumn(Modifier.fillMaxWidth().weight(1f), state = rememberLazyListState(), verticalArrangement = Arrangement.spacedBy(6.dp)) {

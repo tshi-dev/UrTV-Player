@@ -30,6 +30,8 @@ class M3uVodTest {
         val show = st.series.first { it.name == "Show X" }
         val eps = runBlocking { app.vod.episodes(def, show.id) }
         assertEquals(listOf(1 to 1, 1 to 2, 2 to 1), eps.map { it.season to it.number }, "sorted by season then number")
+        app.vod.open(def, fetch = false)          // the start-up cache read must not wipe what is already showing
+        assertEquals(2, app.vod.state.value.series.size); assertEquals(1, app.vod.state.value.movies.size)
         // after a restart the cached copy is what comes back
         app.vod.open(def, fetch = false)
         val end = System.currentTimeMillis() + 5000

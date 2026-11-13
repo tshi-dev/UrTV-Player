@@ -130,7 +130,7 @@ class HostileInputTest {
     @Test fun xmltvLimitsFieldLengthsAndSurvivesTruncation() {
         val long = "t".repeat(5000)
         val p = XmltvParser.parse("""<tv><programme start="20240101000000" stop="20240101010000" channel="c"><title>$long</title></programme><programme start="2024""").single()
-        assertEquals(300, p.title.length)
+        assertEquals(200, p.title.length)
     }
 
     @Test fun xtreamJsonOfWrongShapeIsHarmless() {
@@ -166,5 +166,20 @@ class XtreamEpisodesTest {
         val lists = """{"episodes":[[${ep(1, 1, 1)},${ep(2, 1, 2)}],[${ep(3, 2, 1)}]]}"""
         val flat = """{"episodes":[${ep(1, 1, 1)},${ep(2, 1, 2)},${ep(3, 2, 1)}]}"""
         for (b in listOf(map, lists, flat)) assertEquals(listOf("1", "2", "3"), XtreamParser.parseEpisodes(b, acc).map { it.id }, b)
+    }
+}
+
+class XmltvWindowTest {
+    @Test fun onlyTheWindowAndAFewProgrammesPerChannelAreKept() {
+        val h = 3_600_000L
+        fun t(ms: Long) = java.text.SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(java.util.Date(ms)) + " +0000"
+        val base = 1_700_000_000_000L
+        val xml = "<tv>" + (-30..60).joinToString("") { i -> """<programme start="${t(base + i * h)}" stop="${t(base + (i + 1) * h)}" channel="a"><title>P$i</title></programme>""" } + "</tv>"
+        val all = XmltvParser.parse(xml.byteInputStream())
+        assertEquals(91, all.size)
+        val w = XmltvParser.parse(xml.byteInputStream(), null, fromMs = base - 2 * h, toMs = base + 14 * h, perChannelMax = 12)
+        assertEquals(12, w.size, "capped per channel")
+        assertEquals("P-3", w.first().title, "the programme that was running 2 h ago still overlaps the window")
+        assertEquals(0, XmltvParser.parse(xml.byteInputStream(), null, fromMs = base + 100 * h, toMs = base + 120 * h).size, "nothing in the window")
     }
 }

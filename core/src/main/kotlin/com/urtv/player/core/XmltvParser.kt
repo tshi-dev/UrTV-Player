@@ -8,12 +8,18 @@ import java.io.Reader
 /** Streaming XMLTV parser (XmlPullParser: built into Android, so no extra APK weight). Malformed documents yield what was read so far. */
 object XmltvParser {
     const val MAX_PROGRAMMES = 1_500_000
-    fun parse(input: InputStream, keepChannels: Set<String>? = null): List<Programme> = run { it.setInput(input, null) }(keepChannels)
-    fun parse(reader: Reader, keepChannels: Set<String>? = null): List<Programme> = run { it.setInput(reader) }(keepChannels)
+    /**
+     * [fromMs]..[toMs] keep only programmes that overlap that window and [perChannelMax] caps how many each channel keeps: a provider guide of a
+     * week for tens of thousands of channels is millions of entries, and holding them all is what ran small TVs out of memory while the person
+     * only sat on the home screen. The defaults keep everything (small guides, tests).
+     */
+    fun parse(input: InputStream, keepChannels: Set<String>? = null, fromMs: Long = Long.MIN_VALUE, toMs: Long = Long.MAX_VALUE, perChannelMax: Int = Int.MAX_VALUE): List<Programme> =
+        run({ it.setInput(input, null) }, fromMs, toMs, perChannelMax)(keepChannels)
+    fun parse(reader: Reader, keepChannels: Set<String>? = null): List<Programme> = run({ it.setInput(reader) }, Long.MIN_VALUE, Long.MAX_VALUE, Int.MAX_VALUE)(keepChannels)
     fun parse(text: String, keepChannels: Set<String>? = null) = parse(java.io.StringReader(text.removePrefix("﻿").trimStart()), keepChannels)
 
-    private fun run(init: (XmlPullParser) -> Unit): (Set<String>?) -> List<Programme> = { keep ->
-        val out = ArrayList<Programme>()
+    private fun run(init: (XmlPullParser) -> Unit, fromMs: Long, toMs: Long, perChannelMax: Int): (Set<String>?) -> List<Programme> = { keep ->
+        val out = ArrayList<Programme>(); val perChannel = HashMap<String, Int>()
         try {
             val f = XmlPullParserFactory.newInstance()
             f.isNamespaceAware = false
@@ -22,7 +28,12 @@ object XmltvParser {
             val p = f.newPullParser(); init(p)
             var ev = p.eventType
             while (ev != XmlPullParser.END_DOCUMENT) {
-                if (ev == XmlPullParser.START_TAG && p.name == "programme") readProgramme(p, keep)?.let { if (out.size < MAX_PROGRAMMES) out.add(it) }
+                if (ev == XmlPullParser.START_TAG && p.name == "programme") readProgramme(p, keep)?.let { pr ->
+                    if (pr.stopMs >= fromMs && pr.startMs <= toMs && out.size < MAX_PROGRAMMES) {
+                        val n = perChannel[pr.channelId] ?: 0
+                        if (n < perChannelMax) { perChannel[pr.channelId] = n + 1; out.add(pr) }
+                    }
+                }
                 ev = p.next()
             }
         } catch (_: Exception) { /* keep partial result */ }
@@ -44,14 +55,16 @@ object XmltvParser {
         }
         if (start == null || stop == null || stop <= start) return null
         if (keep != null && ch !in keep) return null
-        return Programme(ch.take(200), start, stop, title.take(300), desc.take(1500))
+        return Programme(ch.take(200), start, stop, title.take(200), desc.take(400))
     }
 
     /** "20240131203000 +0300", "20240131203000", "202401312030 -0100" -> epoch millis (UTC). */
+    private val TIME = Regex("""^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*([+-]\d{4})?$""")     // compiled once: it used to be rebuilt twice per programme
+
     fun parseTime(s: String?): Long? {
         if (s == null) return null
         val t = s.trim()
-        val m = Regex("""^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*([+-]\d{4})?$""").find(t) ?: return null
+        val m = TIME.find(t) ?: return null
         val g = m.groupValues
         val days = daysFromCivil(g[1].toInt(), g[2].toInt(), g[3].toInt())
         var sec = days * 86400L + g[4].toInt() * 3600 + g[5].toInt() * 60 + (g[6].toIntOrNull() ?: 0)
