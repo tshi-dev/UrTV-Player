@@ -42,4 +42,4 @@ data class Series(
 
 data class Episode(val id: String, val season: Int, val number: Int, val title: String, val url: String, val plot: String = "", val image: String? = null, val durationSec: Int = 0)
 
-data class VodInfo(val plot: String = "", val cast: String = "", val genre: String = "", val director: String = "", val durationSec: Int = 0, val backdrop: String? = null)
+data class VodInfo(val plot: String = "", val cast: String = "", val genre: String = "", val director: String = "", val durationSec: Int = 0, val backdrop: String? = null, val tmdbId: Long? = null)

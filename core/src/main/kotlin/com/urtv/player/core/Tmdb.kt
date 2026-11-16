@@ -9,7 +9,7 @@ import kotlinx.serialization.json.*
 object Tmdb {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    data class Hit(val id: Long, val title: String, val year: String, val poster: String?, val popularity: Double)
+    data class Hit(val id: Long, val title: String, val year: String, val poster: String?, val popularity: Double, val original: String = "")
     data class Person(val name: String, val photo: String?)
     data class Info(
         val id: Long = 0, val overview: String = "", val year: String = "", val runtimeMin: Int = 0, val genres: List<String> = emptyList(),
@@ -26,15 +26,32 @@ object Tmdb {
     fun parseHits(body: String): List<Hit> = obj(body)?.arr("results").orEmpty().mapNotNull { o ->
         val id = o.s("id")?.toLongOrNull() ?: return@mapNotNull null
         val title = o.s("title") ?: o.s("name") ?: return@mapNotNull null
-        Hit(id, title, (o.s("release_date") ?: o.s("first_air_date") ?: "").take(4), o.s("poster_path"), o.d("popularity"))
+        Hit(id, title, (o.s("release_date") ?: o.s("first_air_date") ?: "").take(4), o.s("poster_path"), o.d("popularity"), o.s("original_title") ?: o.s("original_name") ?: "")
     }
 
-    /** The first result whose title (and year when both are known) matches; null when nothing fits. */
-    fun bestHit(hits: List<Hit>, title: String, year: String?): Hit? {
-        val n = normalize(title)
-        return hits.firstOrNull { normalize(it.title) == n && (year.isNullOrBlank() || it.year.isBlank() || it.year == year) }
-            ?: hits.firstOrNull { normalize(it.title) == n }
+    /** 1.0 for the same words, else the share of words two titles have in common (0 when one is empty). */
+    fun similarity(a: String, b: String): Double {
+        val x = normalize(a); val y = normalize(b)
+        if (x.isEmpty() || y.isEmpty()) return 0.0
+        if (x == y) return 1.0
+        val p = x.split(' ').toSet(); val q = y.split(' ').toSet()
+        return p.intersect(q).size.toDouble() / p.union(q).size
     }
+
+    /** The result that best fits any of [titles] (the provider's name, and its English / Arabic forms) and the year; null when nothing is close enough. */
+    fun bestHit(hits: List<Hit>, titles: List<String>, year: String?): Hit? {
+        val y = year?.toIntOrNull()
+        var best: Hit? = null; var bestScore = 0.74
+        for (h in hits) {
+            val hy = h.year.toIntOrNull()
+            if (y != null && hy != null && kotlin.math.abs(hy - y) > 1) continue          // a year that is known on both sides must agree (±1: release dates differ)
+            var sc = titles.maxOfOrNull { t -> maxOf(similarity(t, h.title), if (h.original.isBlank()) 0.0 else similarity(t, h.original)) } ?: 0.0
+            if (y != null && hy == y) sc += 0.05
+            if (sc > bestScore) { best = h; bestScore = sc }
+        }
+        return best
+    }
+    fun bestHit(hits: List<Hit>, title: String, year: String?): Hit? = bestHit(hits, listOf(title), year)
 
     /** Lower case, no punctuation, no «(2020)» / «[HD]» tails: for comparing a provider's title with TMDB's. */
     fun normalize(t: String): String = t.lowercase().replace(Regex("""[\(\[][^\)\]]*[\)\]]"""), " ").replace(Regex("""[^\p{L}\p{N}]+"""), " ").trim()
@@ -55,15 +72,17 @@ object Tmdb {
         )
     }
 
-    /** «+13», «+18», «للجميع»-style label from the certification of the first country that has one (SA, AE, US, GB). */
+    /** «+13», «+18», «+0»-style label from the first country that has a usable certification: SA, AE, US, then any other. Empty rather than a wrong guess. */
     private fun ageOf(o: JsonObject): String {
-        val prefer = listOf("SA", "AE", "US", "GB")
         val movie = (o["release_dates"] as? JsonObject)?.arr("results").orEmpty()
         val tv = (o["content_ratings"] as? JsonObject)?.arr("results").orEmpty()
-        for (cc in prefer) {
-            movie.firstOrNull { it.s("iso_3166_1") == cc }?.arr("release_dates")?.firstNotNullOfOrNull { it.s("certification")?.takeIf { c -> c.isNotBlank() } }?.let { return ageLabel(it) }
-            tv.firstOrNull { it.s("iso_3166_1") == cc }?.s("rating")?.takeIf { it.isNotBlank() }?.let { return ageLabel(it) }
+        fun of(cc: String): String {
+            movie.firstOrNull { it.s("iso_3166_1") == cc }?.arr("release_dates").orEmpty()
+                .mapNotNull { it.s("certification")?.let(::ageLabel)?.takeIf { l -> l.isNotEmpty() } }.firstOrNull()?.let { return it }
+            return tv.firstOrNull { it.s("iso_3166_1") == cc }?.s("rating")?.let(::ageLabel).orEmpty()
         }
+        for (cc in listOf("SA", "AE", "US")) of(cc).takeIf { it.isNotEmpty() }?.let { return it }
+        for (cc in (movie + tv).mapNotNull { it.s("iso_3166_1") }.distinct()) of(cc).takeIf { it.isNotEmpty() }?.let { return it }
         return ""
     }
 
@@ -73,7 +92,7 @@ object Tmdb {
         "PG-13", "TV-14", "12", "12A", "13", "13+" -> "+13"
         "15", "16", "16+" -> "+16"
         "R", "TV-MA", "NC-17", "18", "18+" -> "+18"
-        else -> cert.trim().take(6).let { if (it.all { c -> c.isDigit() || c == '+' }) (if (it.startsWith("+")) it else "+$it") else "" }
+        else -> cert.trim().take(6).let { if (it.any { c -> c.isDigit() } && it.all { c -> c.isDigit() || c == '+' }) (if (it.startsWith("+")) it else "+$it") else "" }
     }
 
     const val IMG = "https://image.tmdb.org/t/p/"

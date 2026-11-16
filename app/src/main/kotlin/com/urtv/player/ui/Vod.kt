@@ -176,7 +176,7 @@ fun MovieDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (VodPlay, Lo
     val pos = remember { app.store.position(key) }
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
-    val tm by produceState<com.urtv.player.core.Tmdb.Info?>(null, m.name) { value = app.tmdb.info(m.name, yearIn(m.name), false) }
+    val tm by produceState<com.urtv.player.core.Tmdb.Info?>(null, m.name, info.tmdbId) { value = app.tmdb.info(m.name, yearIn(m.name), false, info.tmdbId) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val chips = listOfNotNull(tm?.year?.takeIf { it.isNotBlank() }, tm?.age?.takeIf { it.isNotBlank() }, (info.genre.takeIf { it.isNotBlank() } ?: tm?.genres?.joinToString("، ")?.takeIf { it.isNotBlank() }), m.rating?.takeIf { it != "0" }?.let { "★ $it" } ?: tm?.rating?.takeIf { it > 0 }?.let { "TMDB ★ %.1f".format(java.util.Locale.US, it) }, (info.durationSec.takeIf { it > 0 }?.let { it / 60 } ?: tm?.runtimeMin?.takeIf { it > 0 })?.let { stringResource(R.string.min_n, it) })
     val play = VodPlay(m.name, m.url, key, def.id, "movie", m.poster)

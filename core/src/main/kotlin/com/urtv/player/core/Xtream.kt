@@ -111,7 +111,8 @@ object XtreamParser {
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return VodInfo()
         val i = root["info"] as? JsonObject ?: return VodInfo()
         return VodInfo(i.str("plot") ?: i.str("description") ?: "", i.str("cast") ?: i.str("actors") ?: "", i.str("genre") ?: "", i.str("director") ?: "",
-            i.str("duration_secs")?.toIntOrNull() ?: 0, (i["backdrop_path"] as? JsonArray)?.firstOrNull()?.let { (it as? JsonPrimitive)?.content })
+            i.str("duration_secs")?.toIntOrNull() ?: 0, (i["backdrop_path"] as? JsonArray)?.firstOrNull()?.let { (it as? JsonPrimitive)?.content },
+            (i.str("tmdb_id") ?: i.str("tmdb"))?.toLongOrNull()?.takeIf { it > 0 })
     }
 
     /** Episodes of a series, sorted by season then number. */

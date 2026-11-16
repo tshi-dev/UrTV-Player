@@ -22,7 +22,7 @@ class TmdbLiveCheckTest {
         assumeTrue(key.isNotBlank())
         val c = com.urtv.player.data.TmdbClient(ApplicationProvider.getApplicationContext(), key)
         var found = 0
-        for ((title, year, series) in listOf(Triple("Inception", "2010", false), Triple("The Dark Knight", "2008", false), Triple("الفيل الأزرق", "2014", false), Triple("Game of Thrones", null, true), Triple("باب الحارة", null, true))) {
+        for ((title, year, series) in listOf(Triple("Inception", "2010", false), Triple("The Dark Knight", "2008", false), Triple("الفيل الأزرق", "2014", false), Triple("Game of Thrones", null, true), Triple("باب الحارة", null, true), Triple("Inception (2010)", "2010", false), Triple("Breaking Bad", null, true))) {
             val i = runBlocking { c.info(title, year, series) }
             if (i == null) { println("TMDBCHECK $title: not found"); continue }
             found++
@@ -31,7 +31,7 @@ class TmdbLiveCheckTest {
         }
         val t = runBlocking { c.trending() }
         println("TMDBCHECK trending: ${t.size} titles, first: ${t.take(3).joinToString { it.title }}")
-        assertTrue(found >= 3, "only $found of 5 titles found")
+        assertTrue(found >= 3, "only $found of 7 titles found")
         assertTrue(t.size >= 10, "trending gave ${t.size}")
     }
 }

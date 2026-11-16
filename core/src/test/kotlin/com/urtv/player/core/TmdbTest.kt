@@ -33,4 +33,29 @@ class TmdbTest {
     @Test fun titlesAreComparedWithoutPunctuationOrTails() {
         assertEquals(Tmdb.normalize("The Movie: Part 2 (2019) [4K]"), Tmdb.normalize("the movie part 2"))
     }
+
+    // Shapes recorded from TMDB: an English title searched in Arabic comes back localized, with the English one in original_title.
+    @Test fun englishNameMatchesALocalizedHitThroughItsOriginalTitle() {
+        val ar = Tmdb.parseHits("""{"results":[{"id":27205,"title":"بداية","original_title":"Inception","release_date":"2010-07-15","popularity":50.2},{"id":1,"title":"استهلال","original_title":"Inception: The Cobol Job","release_date":"2010-12-07"}]}""")
+        assertEquals(27205L, Tmdb.bestHit(ar, listOf("Inception"), "2010")?.id)
+        assertEquals(27205L, Tmdb.bestHit(ar, listOf("Inception (2010) [4K]"), null)?.id)
+    }
+    @Test fun yearMustAgreeAndUnrelatedTitlesGiveNothing() {
+        val hits = Tmdb.parseHits("""{"results":[{"id":1,"title":"Heat","release_date":"1995-12-15"},{"id":2,"title":"Heat","release_date":"2022-01-01"}]}""")
+        assertEquals(2L, Tmdb.bestHit(hits, listOf("Heat"), "2022")?.id)
+        assertEquals(1L, Tmdb.bestHit(hits, listOf("Heat"), "1996")?.id, "±1 year is tolerated")
+        assertNull(Tmdb.bestHit(hits, listOf("Heat"), "2010"))
+        assertNull(Tmdb.bestHit(hits, listOf("Casablanca"), null))
+    }
+    @Test fun ageFollowsSaThenAeThenUsThenAnyAndNeverGuesses() {
+        fun age(r: String) = Tmdb.parseInfo("""{"id":1,"release_dates":{"results":[$r]}}""")!!.age
+        val us = """{"iso_3166_1":"US","release_dates":[{"certification":""},{"certification":"PG-13","type":3}]}"""
+        val sa = """{"iso_3166_1":"SA","release_dates":[{"certification":"15+"}]}"""
+        val de = """{"iso_3166_1":"DE","release_dates":[{"certification":"12"}]}"""
+        assertEquals("+13", age(us), "skips an empty certification inside a country")
+        assertEquals("+16", age("$us,$sa"), "SA wins")
+        assertEquals("+13", age(de), "first available country when SA, AE and US have none")
+        assertEquals("", age("""{"iso_3166_1":"SA","release_dates":[{"certification":""}]},{"iso_3166_1":"FR","release_dates":[{"certification":"Interdit"}]}"""), "unknown label: nothing")
+        assertEquals("+18", Tmdb.parseInfo("""{"id":2,"content_ratings":{"results":[{"iso_3166_1":"GB","rating":"18"}]}}""")!!.age)
+    }
 }
