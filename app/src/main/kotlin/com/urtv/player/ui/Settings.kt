@@ -230,12 +230,13 @@ fun HomeManage(app: UrtvApp, onBack: () -> Unit) {
     val isXtream = app.store.playlists.collectAsState().value.firstOrNull { it.id == cat.playlistId }?.isXtream == true
     val groups = remember(cat.channels) { Browse.groups(cat.channels).map { "group:$it" } }
     val vodS by app.vod.state.collectAsState()
-    val available = listOf("continue", "favs", "recent") + (if (isXtream || vodS.movies.isNotEmpty() || vodS.series.isNotEmpty()) listOf("movies", "series") else emptyList()) + groups
+    val available = listOf("continue", "favs", "recent") + (if (isXtream || vodS.movies.isNotEmpty() || vodS.series.isNotEmpty()) listOf("added", "viewed", "trending", "movies", "series") else emptyList()) + groups
     val enabled = rows.filter { it in available }
     val full = enabled + available.filter { it !in enabled }
     @Composable fun name(id: String) = when (id) {
         "continue" -> stringResource(R.string.cont_watching); "favs" -> stringResource(R.string.tab_favs); "recent" -> stringResource(R.string.recent_channels)
         "movies" -> stringResource(R.string.tab_movies); "series" -> stringResource(R.string.tab_series)
+        "added" -> stringResource(R.string.row_added); "viewed" -> stringResource(R.string.row_viewed); "trending" -> stringResource(R.string.row_trending)
         else -> id.removePrefix("group:").let { if (it == Browse.OTHER) stringResource(R.string.group_other) else it }
     }
     ManageList(stringResource(R.string.home_customize), stringResource(R.string.home_customize_hint), full.map { it to name(it) }, { it in enabled },

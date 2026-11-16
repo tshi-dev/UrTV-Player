@@ -209,9 +209,24 @@ private fun HomeRows(
     val favs by store.favs.collectAsState()
     val recents by store.recents.collectAsState()
     val vod by app.vod.state.collectAsState()
+    val views by store.views.collectAsState()
     val epg by app.catalog.epg.collectAsState()
     val byKeyL = remember(cat.channels) { lazy { cat.channels.associateBy { chKey(pid, it) } } }
     val first = remember { FocusRequester() }
+    // «recently added», «most watched» (this TV's own counts) and «trending» (TMDB's week, shown only for what the provider really has); ids carry m: / s: for film or series
+    val added = remember(vod.movies, vod.series) { (vod.movies.map { Poster("m:" + it.id, it.name, it.poster, it.category, it.rating, it.added) } + vod.series.map { Poster("s:" + it.id, it.name, it.poster, it.category, it.rating, it.added) }).sortedByDescending { it.added }.take(24) }
+    val viewed = remember(vod.movies, vod.series, views) {
+        val mv = vod.movies.associateBy { vodKey(vod.playlistId.orEmpty(), it.id) }; val sr = vod.series.associateBy { vodKey(vod.playlistId.orEmpty(), it.id) }
+        views.entries.sortedByDescending { it.value }.mapNotNull { (k, _) -> mv[k]?.let { Poster("m:" + it.id, it.name, it.poster, it.category, it.rating) } ?: sr[k]?.let { Poster("s:" + it.id, it.name, it.poster, it.category, it.rating) } }.take(24)
+    }
+    val trendingHits by produceState(emptyList<com.urtv.player.core.Tmdb.Hit>(), app.tmdb.enabled) { value = app.tmdb.trending() }
+    val trending = remember(vod.movies, vod.series, trendingHits) {
+        val byTitle = HashMap<String, Poster>()
+        for (m in vod.movies) byTitle.putIfAbsent(com.urtv.player.core.Tmdb.normalize(m.name), Poster("m:" + m.id, m.name, m.poster, m.category, m.rating))
+        for (s in vod.series) byTitle.putIfAbsent(com.urtv.player.core.Tmdb.normalize(s.name), Poster("s:" + s.id, s.name, s.poster, s.category, s.rating))
+        trendingHits.mapNotNull { byTitle[com.urtv.player.core.Tmdb.normalize(it.title)] }.distinctBy { it.id }.take(24)
+    }
+    val openMixed = { id: String -> if (id.startsWith("s:")) onOpenSeries(id.drop(2)) else onOpenMovie(id.drop(2)) }
     var firstTaken = false
 
     @Composable
@@ -251,6 +266,9 @@ private fun HomeRows(
             id == "continue" -> watching.any { it.pid == pid }
             id == "favs" -> favs.any { it.startsWith("$pid|") }
             id == "recent" -> recents.any { it.startsWith("$pid|") }
+            id == "added" -> added.isNotEmpty()
+            id == "viewed" -> viewed.isNotEmpty()
+            id == "trending" -> trending.isNotEmpty()
             id == "movies" -> vod.movies.isNotEmpty()
             id == "series" -> vod.series.isNotEmpty()
             else -> true
@@ -285,6 +303,9 @@ private fun HomeRows(
                     }
                     id == "favs" -> channelRow(R.string.tab_favs, cat.channels.filter { chKey(pid, it) in favs })
                     id == "recent" -> channelRow(R.string.recent_channels, recents.mapNotNull { byKeyL.value[it] }.take(20))
+                    id == "added" -> posterRow(R.string.row_added, added, openMixed)
+                    id == "viewed" -> posterRow(R.string.row_viewed, viewed, openMixed)
+                    id == "trending" -> posterRow(R.string.row_trending, trending, openMixed)
                     id == "movies" -> posterRow(R.string.tab_movies, vod.movies.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenMovie)
                     id == "series" -> posterRow(R.string.tab_series, vod.series.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenSeries)
                     id.startsWith("group:") -> {

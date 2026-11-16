@@ -108,6 +108,7 @@ jobs:
       PLAYER_KEYSTORE_PASSWORD: ${{ secrets.PLAYER_KEYSTORE_PASSWORD }}
       PLAYER_KEY_ALIAS: ${{ secrets.PLAYER_KEY_ALIAS }}
       PLAYER_KEY_PASSWORD: ${{ secrets.PLAYER_KEY_PASSWORD }}
+      TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}     # free TMDB key: posters, stories, cast, trailers; empty = those features stay off
       TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - name: Tag must look like vMAJOR.MINOR.PATCH (optionally -suffix)

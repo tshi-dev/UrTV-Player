@@ -33,3 +33,12 @@ class M3uVodTest {
         assertEquals(listOf("A", "Y"), s.live.map { it.name }); assertEquals(listOf("Film"), s.movies.map { it.name }); assertEquals(1, s.episodes.size)
     }
 }
+
+class M3uFirstChunkTest {
+    @Test fun aBigListHandsOverItsFirstChannelsBeforeItIsFullyRead() {
+        val text = "#EXTM3U\n" + (1..50).joinToString("") { "#EXTINF:-1,Ch $it\nhttp://h/live/u/p/$it.m3u8\n" }
+        var chunk = 0; var calls = 0
+        val full = M3uParser.parse(text.lineSequence(), firstChunk = 10) { chunk = it.size; calls++ }
+        assertEquals(10, chunk); assertEquals(1, calls, "once"); assertEquals(50, full.channels.size, "and the full list still comes at the end")
+    }
+}

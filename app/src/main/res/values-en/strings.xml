@@ -324,4 +324,9 @@
     <string name="cm_choose">Choose a channel</string>
     <string name="cm_audio_from_short">Commentary</string>
     <string name="cm_preview_tag">Sound preview</string>
+    <string name="tmdb_trailer">Trailer</string>
+    <string name="tmdb_cast">Cast</string>
+    <string name="row_added">Recently added</string>
+    <string name="row_viewed">Most watched</string>
+    <string name="row_trending">Trending</string>
 </resources>

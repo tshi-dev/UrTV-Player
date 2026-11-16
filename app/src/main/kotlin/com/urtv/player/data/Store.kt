@@ -102,6 +102,15 @@ class Store(ctx: Context) {
     fun commentaryDelay(pair: String): Long? = if (sp.contains("cmd_$pair")) sp.getLong("cmd_$pair", 0L) else null
     fun setCommentaryDelay(pair: String, ms: Long) { sp.edit().putLong("cmd_$pair", ms).apply() }
 
+    /** How many times each film or episode was started on this TV (for «most watched»). */
+    private val _views = MutableStateFlow(sp.getString("views", "")!!.lines().mapNotNull { l -> l.substringBefore('=', "").takeIf { it.isNotEmpty() }?.let { it to (l.substringAfter('=').toIntOrNull() ?: 0) } }.toMap())
+    val views: StateFlow<Map<String, Int>> = _views
+    fun bumpViews(key: String) {
+        val m = _views.value.toMutableMap(); m[key] = (m[key] ?: 0) + 1
+        val kept = if (m.size > 400) m.entries.sortedByDescending { it.value }.take(300).associate { it.key to it.value } else m
+        _views.value = kept; sp.edit().putString("views", kept.entries.joinToString("\n") { it.key.replace('\n', ' ').replace('=', ' ') + "=" + it.value }).apply()
+    }
+
     fun position(key: String): Long = sp.getLong("pos_$key", 0L)
     fun savePosition(key: String, ms: Long, durationMs: Long) {
         val e = sp.edit()
@@ -212,6 +221,7 @@ class Store(ctx: Context) {
     fun setStartScreen(v: String) { _start.value = v; sp.edit().putString("start", v).apply() }
     private val _homeRows = MutableStateFlow(sp.getString("homeRows", "continue\nfavs\nrecent")!!.split('\n').filter { it.isNotEmpty() })
     val homeRows: StateFlow<List<String>> = _homeRows   // ids in display order; hidden rows are simply absent
+    init { if (!sp.getBoolean("homeRowsV2", false)) { val l = listOf("added", "viewed", "trending") + _homeRows.value.filter { it !in listOf("added", "viewed", "trending") }; _homeRows.value = l; sp.edit().putString("homeRows", l.joinToString("\n")).putBoolean("homeRowsV2", true).apply() } }     // the new rows start on top once; they only show when there is something for them
     fun setHomeRows(l: List<String>) { _homeRows.value = l; sp.edit().putString("homeRows", l.joinToString("\n")).apply() }
     private val _preview = MutableStateFlow(if (sp.contains("preview")) sp.getBoolean("preview", true) else previewDefault(ctx))
     val livePreview: StateFlow<Boolean> = _preview

@@ -123,7 +123,13 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         var seen = 0
         val parsed = Http.retrying { Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r ->
             // count entries as they stream in so the screen can say "N channels" instead of an empty wait
-            M3uParser.parse(r.lineSequence().onEach { l -> if (l.startsWith("#EXTINF")) { seen++; if (seen % 25 == 0) _state.value = _state.value.copy(progress = seen) } })
+            M3uParser.parse(r.lineSequence().onEach { l -> if (l.startsWith("#EXTINF")) { seen++; if (seen % 25 == 0) _state.value = _state.value.copy(progress = seen) } }, firstChunk = 1500) { first ->
+                // nothing on screen yet (no cached list): the first channels appear while the rest of a big list is still being read
+                if (_state.value.channels.isEmpty()) {
+                    val live = com.urtv.player.core.M3uVod.split(first).live
+                    if (live.isNotEmpty()) _state.value = _state.value.copy(channels = live, index = ChannelIndex(live, def.id), settled = true)
+                }
+            }
         } }
         val sp = com.urtv.player.core.M3uVod.split(parsed.channels)
         vodSplit = sp.takeIf { it.movies.isNotEmpty() || it.episodes.isNotEmpty() }

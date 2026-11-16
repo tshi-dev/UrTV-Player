@@ -128,7 +128,7 @@ private fun hms(ms: Long): String { val s = ms / 1000; return if (s >= 3600) "%d
 
 /** Poster on the start side; title, fact chips, plot and actions beside it. Facts are chips, never "a · b · c". */
 @Composable
-private fun DetailHeader(poster: String?, title: String, chips: List<String>, plot: String, credits: String, buttons: @Composable () -> Unit) {
+private fun DetailHeader(poster: String?, title: String, chips: List<String>, plot: String, credits: String, buttons: @Composable () -> Unit, extra: @Composable () -> Unit = {}) {
     Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
         Box(Modifier.width(220.dp).aspectRatio(0.68f).clip(Rd(16))) { PosterArt(poster, title) }
         Column(Modifier.weight(1f)) {
@@ -138,6 +138,30 @@ private fun DetailHeader(poster: String?, title: String, chips: List<String>, pl
             if (credits.isNotBlank()) Text(credits, style = T.small, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp).width(900.dp))
             Spacer(Modifier.height(22.dp))
             buttons()
+            extra()
+        }
+    }
+}
+
+private fun yearIn(name: String): String? = Regex("""\((\d{4})\)""").find(name)?.groupValues?.get(1)
+
+private fun openUrl(ctx: android.content.Context, url: String) { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+
+/** TMDB's required attribution, shown wherever its data is. */
+@Composable
+private fun TmdbCredit() { Text("This product uses the TMDB API but is not endorsed or certified by TMDB.", style = T.tiny.copy(color = C.faint), modifier = Modifier.padding(top = 14.dp)) }
+
+/** Cast with photos (TMDB) under the buttons of the details page. */
+@Composable
+private fun CastRow(t: com.urtv.player.core.Tmdb.Info) {
+    if (t.cast.isEmpty()) return
+    Text(stringResource(R.string.tmdb_cast), style = T.bodyBold, modifier = Modifier.padding(top = 18.dp, bottom = 8.dp))
+    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        items(t.cast.size) { i -> val p = t.cast[i]
+            Column(Modifier.width(104.dp)) {
+                Box(Modifier.width(104.dp).height(104.dp).clip(Rd(14))) { PosterArt(com.urtv.player.core.Tmdb.profile(p.photo), p.name) }
+                Text(p.name, style = T.tiny, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            }
         }
     }
 }
@@ -152,18 +176,21 @@ fun MovieDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (VodPlay, Lo
     val pos = remember { app.store.position(key) }
     val fr = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
-    val chips = listOfNotNull(info.genre.takeIf { it.isNotBlank() }, m.rating?.takeIf { it != "0" }?.let { "★ $it" }, info.durationSec.takeIf { it > 0 }?.let { stringResource(R.string.min_n, it / 60) })
+    val tm by produceState<com.urtv.player.core.Tmdb.Info?>(null, m.name) { value = app.tmdb.info(m.name, yearIn(m.name), false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val chips = listOfNotNull(tm?.year?.takeIf { it.isNotBlank() }, tm?.age?.takeIf { it.isNotBlank() }, (info.genre.takeIf { it.isNotBlank() } ?: tm?.genres?.joinToString("، ")?.takeIf { it.isNotBlank() }), m.rating?.takeIf { it != "0" }?.let { "★ $it" } ?: tm?.rating?.takeIf { it > 0 }?.let { "TMDB ★ %.1f".format(java.util.Locale.US, it) }, (info.durationSec.takeIf { it > 0 }?.let { it / 60 } ?: tm?.runtimeMin?.takeIf { it > 0 })?.let { stringResource(R.string.min_n, it) })
     val play = VodPlay(m.name, m.url, key, def.id, "movie", m.poster)
     Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 72.dp, vertical = 56.dp)) {
-        DetailHeader(m.poster, m.name, chips, info.plot, listOf(info.director, info.cast).filter { it.isNotBlank() }.joinToString("\n"), buttons = {
+        DetailHeader(m.poster ?: com.urtv.player.core.Tmdb.poster(tm?.poster), m.name, chips, listOf(info.plot, tm?.overview.orEmpty()).maxByOrNull { it.length }.orEmpty(), listOf(info.director, info.cast).filter { it.isNotBlank() }.joinToString("\n"), buttons = {
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (pos > 0) TvButton(stringResource(R.string.resume_from, hms(pos)), { onPlay(play, pos) }, primary = true, focusRequester = fr)
                 TvButton(stringResource(if (pos > 0) R.string.from_start else R.string.play), { onPlay(play, 0) }, primary = pos == 0L, focusRequester = if (pos > 0) null else fr)
                 val favs by app.store.favs.collectAsState()
                 TvButton(stringResource(if (key in favs) R.string.menu_unfav else R.string.menu_fav), { app.store.toggleFav(key) })
+                tm?.trailerKey?.let { k -> TvButton(stringResource(R.string.tmdb_trailer), { openUrl(ctx, com.urtv.player.core.Tmdb.youtube(k)) }) }
                 TvButton(stringResource(R.string.back), onBack)
             }
-        })
+        }, extra = { tm?.let { CastRow(it) }; if (tm != null) TmdbCredit() })
     }
 }
 
@@ -173,6 +200,7 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
     val s: Series? = remember(id) { app.vod.state.value.series.firstOrNull { it.id == id } }
     if (s == null) { onBack(); return }
     val eps by produceState<List<Episode>?>(null) { value = app.vod.episodes(def, id) }
+    val tmS by produceState<com.urtv.player.core.Tmdb.Info?>(null, s.name) { value = app.tmdb.info(s.name, s.year ?: yearIn(s.name), true) }
     val seasons = remember(eps) { eps.orEmpty().map { it.season }.distinct() }
     var season by remember(seasons) { mutableStateOf(seasons.firstOrNull() ?: 1) }
     val all = eps.orEmpty()
@@ -187,10 +215,11 @@ fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPl
     Column(Modifier.fillMaxSize().background(C.bgBrush).padding(horizontal = 72.dp, vertical = 44.dp)) {
         Text(s.name, style = T.display.copy(fontSize = 46.sp, lineHeight = 60.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            s.year?.let { Chip(it) }; s.rating?.takeIf { it != "0" }?.let { Chip("★ $it") }
+            (s.year ?: tmS?.year?.takeIf { it.isNotBlank() })?.let { Chip(it) }; tmS?.age?.takeIf { it.isNotBlank() }?.let { Chip(it) }; (s.rating?.takeIf { it != "0" }?.let { "★ $it" } ?: tmS?.rating?.takeIf { it > 0 }?.let { "TMDB ★ %.1f".format(java.util.Locale.US, it) })?.let { Chip(it) }
             if (all.isNotEmpty()) Chip(stringResource(R.string.episodes_n, all.size))
         }
-        if (s.plot.isNotBlank()) Text(s.plot, style = T.body.copy(color = C.muted), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(1000.dp))
+        listOf(s.plot, tmS?.overview.orEmpty()).maxByOrNull { it.length }?.takeIf { it.isNotBlank() }?.let { Text(it, style = T.body.copy(color = C.muted), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(1000.dp)) }
+        if (tmS != null) TmdbCredit()
         val sFavs by app.store.favs.collectAsState(); val sKey = vodKey(def.id, id)
         Spacer(Modifier.height(10.dp))
         TvButton(stringResource(if (sKey in sFavs) R.string.menu_unfav else R.string.menu_fav), { app.store.toggleFav(sKey) })

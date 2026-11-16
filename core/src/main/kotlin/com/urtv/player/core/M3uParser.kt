@@ -11,7 +11,9 @@ object M3uParser {
     const val MAX_CHANNELS = 200_000
     const val MAX_LINE = 8192
 
-    fun parse(lines: Sequence<String>): ParsedPlaylist {
+    /** [onFirstChunk] is called once, with a copy, when [firstChunk] channels have been read: a big list can show its first channels while the rest is still being parsed. */
+    fun parse(lines: Sequence<String>, firstChunk: Int = 0, onFirstChunk: ((List<Channel>) -> Unit)? = null): ParsedPlaylist {
+        var chunkSent = firstChunk <= 0 || onFirstChunk == null
         val channels = ArrayList<Channel>()
         val epg = LinkedHashSet<String>()
         var skipped = 0
@@ -48,6 +50,7 @@ object M3uParser {
                             logo = p?.logo?.ifBlank { null }, epgId = p?.epgId?.ifBlank { null },
                             number = p?.number,
                         )
+                        if (!chunkSent && channels.size >= firstChunk) { chunkSent = true; onFirstChunk?.invoke(channels.toList()) }
                     }
                     pending = null; group = ""
                 }

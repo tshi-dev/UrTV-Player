@@ -324,4 +324,9 @@
     <string name="cm_choose">اختر قناة</string>
     <string name="cm_audio_from_short">تعليق</string>
     <string name="cm_preview_tag">معاينة الصوت</string>
+    <string name="tmdb_trailer">التريلر</string>
+    <string name="tmdb_cast">طاقم العمل</string>
+    <string name="row_added">أُضيف حديثًا</string>
+    <string name="row_viewed">الأكثر مشاهدة</string>
+    <string name="row_trending">الأكثر رواجًا</string>
 </resources>

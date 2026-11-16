@@ -17,6 +17,7 @@ android {
         // SHA-256 of OUR release signing certificate, passed in by CI (never stored in the repository). The app compares it
         // with the certificate it is actually installed with; empty on local and fork builds, which therefore count as unofficial.
         buildConfigField("String", "OFFICIAL_CERT_SHA256", "\"${System.getenv("PLAYER_CERT_SHA256") ?: ""}\"")
+        buildConfigField("String", "TMDB_KEY", "\"${System.getenv("TMDB_API_KEY") ?: ""}\"")     // free key from the TMDB_API_KEY secret; empty = the TMDB features stay off
         // Only the two shipped languages (drops library string tables).
         resourceConfigurations += listOf("ar", "en")
     }

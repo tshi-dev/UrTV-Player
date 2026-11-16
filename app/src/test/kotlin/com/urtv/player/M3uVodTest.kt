@@ -58,6 +58,13 @@ class TrackPrefTest {
         assertEquals("English", app.store.trackPref("ch|a")?.audio); assertEquals(null, app.store.trackPref("ch|unknown"))
     }
 
+    @Test fun watchCountsFeedMostWatchedAndTheNewHomeRowsStartOnTopOnce() {
+        val st = app.store
+        st.bumpViews("vod|p|1"); st.bumpViews("vod|p|1"); st.bumpViews("vod|p|2")
+        assertEquals(2, st.views.value["vod|p|1"]); assertEquals(1, st.views.value["vod|p|2"])
+        assertEquals(listOf("added", "viewed", "trending"), st.homeRows.value.take(3), "new installs and upgrades get the new rows first")
+    }
+
     @Test fun serverHiccupsAreRetriedButAWrongLoginIsFinal() {
         var calls = 0
         val r = com.urtv.player.data.Http.retrying { calls++; if (calls < 3) throw java.io.IOException("HTTP 503") else "ok" }

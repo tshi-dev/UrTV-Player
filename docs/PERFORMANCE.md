@@ -170,3 +170,10 @@ Causes found in the code, all from the zapping-first tuning: buffers of 4 s mini
 - Player: playback speed for films (0.75 to 2), and the audio track, subtitle track and speed chosen for a channel or a film are remembered and applied the next time it plays.
 - Films and series can be favourites (button on the details page, «المفضّلة» entry in the Movies and Series lists).
 - Server hiccups (5xx, timeouts, refused or dropped connections) are retried twice (0.8 s, 1.6 s) when a list, a category list or the movie and series lists are fetched; a wrong login (4xx) is final at once.
+
+### v0.9.16 beta9
+
+- Big M3U lists show their first 1500 channels as soon as they are read (when there is no cached list yet) while the rest is still being parsed.
+- TMDB (themoviedb.org): posters, stories (Arabic, else English), cast photos, age rating, TMDB rating and a trailer button (opens the YouTube app) on the film details page; chips and story on the series page; the attribution line is shown wherever its data is. It needs a free API key given at build time as the `TMDB_API_KEY` secret of the repository; without it the app shows only what the provider sends. Answers are cached on disk (details 30 days, trending 12 hours); the key is never logged.
+- Home rows «أُضيف حديثًا» (provider's added time), «الأكثر مشاهدة» (this TV's own start counts) and «الأكثر رواجًا» (TMDB's week, only titles the provider really has). They start on top once and can be switched off in Settings, Customize home.
+- EPG: Xtream accounts get xmltv.php automatically and M3U lists use their `url-tvg`, both read for the 2 h back to 14 h ahead window only (beta5); catch-up exists for Xtream channels that report `tv_archive`.

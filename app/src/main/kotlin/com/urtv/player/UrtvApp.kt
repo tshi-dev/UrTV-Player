@@ -23,6 +23,7 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     // Everything below is created on first use, so process start does the bare minimum.
     val catalog: Catalog by lazy { Catalog(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)).also { c -> c.onVod = { def, split -> vod.setFromM3u(def, split) } } }
     val vod: Vod by lazy { Vod(this, store, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+    val tmdb: com.urtv.player.data.TmdbClient by lazy { com.urtv.player.data.TmdbClient(this, BuildConfig.TMDB_KEY) }
     val player: PlayerController by lazy { PlayerController(this, store) }
     val commentary: com.urtv.player.player.CommentaryController by lazy { com.urtv.player.player.CommentaryController(this, player, commentaryTier == com.urtv.player.core.Commentary.Tier.Warn, store) }
     /** «دمج التعليق» needs two decoders and two connections: under 2000 MB of RAM the row stays, with a warning and the lightest second player. */

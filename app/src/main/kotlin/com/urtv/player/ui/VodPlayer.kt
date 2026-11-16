@@ -74,7 +74,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     val ended by ctrl.ended.collectAsState()
     val attempt by ctrl.attempt.collectAsState()
 
-    LaunchedEffect(item.url) { ctrl.trackKey(item.key); ctrl.playVod(item.title, item.url, firstStart); firstStart = 0; bar = true; tick++ }
+    LaunchedEffect(item.url) { ctrl.trackKey(item.key); app.store.bumpViews(item.seriesId?.takeIf { it.isNotEmpty() }?.let { vodKey(item.pid, it) } ?: item.key); ctrl.playVod(item.title, item.url, firstStart); firstStart = 0; bar = true; tick++ }
     LaunchedEffect(item.url) {
         var n = 0
         while (true) {
