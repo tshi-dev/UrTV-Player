@@ -288,7 +288,14 @@ private fun HomeRows(
         }
         return
     }
+    // the big banner: the first title of «trending» (else «recently added»), when one of those rows is on
+    val heroPick = if ("trending" in rows || "added" in rows) (if ("trending" in rows) trending.firstOrNull() else null) ?: (if ("added" in rows) added.firstOrNull() else null) else null
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp)) {
+        if (heroPick != null) item(key = "hero") {
+            val fr = if (!firstTaken) { firstTaken = true; first } else null
+            HeroBanner(app, vod.playlistId.orEmpty(), heroPick, fr, openMixed)
+            Spacer(Modifier.height(22.dp))
+        }
         for (id in shown) item(key = id) {
             Column(Modifier.padding(bottom = 22.dp)) {
                 when {
@@ -757,6 +764,35 @@ fun Logo(ch: Channel, size: Int) {
 }
 
 /** Poster/still with a stable tinted placeholder underneath (no flash while loading, nothing broken when it fails). */
+/** Big banner on top of the home: title, year / age / rating chips, two lines of story, «watch now» and «add to favourites». Provider data only when there is no TMDB key. */
+@Composable
+private fun HeroBanner(app: UrtvApp, pid: String, p: Poster, focus: FocusRequester?, onOpen: (String) -> Unit) {
+    val series = p.id.startsWith("s:"); val id = p.id.drop(2)
+    val tm by produceState<com.urtv.player.core.Tmdb.Info?>(null, p.title) { value = app.tmdb.info(p.title, null, series) }
+    val provPlot by produceState("", p.id) {
+        value = if (series) app.vod.state.value.series.firstOrNull { it.id == id }?.plot.orEmpty()
+        else app.store.playlists.value.firstOrNull { it.id == pid }?.let { runCatching { app.vod.movieInfo(it, id).plot }.getOrDefault("") }.orEmpty()
+    }
+    val plot = listOf(provPlot, tm?.overview.orEmpty()).maxByOrNull { it.length }.orEmpty()
+    val favs by app.store.favs.collectAsState(); val fkey = vodKey(pid, id); val fav = fkey in favs
+    val ltr = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Ltr
+    val chips = listOfNotNull(tm?.year?.takeIf { it.isNotBlank() }, tm?.age?.takeIf { it.isNotBlank() }, p.meta?.takeIf { it.isNotBlank() && it != "0" }?.let { "★ $it" } ?: tm?.rating?.takeIf { it > 0 }?.let { "TMDB ★ %.1f".format(java.util.Locale.US, it) }, p.category.takeIf { it.isNotBlank() })
+    Box(Modifier.fillMaxWidth().height(340.dp).clip(Rd(22)).background(C.surface)) {
+        PosterArt(com.urtv.player.core.Tmdb.backdrop(tm?.backdrop) ?: p.image, p.title)
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(if (ltr) listOf(Color(0xF00E0F11), Color.Transparent) else listOf(Color.Transparent, Color(0xF00E0F11)))))
+        Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 44.dp).width(780.dp)) {
+            Text(p.title, style = T.display.copy(fontSize = 44.sp, lineHeight = 54.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (chips.isNotEmpty()) Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { chips.forEach { Chip(it) } }
+            if (plot.isNotBlank()) Text(plot, style = T.body.copy(color = C.muted), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                TvButton(stringResource(R.string.hero_watch), { onOpen(p.id) }, primary = true, focusRequester = focus)
+                TvButton(stringResource(if (fav) R.string.menu_unfav else R.string.menu_fav), { app.store.toggleFav(fkey) })
+            }
+        }
+    }
+}
+
 @Composable
 fun PosterArt(image: String?, title: String) {
     val h = (title.fold(0) { a, c -> (a * 31 + c.code) and 0xFFFF } % 360).toFloat()

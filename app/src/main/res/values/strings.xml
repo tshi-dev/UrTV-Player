@@ -329,4 +329,5 @@
     <string name="row_added">أُضيف حديثًا</string>
     <string name="row_viewed">الأكثر مشاهدة</string>
     <string name="row_trending">الأكثر رواجًا</string>
+    <string name="hero_watch">شاهد الآن</string>
 </resources>

@@ -139,6 +139,8 @@ class ShotsTest {
     @Test fun commentaryCard() { seed(); val all = app.catalog.state.value.channels
         shot("16-commentary-card-ar") { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.BottomCenter) { com.urtv.player.ui.CommentaryPanel(app, all, all[2]) {} } } }
 
+    @Test fun homeHero() { seedXtream(); shot("17-home-hero-ar") { HomeScreen(app, Tab.Home, {}, { _, _ -> }, {}, {}, null) } }
+
     @Test fun movies() { seedXtream(); shot("05-movies-ar") { HomeScreen(app, Tab.Movies, {}, { _, _ -> }, {}, {}, null) } }
     @Test fun series() { seedXtream(); shot("06-series-ar") { HomeScreen(app, Tab.Series, {}, { _, _ -> }, {}, {}, null) } }
     @Test @Config(qualifiers = "en-w960dp-h540dp-xhdpi") fun homeEn() { seed(); seedHome(); shot("01-home-en") { HomeScreen(app, Tab.Home, {}, { _, _ -> }, {}, {}, null) } }
