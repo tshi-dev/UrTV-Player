@@ -17,6 +17,7 @@ object Net {
             .connectionPool(ConnectionPool(6, 5, TimeUnit.MINUTES))
             .connectTimeout(8, TimeUnit.SECONDS).readTimeout(12, TimeUnit.SECONDS).callTimeout(0, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .pingInterval(10, TimeUnit.SECONDS)          // HTTP/2: a dead connection is noticed in seconds, not at the read timeout
             .dns(dns).eventListenerFactory(LoadTrace.listenerFactory).addInterceptor(ManifestCache.interceptor)
             .followRedirects(true).followSslRedirects(true)
             .build()

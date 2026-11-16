@@ -77,6 +77,7 @@ fun Tv(
 ) {
     val th = LocalTheme.current
     var focused by remember { mutableStateOf(false) }
+    var pressed by remember { mutableStateOf(false) }; var longFired by remember { mutableStateOf(false) }
     val noAnim = Bisect.on("nofocus")
     val scaleA by animateFloatAsState(if (focused) lift else 1f, tween(170, easing = androidx.compose.animation.core.LinearOutSlowInEasing), label = "lift")
     val scale = if (noAnim) 1f else scaleA
@@ -100,6 +101,17 @@ fun Tv(
             .let { if (border != null) it.border(border, shape) else it }
             .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
             .onFocusChanged { focused = it.isFocused; onFocus(it.isFocused) }
+            // a remote has no long press in Compose's own click handling: holding OK (or pressing Menu) is read here, so «hold to remove / more» works with the D-pad
+            .let { m -> if (onLongClick == null) m else m.onPreviewKeyEvent { e ->
+                val k = e.nativeKeyEvent.keyCode
+                when {
+                    k == android.view.KeyEvent.KEYCODE_MENU -> { if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) onLongClick(); true }
+                    k != android.view.KeyEvent.KEYCODE_DPAD_CENTER && k != android.view.KeyEvent.KEYCODE_ENTER -> false
+                    e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown -> { if (e.nativeKeyEvent.repeatCount == 0) { pressed = true; longFired = false } else if (pressed && !longFired) { longFired = true; onLongClick() }; true }
+                    e.type == androidx.compose.ui.input.key.KeyEventType.KeyUp -> { val click = pressed && !longFired; pressed = false; longFired = false; if (click) onClick(); true }
+                    else -> false
+                }
+            } }
             .combinedClickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onClick, onLongClick = onLongClick),
     ) { CompositionLocalProvider(LocalFocused provides (focused && solid)) { content(focused) } }
 }

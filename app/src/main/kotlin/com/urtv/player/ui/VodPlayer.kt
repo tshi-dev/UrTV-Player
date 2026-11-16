@@ -64,6 +64,9 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     var options by remember { mutableStateOf(false) }
     var firstStart by remember { mutableLongStateOf(startMs) }
     var seekStreak by remember { mutableStateOf(0) }
+    // scrubbing like a standard player: each press moves a marker on the bar, the picture jumps once, a moment after the last press (or at OK) — not a seek per key press
+    var pending by remember(idx) { mutableStateOf<Long?>(null) }
+    var pendingTick by remember { mutableStateOf(0) }
     var noSeek by remember(idx) { mutableStateOf(false) }        // this stream cannot be seeked (the server does not answer range requests): said on the bar instead of doing nothing
     var dismissedNext by remember { mutableStateOf(-1) }
     val root = remember { FocusRequester() }
@@ -104,11 +107,14 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     DisposableEffect(Unit) { onDispose { ctrl.stop() } }
     BackHandler { if (options) options = false else if (dur > 0 && dur - pos in 1..12_000 && idx + 1 < items.size && dismissedNext != idx) dismissedNext = idx else if (bar && !paused) bar = false else onExit() }
 
+    LaunchedEffect(pendingTick) { val t = pending ?: return@LaunchedEffect; delay(450); ctrl.player?.seekTo(t); pos = t; pending = null; tick++ }
+    fun commitSeek() { val t = pending ?: return; ctrl.player?.seekTo(t); pos = t; pending = null; tick++ }
+
     fun seek(deltaMs: Long) {
         val p = ctrl.player ?: return
         if (!p.isCurrentMediaItemSeekable) { noSeek = true; bar = true; tick++; android.util.Log.i("UrTVPerf", "vod seek: stream is not seekable"); return }
-        val target = (p.currentPosition + deltaMs).coerceIn(0, if (dur > 0) dur - 1000 else Long.MAX_VALUE)
-        p.seekTo(target); pos = target; bar = true; tick++
+        val target = ((pending ?: p.currentPosition) + deltaMs).coerceIn(0, if (dur > 0) (dur - 1000).coerceAtLeast(0) else Long.MAX_VALUE)
+        pending = target; bar = true; tick++; pendingTick++
     }
 
     Box(
@@ -118,7 +124,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             when (e.nativeKeyEvent.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { seekStreak++; seek(-(if (seekStreak > 12) 60_000L else if (seekStreak > 4) 30_000L else 10_000L)); true }
                 KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { seekStreak++; seek(if (seekStreak > 12) 60_000L else if (seekStreak > 4) 30_000L else 10_000L); true }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { if (items.getOrNull(idx + 1) != null && dur > 0 && dur - pos in 1..12_000) { idx++ } else { ctrl.togglePause(); bar = true; tick++ }; true }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { if (pending != null) { commitSeek(); bar = true } else if (items.getOrNull(idx + 1) != null && dur > 0 && dur - pos in 1..12_000) { idx++ } else { ctrl.togglePause(); bar = true; tick++ }; true }
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> { ctrl.togglePause(); bar = true; tick++; true }
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_INFO -> { bar = true; tick++; true }
                 KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { options = true; true }
@@ -131,7 +137,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
         VideoSurface(ctrl)
         if (app.store.statsOverlay.collectAsState().value) StatsOverlay(ctrl, Modifier.align(Alignment.TopStart).padding(40.dp))
         val sub by ctrl.cue.collectAsState()
-        if (sub.isNotBlank()) Text(sub, style = T.title.copy(color = Color.White), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 260.dp, start = 240.dp, end = 240.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 14.dp, vertical = 4.dp))
+        if (sub.isNotBlank()) SubtitleText(sub, app.store, Modifier.align(Alignment.BottomCenter).padding(bottom = 260.dp, start = 240.dp, end = 240.dp))
         Box(Modifier.align(Alignment.Center)) {
             when {
                 status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); Text(stringResource(R.string.press_ok_retry), style = T.small) }
@@ -149,10 +155,11 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
                 if (item.episodeTitle.isNotBlank()) Text(item.episodeTitle, style = T.small)
                 if (noSeek) Text(stringResource(R.string.vod_no_seek), style = T.small.copy(color = C.accent))
                 Spacer(Modifier.height(12.dp))
-                ProgressBar(if (dur > 0) pos / dur.toFloat() else 0f)
+                val shownPos = pending ?: pos
+                ProgressBar(if (dur > 0) (shownPos / dur.toFloat()).coerceIn(0f, 1f) else 0f)
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth()) {
-                    Text(clock(pos), style = T.small); Spacer(Modifier.weight(1f)); Text(if (dur > 0) clock(dur) else "", style = T.small)
+                    Text(clock(shownPos) + (pending?.let { "   " + (if (it >= pos) "+" else "−") + clock(kotlin.math.abs(it - pos)) } ?: ""), style = if (pending != null) T.bodyBold.copy(color = C.accent) else T.small); Spacer(Modifier.weight(1f)); Text(if (dur > 0) clock(dur) else "", style = T.small)
                 }
             }
         }

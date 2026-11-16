@@ -203,3 +203,13 @@ How it works:
 - Lists cached by older versions are read once into the index (streamed) and removed.
 - Memory/exit paths: database errors (full or damaged disk) answer «nothing» and are noted in the log instead of ending the app; all refresh work runs in `runCatching`, which also catches out-of-memory. The `UrTVPerf` memory line stays.
 - Not done: conditional HTTP (ETag) per category; fuzzy «skeleton» matching in film search (the folded-name search with aliases and the keyboard-layout swap stays); the live list (55k channels) is still held in memory (about 25 MB) because zapping, groups and the guide use it.
+
+### v0.9.16 beta15
+
+Live stability (what UrTVPerf separates: `rebuffers=` is the network or the provider, `dropped=` is the decoder or the TV; the playback line prints both every 10 s):
+- After a stall the cushion is asked to be deeper (+3 s per stall, at most +9 s, one step back per five quiet minutes) without rebuilding the player (`AdaptiveLoadControl`): the restart waits for the deeper cushion and loading keeps filling to the deeper floor. A `buffer_grow` line is logged.
+- The first retry of a live stream is a re-prepare on the same player (new connection; picture and decoder kept); only a second retry rebuilds, as before.
+- HTTP/2 ping every 10 s (a dead connection is noticed in seconds); the pooled keep-alive connections stay.
+- Settings «جودة أثبت»: up to 720p, quality only goes up after 25 s and only to what half of the measured bandwidth carries, and a deeper base buffer.
+
+Films and series player: seeking moves a marker on the bar (with the offset), the picture jumps once a moment after the last press or at OK (no seek per key press); hold OK on a remote card (or press Menu) is read as a long press; subtitle size is a real setting (small/normal/large/huge) and follows the TV's caption scale (the old fixed 34 sp title size was the «huge» subtitle).

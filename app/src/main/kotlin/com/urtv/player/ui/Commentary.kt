@@ -55,6 +55,8 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
     var asked by remember { mutableStateOf(!warn) }                            // small TVs: «try it?» comes first, the focus on «cancel»
     var pickGroup by remember { mutableStateOf<String?>(null) }                // the folder (a group of the subscription) opened in the picker
     BackHandler { if (asked) cancel() else onClose() }
+    // the zoom is only for syncing: it goes back to normal when the card closes
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { cm.resetZoom() } }
     BackHandler(picking) { if (pickGroup != null) pickGroup = null else picking = false }     // registered later: wins while picking
     val first = remember { FocusRequester() }
     LaunchedEffect(asked, picking, st.audio?.url, st.failure) { repeat(10) { if (runCatching { first.requestFocus(); true }.getOrDefault(false)) return@LaunchedEffect; kotlinx.coroutines.delay(30) } }
@@ -70,7 +72,7 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
         }
         picking -> Column(card.fillMaxHeight(0.8f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(stringResource(R.string.cm_title), style = T.title.copy(fontSize = 32.sp))
-            Picker(all, current, first, app.catalog.state.collectAsState().value.index, pickGroup, { pickGroup = it }, onPick = { cm.start(it); picking = false; pickGroup = null })
+            Picker(all, current, st.audio?.url, first, app.catalog.state.collectAsState().value.index, pickGroup, { pickGroup = it }, onPick = { cm.start(it); picking = false; pickGroup = null })
         }
         else -> Row(card, horizontalArrangement = Arrangement.spacedBy(32.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -86,7 +88,7 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SourceCard(stringResource(R.string.cm_original), current.name, st.audio == null, Modifier.weight(1f), if (st.audio == null) first else null) { if (st.audio != null) cm.original() else cm.clearFailure() }
-                    for (c in recent.take(2)) SourceCard(c.name, stringResource(if (st.audio?.url == c.url && !st.ready) R.string.cm_loading else R.string.cm_audio_from_short), st.audio?.url == c.url, Modifier.weight(1f), if (st.audio?.url == c.url) first else null) { if (st.audio?.url != c.url) cm.start(c) }
+                    for (c in recent.take(2)) SourceCard(c.name, stringResource(if (st.audio?.url == c.url && !st.ready) R.string.cm_loading else R.string.cm_audio_from_short) + "  ·  " + stringResource(R.string.cm_hold_remove), st.audio?.url == c.url, Modifier.weight(1f), onLong = { cm.forget(c) }, focus = if (st.audio?.url == c.url) first else null) { if (st.audio?.url != c.url) cm.start(c) }
                     SourceCard("+ " + stringResource(R.string.cm_choose), stringResource(R.string.cm_pick_sub), false, Modifier.weight(1f), null) { picking = true }
                 }
                 if (st.audio != null) {
@@ -115,6 +117,13 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
                     if (st.audio != null) Text(stringResource(R.string.cm_preview_tag), style = T.tiny.copy(color = Color.White), modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 10.dp, vertical = 3.dp))
                     Text((st.audio ?: current).name, style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
                 }
+                // reading the score and the match clock: the picture above can be enlarged from a corner of the screen
+                val zoom by cm.zoom.collectAsState()
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TvButton(stringResource(R.string.cm_zoom_n, zoom.level), { cm.cycleZoom() }, Modifier.weight(1f))
+                    if (zoom.level > 1) TvButton(stringResource(listOf(R.string.pos_tl, R.string.pos_tc, R.string.pos_tr, R.string.pos_bl, R.string.pos_bc, R.string.pos_br)[zoom.pos]), { cm.cycleZoomPos() }, Modifier.weight(1f))
+                }
+                if (st.audio != null) TvButton(stringResource(R.string.cm_remove), { cm.original() }, Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TvButton(stringResource(R.string.cm_apply), { apply() }, Modifier.weight(1f), primary = true)
                     TvButton(stringResource(R.string.cm_cancel), { cancel() }, Modifier.weight(1f))
@@ -125,10 +134,13 @@ internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel,
 }
 
 @Composable
-private fun SourceCard(title: String, sub: String, selected: Boolean, modifier: Modifier, focus: FocusRequester?, onClick: () -> Unit) {
-    Tv(onClick, modifier.height(84.dp), Rd(14), selected = selected, focusRequester = focus, restColor = C.surfaceHi) {
+private fun SourceCard(title: String, sub: String, selected: Boolean, modifier: Modifier, focus: FocusRequester?, onLong: (() -> Unit)? = null, onClick: () -> Unit) {
+    Tv(onClick, modifier.height(84.dp), Rd(14), selected = selected, focusRequester = focus, onLongClick = onLong, restColor = C.surfaceHi) {
         Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 20.dp)) {
-            Text(title, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (selected) { Text("✓", style = T.bodyBold.copy(color = C.accent)); Spacer(Modifier.width(8.dp)) }
+                Text(title, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Text(sub, style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -136,7 +148,7 @@ private fun SourceCard(title: String, sub: String, selected: Boolean, modifier: 
 
 /** The person's own list with a search box: the typed text filters the names (Arabic and Latin, layout slips included). */
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Channel>, current: Channel, first: FocusRequester, index: com.urtv.player.data.ChannelIndex, group: String?, onGroup: (String?) -> Unit, onPick: (Channel) -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Channel>, current: Channel, chosenUrl: String?, first: FocusRequester, index: com.urtv.player.data.ChannelIndex, group: String?, onGroup: (String?) -> Unit, onPick: (Channel) -> Unit) {
     var q by remember { mutableStateOf("") }
     val fast = index.channels === all
     // a folder first (the groups of the subscription, in its order), then the channels inside it; typing searches the folder, or everything when none is open
@@ -147,19 +159,27 @@ private fun androidx.compose.foundation.layout.ColumnScope.Picker(all: List<Chan
     val keys = remember(hits) { uniqueKeys(hits.map { it.url }) }
     if (group != null) Text(if (group == Browse.OTHER) stringResource(R.string.group_other) else group, style = T.bodyBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     FocusField(q, { q = it }, stringResource(R.string.cm_search), Modifier.fillMaxWidth(), focusRequester = first)
+    Text(stringResource(if (showFolders) R.string.cm_pick_folder_hint else R.string.cm_pick_hint), style = T.tiny)
+    // opening a folder removes the row that had the focus: the first channel of the folder takes it (else the search box)
+    val firstRow = remember { FocusRequester() }
+    LaunchedEffect(group, showFolders) { kotlinx.coroutines.delay(80); if (!runCatching { firstRow.requestFocus(); true }.getOrDefault(false)) runCatching { first.requestFocus() } }
     LazyColumn(Modifier.fillMaxWidth().weight(1f), state = rememberLazyListState(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (showFolders) {
-            itemsIndexed(folders, key = { _, f -> "g|" + f.first }) { _, f ->
-                Tv({ onGroup(f.first) }, Modifier.fillMaxWidth().height(64.dp), Rd(12), restColor = C.surfaceHi, flat = true) {
+            itemsIndexed(folders, key = { _, f -> "g|" + f.first }) { i, f ->
+                Tv({ onGroup(f.first) }, Modifier.fillMaxWidth().height(64.dp), Rd(12), focusRequester = if (i == 0) firstRow else null, restColor = C.surfaceHi, flat = true) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(if (f.first == Browse.OTHER) stringResource(R.string.group_other) else f.first, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Text("${f.second}", style = T.tiny)
                     }
                 }
             }
-        } else itemsIndexed(hits, key = { i, _ -> keys[i] }) { _, ch ->
-            Tv({ onPick(ch) }, Modifier.fillMaxWidth().height(64.dp), Rd(12), restColor = C.surfaceHi, flat = true) {
-                Text(ch.name, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 22.dp))
+        } else itemsIndexed(hits, key = { i, _ -> keys[i] }) { i, ch ->
+            val picked = ch.url == chosenUrl
+            Tv({ onPick(ch) }, Modifier.fillMaxWidth().height(64.dp), Rd(12), selected = picked, focusRequester = if (i == 0) firstRow else null, restColor = C.surfaceHi, flat = true) {
+                Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(ch.name, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(if (picked) "✓" else stringResource(R.string.cm_pick_ok), style = if (picked) T.bodyBold.copy(color = C.accent) else T.tiny)      // OK picks it; the mark shows what is chosen now
+                }
             }
         }
     }

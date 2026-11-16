@@ -50,6 +50,7 @@ import com.urtv.player.data.PlaylistDef
 import com.urtv.player.data.VodQuery
 import com.urtv.player.data.VodRow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -67,6 +68,9 @@ private const val ALL = "\u0000all"
 private const val LATEST = "\u0000latest"
 private const val FAVS = "\u0000favs"
 fun vodKey(pid: String, id: String) = "vod|$pid|$id"
+
+/** What to come back to: the folder, the search text, which card was opened and where it sat in the list. */
+class VodBrowseMem(var cat: String = LATEST, var query: String = "", var index: Int = 0, var openedId: String? = null)
 
 /** A long list read from the disk index a page at a time: only the pages near the screen are held (and a few behind), the rest is asked for as it is scrolled to. */
 class PagedPosters(val count: Int, private val scope: kotlinx.coroutines.CoroutineScope, private val load: suspend (Int, Int) -> List<Poster>) {
@@ -93,8 +97,14 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
     val pid = vod.playlistId.orEmpty(); val kind = if (movies) VodRow.MOVIE else VodRow.SERIES
     val total = if (movies) vod.movieCount else vod.seriesCount
     val favs by app.store.favs.collectAsState()
-    var cat by remember(movies) { mutableStateOf(LATEST) }
-    var query by remember(movies) { mutableStateOf("") }
+    val mem = remember(pid, movies) { app.vodBrowse.getOrPut("$pid|$movies") { VodBrowseMem() } }
+    var cat by remember(pid, movies) { mutableStateOf(mem.cat) }
+    var query by remember(pid, movies) { mutableStateOf(mem.query) }
+    androidx.compose.runtime.SideEffect { mem.cat = cat; mem.query = query }
+    // coming back from a details page: scroll to the card that was opened and put the focus on it (the folder list on the left must not take it, it would change the folder)
+    var restoreId by remember(pid, movies) { mutableStateOf(mem.openedId) }
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    val restoreFocus = remember { FocusRequester() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // the provider's category order with the number of items in each: one grouped read of the index, off the main thread
     val cats by produceState(emptyList<Pair<String, Int>>(), vod.rev, pid, kind) { value = withContext(Dispatchers.IO) { app.vod.db.cats(pid, kind).filter { it.first.isNotBlank() } } }
@@ -110,7 +120,7 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         LazyColumn(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
             items(listOf(LATEST, FAVS, ALL) + cats.map { it.first }, key = { it }) { c ->
-                Tv({ cat = c }, Modifier.fillMaxWidth().height(52.dp), selected = c == cat, onFocus = { if (it) cat = c }) {
+                Tv({ cat = c }, Modifier.fillMaxWidth().height(52.dp), selected = c == cat, onFocus = { if (it && restoreId == null) cat = c }) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(if (c == ALL) stringResource(R.string.all_categories) else if (c == LATEST) stringResource(R.string.vod_latest) else if (c == FAVS) stringResource(R.string.tab_favs) else c, style = if (c == cat) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Text("${if (c == ALL) total else if (c == LATEST) minOf(total, 200) else if (c == FAVS) favCount else cats.firstOrNull { it.first == c }?.second ?: 0}", style = T.tiny)
@@ -139,9 +149,17 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
                         Text(stringResource(R.string.err_network), style = T.title); Spacer(Modifier.height(16.dp))
                         TvButton(stringResource(R.string.retry), { app.vod.open(app.store.playlists.value.firstOrNull { it.id == vod.playlistId }, true) }, primary = true) }
                     shown == 0 -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center))
-                    else -> LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    else -> {
                         val l = list!!
-                        items(l.count, key = { it }) { i -> val p = l.at(i); if (p != null) PosterCard(p, Modifier.fillMaxWidth()) { onOpen(p.id) } else SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) }
+                        LaunchedEffect(l, restoreId) {
+                            val id = restoreId ?: return@LaunchedEffect
+                            if (mem.index in 0 until l.count) gridState.scrollToItem(mem.index)
+                            repeat(40) { if (runCatching { restoreFocus.requestFocus(); true }.getOrDefault(false)) { restoreId = null; mem.openedId = null; return@LaunchedEffect }; delay(60) }
+                            restoreId = null; mem.openedId = null
+                        }
+                        LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), gridState, contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                            items(l.count, key = { it }) { i -> val p = l.at(i); if (p != null) PosterCard(p, Modifier.fillMaxWidth(), focusRequester = if (p.id == restoreId) restoreFocus else null) { mem.index = i; mem.openedId = p.id; onOpen(p.id) } else SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) }
+                        }
                     }
                 }
             }

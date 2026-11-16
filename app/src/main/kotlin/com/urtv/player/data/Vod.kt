@@ -55,8 +55,8 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
     fun skip() { skipped = true }
 
     private val fetched = HashSet<String>()     // playlists already asked in this run: switching between Movies and Series does not ask again
-    /** [fetch] false: only what is on disk is read (start-up). */
-    fun open(def: PlaylistDef?, force: Boolean = false, fetch: Boolean = true) {
+    /** [fetch] false: only what is on disk is read (start-up). [kinds]: which of films (0) and series (1) to refresh, so each can be updated on its own. */
+    fun open(def: PlaylistDef?, force: Boolean = false, fetch: Boolean = true, kinds: Set<Int> = setOf(VodRow.MOVIE, VodRow.SERIES)) {
         val cur = _state.value
         // the cache-only open at start must never cancel a refresh in progress or replace what is already showing
         if (!fetch && def != null && cur.playlistId == def.id && (cur.loading || cur.any)) return
@@ -75,11 +75,12 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             _state.value = _state.value.copy(loading = true, failed = false, doneCats = 0, totalCats = 0, current = "", rows = 0)
             val acc = account(def)
             val ok = withContext(Dispatchers.IO) {
-                val m = runCatching { refreshKind(def, acc, VodRow.MOVIE) { skipped || !isActive } }
-                val sr = runCatching { refreshKind(def, acc, VodRow.SERIES) { skipped || !isActive } }
-                (m.exceptionOrNull() ?: sr.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }
-                if (m.isSuccess || sr.isSuccess) db.setMeta(def.id, "checked", System.currentTimeMillis().toString())
-                m.isSuccess || sr.isSuccess
+                val m = if (VodRow.MOVIE in kinds) runCatching { refreshKind(def, acc, VodRow.MOVIE) { skipped || !isActive } } else null
+                val sr = if (VodRow.SERIES in kinds) runCatching { refreshKind(def, acc, VodRow.SERIES) { skipped || !isActive } } else null
+                (m?.exceptionOrNull() ?: sr?.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }
+                val good = m?.isSuccess == true || sr?.isSuccess == true
+                if (good && kinds.size == 2) db.setMeta(def.id, "checked", System.currentTimeMillis().toString())
+                good
             }
             if (!ok) fetched -= def.id      // nothing came: the next visit to the tab asks again
             _state.value = snap(def.id).copy(loading = false, failed = !ok && !_state.value.any, doneCats = 0, totalCats = 0, current = "")

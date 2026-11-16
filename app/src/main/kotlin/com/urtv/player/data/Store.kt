@@ -129,6 +129,11 @@ class Store(ctx: Context) {
     fun setGroupOrder(pid: String, l: List<String>) { _order.value = _order.value + (pid to l); sp.edit().putString("gorder_$pid", l.joinToString("\n")).apply() }
     fun setEpgOffset(pid: String, min: Int) { _offsets.value = _offsets.value + (pid to min); sp.edit().putInt("epgoff_$pid", min).apply() }
 
+    // ---- subtitles: 0 small, 1 normal, 2 large, 3 huge (size of the text on the picture, for films, series and channels)
+    private val _subSize = MutableStateFlow(sp.getInt("subSize", 1).coerceIn(0, 3))
+    val subSize: StateFlow<Int> = _subSize
+    fun setSubSize(v: Int) { _subSize.value = v.coerceIn(0, 3); sp.edit().putInt("subSize", _subSize.value).apply() }
+
     // ---- appearance
     private val _textScale = MutableStateFlow(sp.getInt("textScale", 0))
     val textScale: StateFlow<Int> = _textScale
@@ -209,6 +214,8 @@ class Store(ctx: Context) {
     fun toggleHiddenChannel(key: String) { val s = _hiddenCh.value.toMutableSet(); if (!s.add(key)) s.remove(key); _hiddenCh.value = s; sp.edit().putStringSet("hiddenCh", s).apply() }
     fun clearHiddenChannels(pid: String) { val s = _hiddenCh.value.filterNot { it.startsWith("$pid|") }.toSet(); _hiddenCh.value = s; sp.edit().putStringSet("hiddenCh", s).apply() }
 
+    private val _steady = MutableStateFlow(sp.getBoolean("steady", false)); val steadyQuality: StateFlow<Boolean> = _steady
+    fun setSteadyQuality(v: Boolean) { _steady.value = v; sp.edit().putBoolean("steady", v).apply() }
     private val _autoAlt = MutableStateFlow(sp.getBoolean("autoalt", false)); val autoAlt: StateFlow<Boolean> = _autoAlt
     fun setAutoAlt(v: Boolean) { _autoAlt.value = v; sp.edit().putBoolean("autoalt", v).apply() }
     fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }

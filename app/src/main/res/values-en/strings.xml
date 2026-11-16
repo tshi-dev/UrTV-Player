@@ -17,7 +17,10 @@
     <string name="err_format">The playlist format isn\'t recognised</string>
     <string name="err_empty">The playlist is empty</string>
     <string name="retry">Try again</string>
-    <string name="refresh_now">Full refresh</string>
+    <string name="refresh_now">Refresh all</string>
+    <string name="refresh_channels">Refresh channels</string>
+    <string name="refresh_movies">Refresh films</string>
+    <string name="refresh_series">Refresh series</string>
     <string name="empty_favs">Hold OK on any channel to add it to favourites</string>
     <string name="empty_recents">Channels you watch will show up here</string>
     <string name="empty_group">No channels here</string>
@@ -204,6 +207,12 @@
     <string name="set_prefetch_hint">Makes zapping faster. Turn off if your provider limits connections</string>
     <string name="set_tunnel">Tunneled playback</string>
     <string name="set_tunnel_hint">Smoother on some devices. Turn off if you see picture or audio problems</string>
+    <string name="set_steady">Steadier quality (channels)</string>
+    <string name="set_steady_hint">Up to 720p, slower quality changes and a deeper buffer: fewer stutters on weak lines</string>
+    <string name="set_sub_size">Subtitle size</string>
+    <string name="set_sub_size_hint">Size of the subtitle text on the picture (also follows the TV\'s own caption settings)</string>
+    <string name="sub_small">Small</string>
+    <string name="sub_huge">Huge</string>
     <string name="set_stats">Playback stats</string>
     <string name="set_stats_hint">Shows resolution, bitrate and buffer while playing</string>
     <string name="lang_auto">Auto (follow UrTV)</string>
@@ -335,4 +344,16 @@
     <string name="row_viewed">Most watched</string>
     <string name="row_trending">Trending</string>
     <string name="hero_watch">Watch now</string>
+    <string name="cm_remove">Remove commentary (original sound)</string>
+    <string name="cm_hold_remove">Hold OK to remove</string>
+    <string name="cm_zoom_n">Zoom the picture ×%1$d</string>
+    <string name="cm_pick_hint">Press OK on a channel to choose it</string>
+    <string name="cm_pick_folder_hint">Open a folder, then press OK on a channel to choose it</string>
+    <string name="cm_pick_ok">Choose</string>
+    <string name="pos_tl">Top left</string>
+    <string name="pos_tc">Top centre</string>
+    <string name="pos_tr">Top right</string>
+    <string name="pos_bl">Bottom left</string>
+    <string name="pos_bc">Bottom centre</string>
+    <string name="pos_br">Bottom right</string>
 </resources>

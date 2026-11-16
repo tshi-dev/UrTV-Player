@@ -23,6 +23,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+/** Zoom of the picture while syncing (to read the score and the match clock): ×1..×3 from one of six anchor points (top/bottom × left/centre/right of the screen). */
+data class Zoom(val level: Int = 1, val pos: Int = 0) {
+    val scale get() = level.toFloat()
+    val originX get() = (pos % 3) * 0.5f
+    val originY get() = if (pos / 3 == 0) 0f else 1f
+}
+
 /** What the panel shows: the second channel (null = the original sound), the delay, and why it failed. */
 data class CommentaryState(val audio: Channel? = null, val delayMs: Long = 0L, val failure: Commentary.Failure? = null, val ready: Boolean = false)
 
@@ -45,6 +52,13 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
     /** The sound channels used so far in this run (newest first, at most three), offered again as source cards. */
     private val _recent = MutableStateFlow<List<Channel>>(emptyList())
     val recent: StateFlow<List<Channel>> = _recent
+    private val _zoom = MutableStateFlow(Zoom())
+    val zoom: StateFlow<Zoom> = _zoom
+    fun cycleZoom() { _zoom.value = _zoom.value.let { it.copy(level = if (it.level >= 3) 1 else it.level + 1) } }
+    fun cycleZoomPos() { _zoom.value = _zoom.value.let { it.copy(pos = (it.pos + 1) % 6) } }
+    fun resetZoom() { _zoom.value = Zoom() }
+    /** Takes a channel out of the list of sound sources; if it is the one playing, the original sound comes back. */
+    fun forget(ch: Channel) { _recent.value = _recent.value.filter { it.url != ch.url }; if (_state.value.audio?.url == ch.url) original() }
 
     init {
         main.onSessionEnd = { stop() }
@@ -57,7 +71,7 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
     }
 
     fun start(ch: Channel, initialDelayMs: Long? = null) {
-        endAudio(keepFailure = false)
+        endAudio(keepFailure = false, keepMuted = true)       // replacing the source: the original sound must not blink back in between
         _recent.value = (listOf(ch) + _recent.value.filter { it.url != ch.url }).take(3)
         val keep = initialDelayMs ?: store?.commentaryDelay(pairKey(ch)) ?: 0L
         _state.value = CommentaryState(audio = ch, delayMs = 0L)
@@ -136,14 +150,14 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
         if (wasOriginalDown) main.retryNow()          // the provider cut the first channel: bring it back with its own sound
     }
 
-    fun stop() { endAudio(keepFailure = false) }
+    fun stop() { endAudio(keepFailure = false); resetZoom() }
 
-    private fun endAudio(keepFailure: Boolean) {
+    private fun endAudio(keepFailure: Boolean, keepMuted: Boolean = false) {
         watch?.cancel(); watch = null
         val had = audio != null || _state.value.audio != null
         audio?.let { a -> audioListener?.let(a::removeListener); a.stop(); a.clearMediaItems(); a.release() }; audio = null; audioListener = null     // gone completely: player, buffers, listener
-        if (had) { main.setCommentaryMuted(false); if (_state.value.delayMs < 0L) main.backToLive() }
-        else main.setCommentaryMuted(false)
+        if (had) { if (!keepMuted) main.setCommentaryMuted(false); if (_state.value.delayMs < 0L) main.backToLive() }
+        else if (!keepMuted) main.setCommentaryMuted(false)
         if (!keepFailure) _state.value = CommentaryState()
     }
 }

@@ -174,6 +174,8 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private var serverOrigin: Uri? = null
     private var audioLangs: List<String> = emptyList()
     private var builtServer = false
+    private var builtSteady = false
+    private val growth = PlaybackTuning.BufferGrowth()
 
     private fun sameOrigin(a: Uri, b: Uri?): Boolean {
         if (b == null) return false
@@ -198,14 +200,18 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         dataFactory = http
         val extractors = DefaultExtractorsFactory().setTsExtractorFlags(
             DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS)
-        val buf = if (serverMode) PlaybackTuning.serverBuffers(lowRam) else PlaybackTuning.buffers(buffer, live, lowRam)
-        val load = DefaultLoadControl.Builder().setBufferDurationsMs(buf.minMs, buf.maxMs, buf.startMs, buf.rebufMs)
+        val steady = store.steadyQuality.value && live && !serverMode
+        val buf = if (serverMode) PlaybackTuning.serverBuffers(lowRam) else PlaybackTuning.buffers(buffer, live, lowRam, steady)
+        val baseLoad = DefaultLoadControl.Builder().setBufferDurationsMs(buf.minMs, buf.maxMs, buf.startMs, buf.rebufMs)
             .setPrioritizeTimeOverSizeThresholds(!serverMode).setBackBuffer(if (live) 0 else 30_000, false).apply { if (buf.targetBytes > 0) setTargetBufferBytes(buf.targetBytes) }.build()
+        val load: androidx.media3.exoplayer.LoadControl = if (live && !serverMode) AdaptiveLoadControl(baseLoad, growth, buf.minMs, buf.maxMs, buf.rebufMs) else baseLoad
         val bm = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(ctx)
             .setInitialBitrateEstimate(PlaybackTuning.seedBitrate(prefs.getLong("bw", 0))).build()
         meter = bm
-        val (mw, mh) = PlaybackTuning.maxVideoSize(displaySize().first, displaySize().second)
-        val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx).apply {
+        val (mw0, mh0) = PlaybackTuning.maxVideoSize(displaySize().first, displaySize().second)
+        val (mw, mh) = if (steady) minOf(mw0, PlaybackTuning.STEADY_MAX_W) to minOf(mh0, PlaybackTuning.STEADY_MAX_H) else mw0 to mh0
+        val adaptive = if (steady) androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory(PlaybackTuning.STEADY_UP_AFTER_MS, androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS, androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, PlaybackTuning.STEADY_BANDWIDTH_FRACTION) else androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory()
+        val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(ctx, adaptive).apply {
             // a quality switch that forces the decoder to be rebuilt is what wedges strict boxes: only seamless switches (and the first pick) are allowed
             setParameters(buildUponParameters().setMaxVideoSize(mw, mh).setViewportSizeToPhysicalDisplaySize(ctx, true).setTunnelingEnabled(store.tunneling.value).setAllowVideoMixedMimeTypeAdaptiveness(true).setAllowVideoNonSeamlessAdaptiveness(false).setExceedRendererCapabilitiesIfNecessary(true).setExceedVideoConstraintsIfNecessary(true))
         }
@@ -223,7 +229,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         })
         surface?.let { p.setVideoSurfaceView(it) }
         if (serverMode && audioLangs.isNotEmpty()) p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setPreferredAudioLanguages(*audioLangs.toTypedArray()).build()
-        builtFor = buffer; builtLive = live; builtServer = serverMode
+        builtFor = buffer; builtLive = live; builtServer = serverMode; builtSteady = steady
         return p
     }
     private var dataFactory: androidx.media3.datasource.DataSource.Factory? = null
@@ -240,6 +246,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             if (state == Player.STATE_BUFFERING && readySince && !vod) {
                 if (!preview && !serverMode) tracker.stall(System.currentTimeMillis(), chanKey(current))
                 if (rebuffers.record(System.currentTimeMillis())) downgrade()
+                if (!preview && !serverMode) { val e = growth.onStall(System.currentTimeMillis()); com.urtv.player.ui.Perf.line("buffer_grow +$e ms after a stall") }
             }
             if (state == Player.STATE_READY) readySince = true
             when (state) {
@@ -438,7 +445,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
 
     private fun load(ch: Channel) {
         retryJob?.cancel()
-        if (player == null || builtFor != buffer || builtLive != !vod || builtServer != serverMode) { saveBandwidth(); player?.release(); player = build(!vod) }
+        if (player == null || builtFor != buffer || builtLive != !vod || builtServer != serverMode || builtSteady != (store.steadyQuality.value && !vod && !serverMode)) { saveBandwidth(); player?.release(); player = build(!vod) }
         val p = player!!
         active = true
         loadStartMs = System.currentTimeMillis(); readySince = false
@@ -479,6 +486,11 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         if (n > (if (preview) 1 else MAX_ATTEMPTS)) { _status.value = PlayStatus.Failed; player?.stop(); return }
         _status.value = PlayStatus.Reconnecting
         retryJob?.cancel()
+        // first retry of a live stream: ask the same source again on the same player (new connection, decoder and picture kept) before tearing everything down
+        if (n == 1 && !vod && !preview && !serverMode) {
+            val pl = player
+            if (pl != null && pl.playbackState != Player.STATE_IDLE) { retryJob = scope.launch { delay(400); pl.seekToDefaultPosition(); pl.prepare() }; return }
+        }
         // opt-in: after the first failed retry, try a same-name entry of the user's own list
         var target = c
         if (n >= 2 && !preview && !vod && !serverMode && store.autoAlt.value) {

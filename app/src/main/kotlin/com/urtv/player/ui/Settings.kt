@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -108,8 +109,25 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     }
                     item { Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         TvButton(stringResource(R.string.add_playlist), onAdd, primary = playlists.isEmpty())
-                        if (active != null) { TvButton(stringResource(R.string.refresh_now), { app.catalog.refreshActive(); app.vod.open(playlists.firstOrNull { it.id == active }, true) }); TvButton(stringResource(R.string.remove_playlist), { confirmDelete = active }) }
+                        if (active != null) TvButton(stringResource(R.string.remove_playlist), { confirmDelete = active })
                     } }
+                    // each list is refreshed on its own; «all» does them one after another (channels, then films, then series) so they never compete for the line
+                    if (active != null) item {
+                        val d = playlists.firstOrNull { it.id == active }
+                        val sc = androidx.compose.runtime.rememberCoroutineScope()
+                        Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TvButton(stringResource(R.string.refresh_channels), { app.catalog.refreshActive() })
+                            if (d?.isXtream == true) {
+                                TvButton(stringResource(R.string.refresh_movies), { app.vod.open(d, true, kinds = setOf(com.urtv.player.data.VodRow.MOVIE)) })
+                                TvButton(stringResource(R.string.refresh_series), { app.vod.open(d, true, kinds = setOf(com.urtv.player.data.VodRow.SERIES)) })
+                                TvButton(stringResource(R.string.refresh_now), { sc.launch {
+                                    app.catalog.refreshActive(); kotlinx.coroutines.delay(400); while (app.catalog.state.value.loading) kotlinx.coroutines.delay(300)
+                                    app.vod.open(d, true, kinds = setOf(com.urtv.player.data.VodRow.MOVIE)); kotlinx.coroutines.delay(400); while (app.vod.state.value.loading) kotlinx.coroutines.delay(300)
+                                    app.vod.open(d, true, kinds = setOf(com.urtv.player.data.VodRow.SERIES))
+                                } })
+                            }
+                        }
+                    }
                     if (active != null) {
                         item {
                             val off = offsets[active] ?: 0
@@ -130,6 +148,8 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                     item { Setting(stringResource(R.string.set_prefetch), stringResource(if (prefetch) R.string.on else R.string.off), stringResource(R.string.set_prefetch_hint)) { store.setPrefetch(!prefetch) } }
                     item { Setting(stringResource(R.string.set_tunnel), stringResource(if (tunnel) R.string.on else R.string.off), stringResource(R.string.set_tunnel_hint)) { store.setTunneling(!tunnel) } }
                     item { val alt by store.autoAlt.collectAsState(); Setting(stringResource(R.string.set_autoalt), stringResource(if (alt) R.string.on else R.string.off), stringResource(R.string.set_autoalt_hint)) { store.setAutoAlt(!alt) } }
+                    item { val ss by store.subSize.collectAsState(); Setting(stringResource(R.string.set_sub_size), stringResource(listOf(R.string.sub_small, R.string.size_normal, R.string.size_large, R.string.sub_huge)[ss]), stringResource(R.string.set_sub_size_hint)) { store.setSubSize((ss + 1) % 4) } }
+                    item { val st by store.steadyQuality.collectAsState(); Setting(stringResource(R.string.set_steady), stringResource(if (st) R.string.on else R.string.off), stringResource(R.string.set_steady_hint)) { store.setSteadyQuality(!st) } }
                     item { Setting(stringResource(R.string.set_stats), stringResource(if (statsOn) R.string.on else R.string.off), stringResource(R.string.set_stats_hint)) { store.setStatsOverlay(!statsOn) } }
                 }
                 Section.Appearance -> {
