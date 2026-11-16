@@ -90,7 +90,7 @@ object Tmdb {
         "G", "TV-G", "TV-Y", "U", "0", "ALL" -> "+0"
         "PG", "TV-PG", "TV-Y7", "7", "7+" -> "+7"
         "PG-13", "TV-14", "12", "12A", "13", "13+" -> "+13"
-        "15", "16", "16+" -> "+16"
+        "15", "15+", "16", "16+" -> "+16"
         "R", "TV-MA", "NC-17", "18", "18+" -> "+18"
         else -> cert.trim().take(6).let { if (it.any { c -> c.isDigit() } && it.all { c -> c.isDigit() || c == '+' }) (if (it.startsWith("+")) it else "+$it") else "" }
     }
