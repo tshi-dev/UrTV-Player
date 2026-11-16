@@ -47,9 +47,14 @@ import com.urtv.player.core.Movie
 import com.urtv.player.core.Series
 import com.urtv.player.core.VodInfo
 import com.urtv.player.data.PlaylistDef
+import com.urtv.player.data.VodQuery
+import com.urtv.player.data.VodRow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** One movie or series in a poster grid. */
-data class Poster(val id: String, val title: String, val image: String?, val category: String, val meta: String?, val added: Long = 0)
+data class Poster(val id: String, val title: String, val image: String?, val category: String, val meta: String?, val added: Long = 0, val fresh: Boolean = false)
 
 /** What the VOD player plays: [key] is where the resume position is stored; [kind] non-empty feeds "Continue watching". */
 data class VodPlay(
@@ -63,26 +68,52 @@ private const val LATEST = "\u0000latest"
 private const val FAVS = "\u0000favs"
 fun vodKey(pid: String, id: String) = "vod|$pid|$id"
 
+/** A long list read from the disk index a page at a time: only the pages near the screen are held (and a few behind), the rest is asked for as it is scrolled to. */
+class PagedPosters(val count: Int, private val scope: kotlinx.coroutines.CoroutineScope, private val load: suspend (Int, Int) -> List<Poster>) {
+    private val pages = HashMap<Int, List<Poster>>(); private val asked = HashSet<Int>()
+    private var tick by androidx.compose.runtime.mutableIntStateOf(0)
+    fun at(i: Int): Poster? {
+        tick                                                    // read: the card recomposes when its page arrives
+        val p = i / PAGE
+        pages[p]?.let { return it.getOrNull(i % PAGE) }
+        if (asked.add(p)) scope.launch {
+            val l = load(p * PAGE, PAGE)
+            pages[p] = l
+            if (pages.size > KEEP) pages.keys.sortedByDescending { kotlin.math.abs(it - p) }.take(pages.size - KEEP).forEach { pages.remove(it); asked.remove(it) }
+            tick++
+        }
+        return null
+    }
+    companion object { const val PAGE = 60; const val KEEP = 14 }
+}
+
 @Composable
 fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
     val vod by app.vod.state.collectAsState()
-    val items = remember(vod.movies, vod.series, movies) {
-        if (movies) vod.movies.map { Poster(it.id, it.name, it.poster, it.category, it.rating, it.added) } else vod.series.map { Poster(it.id, it.name, it.poster, it.category, it.rating, it.added) }
-    }
-    // the provider's category order (from its category list), then any category only seen on items; «recently added» is a first entry of its own
-    val cats = remember(items, vod.movieCats, vod.seriesCats) { val seen = items.map { it.category }.distinct().filter { it.isNotBlank() }; val order = (if (movies) vod.movieCats else vod.seriesCats).filter { it in seen }; order + seen.filter { it !in order } }
-    val counts = remember(items) { items.groupingBy { it.category }.eachCount() }
+    val pid = vod.playlistId.orEmpty(); val kind = if (movies) VodRow.MOVIE else VodRow.SERIES
+    val total = if (movies) vod.movieCount else vod.seriesCount
     val favs by app.store.favs.collectAsState()
     var cat by remember(movies) { mutableStateOf(LATEST) }
     var query by remember(movies) { mutableStateOf("") }
-    val list = remember(items, cat, query, favs) { (if (cat == LATEST) items.sortedByDescending { it.added }.take(200) else if (cat == FAVS) items.filter { vodKey(vod.playlistId.orEmpty(), it.id) in favs } else items).filter { (cat == ALL || cat == LATEST || cat == FAVS || it.category == cat) && (query.isBlank() || it.title.contains(query.trim(), true)) } }     // everything else keeps the server's order
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // the provider's category order with the number of items in each: one grouped read of the index, off the main thread
+    val cats by produceState(emptyList<Pair<String, Int>>(), vod.rev, pid, kind) { value = withContext(Dispatchers.IO) { app.vod.db.cats(pid, kind).filter { it.first.isNotBlank() } } }
+    val favIds = remember(favs, pid) { favs.filter { it.startsWith("vod|$pid|") }.map { it.removePrefix("vod|$pid|") }.toSet() }
+    val favCount by produceState(0, favIds, vod.rev, pid, kind) { value = withContext(Dispatchers.IO) { if (favIds.isEmpty()) 0 else app.vod.db.size(VodQuery(pid, kind, ids = favIds)) } }
+    val vq = remember(pid, kind, cat, query, favIds) { VodQuery(pid, kind, cat = cat.takeIf { it != ALL && it != LATEST && it != FAVS }, text = query, ids = if (cat == FAVS) favIds else null, newest = cat == LATEST, limit = if (cat == LATEST) 200 else Int.MAX_VALUE) }
+    val list by produceState<PagedPosters?>(null, vq, vod.rev) {
+        if (vq.text.isNotBlank()) kotlinx.coroutines.delay(150)      // one search per pause in typing, not per key
+        val n = withContext(Dispatchers.IO) { app.vod.db.size(vq) }
+        value = PagedPosters(n, scope) { o, l -> withContext(Dispatchers.IO) { app.vod.db.page(vq, o, l).map { Poster(it.id, it.name, it.poster, it.cat, it.rating, it.added, it.fresh()) } } }
+    }
+    val shown = list?.count ?: 0
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         LazyColumn(Modifier.width(260.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
-            items(listOf(LATEST, FAVS, ALL) + cats, key = { it }) { c ->
+            items(listOf(LATEST, FAVS, ALL) + cats.map { it.first }, key = { it }) { c ->
                 Tv({ cat = c }, Modifier.fillMaxWidth().height(52.dp), selected = c == cat, onFocus = { if (it) cat = c }) {
                     Row(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(if (c == ALL) stringResource(R.string.all_categories) else if (c == LATEST) stringResource(R.string.vod_latest) else if (c == FAVS) stringResource(R.string.tab_favs) else c, style = if (c == cat) T.bodyBold else T.body.copy(color = C.muted), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text("${if (c == ALL) items.size else if (c == LATEST) minOf(items.size, 200) else if (c == FAVS) items.count { vodKey(vod.playlistId.orEmpty(), it.id) in favs } else counts[c] ?: 0}", style = T.tiny)
+                        Text("${if (c == ALL) total else if (c == LATEST) minOf(total, 200) else if (c == FAVS) favCount else cats.firstOrNull { it.first == c }?.second ?: 0}", style = T.tiny)
                     }
                 }
             }
@@ -94,21 +125,37 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
                 LaunchedEffect(Unit) { app.getSharedPreferences("urtv", 0).edit().putBoolean("xtreamHint", true).apply() }
                 Text(stringResource(R.string.xtream_hint), style = T.small, modifier = Modifier.padding(bottom = 12.dp))
             }
-            FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.fillMaxWidth(), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FocusField(query, { query = it }, stringResource(R.string.search_hint), Modifier.weight(1f), leading = { Icon(Glyph.Search, C.faint, 24) }, imeAction = androidx.compose.ui.text.input.ImeAction.Search, compact = true)
+                if (vod.loading) TvButton(stringResource(R.string.vod_skip), { app.vod.skip() })
+            }
+            if (vod.loading) VodProgress(vod)
+            else if (vod.fresh > 0) Text(stringResource(R.string.vod_fresh_n, vod.fresh), style = T.tiny.copy(color = C.accent), modifier = Modifier.padding(top = 6.dp))
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxSize()) {
                 when {
-                    list.isEmpty() && vod.loading -> androidx.compose.foundation.lazy.grid.LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), userScrollEnabled = false) { items(12) { SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) } }
-                    list.isEmpty() && vod.failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    list == null || (shown == 0 && vod.loading) -> androidx.compose.foundation.lazy.grid.LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), userScrollEnabled = false) { items(10) { SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) } }
+                    shown == 0 && vod.failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.err_network), style = T.title); Spacer(Modifier.height(16.dp))
                         TvButton(stringResource(R.string.retry), { app.vod.open(app.store.playlists.value.firstOrNull { it.id == vod.playlistId }, true) }, primary = true) }
-                    list.isEmpty() -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center))
+                    shown == 0 -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center))
                     else -> LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                        itemsIndexed(list, key = { _, p -> p.id }) { _, p -> PosterCard(p, Modifier.fillMaxWidth()) { onOpen(p.id) } }
+                        val l = list!!
+                        items(l.count, key = { it }) { i -> val p = l.at(i); if (p != null) PosterCard(p, Modifier.fillMaxWidth()) { onOpen(p.id) } else SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) }
                     }
                 }
             }
         }
+    }
+}
+
+/** «جارٍ التحديث… 12 من 300 — الفئة» with a bar that moves; the lists already on disk stay usable underneath. */
+@Composable
+private fun VodProgress(v: com.urtv.player.data.VodState) {
+    val frac = if (v.totalCats > 0) (v.doneCats.toFloat() / v.totalCats).coerceIn(0f, 1f) else 0f
+    Column(Modifier.padding(top = 8.dp)) {
+        Text(if (v.totalCats > 1) stringResource(R.string.vod_updating, v.doneCats, v.totalCats) + if (v.current.isNotBlank()) " — ${v.current}" else "" else stringResource(R.string.vod_updating_rows, v.rows), style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.surface)) { Box(Modifier.fillMaxWidth(frac).fillMaxHeight().background(C.accent)) }
     }
 }
 
@@ -117,6 +164,7 @@ fun PosterCard(p: Poster, modifier: Modifier = Modifier, focusRequester: FocusRe
     Tv(onClick, modifier.aspectRatio(0.68f), Rd(14), ring = true, lift = 1.05f, restColor = C.surface, focusRequester = focusRequester, onFocus = { if (it) Backdrop.url = p.image }) {
         PosterArt(p.image, p.title)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color(0xE6000000))))
+        if (p.fresh) Text(stringResource(R.string.vod_new), style = T.tiny.copy(color = Color.White), modifier = Modifier.align(Alignment.TopStart).padding(8.dp).background(C.accent, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
         Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
             Text(p.title, style = T.small.copy(color = Color.White, fontSize = 18.sp, lineHeight = 24.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (!p.meta.isNullOrBlank() && p.meta != "0") Text("★ ${p.meta}", style = T.tiny.copy(color = Color(0xFFB9D9FF)))
@@ -169,7 +217,7 @@ private fun CastRow(t: com.urtv.player.core.Tmdb.Info) {
 @Composable
 fun MovieDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (VodPlay, Long) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val m: Movie? = remember(id) { app.vod.state.value.movies.firstOrNull { it.id == id } }
+    val m: Movie? = remember(id) { app.vod.movie(def, id) }
     if (m == null) { onBack(); return }
     val info by produceState(VodInfo()) { value = app.vod.movieInfo(def, id) }
     val key = vodKey(def.id, id)
@@ -197,7 +245,7 @@ fun MovieDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (VodPlay, Lo
 @Composable
 fun SeriesDetail(app: UrtvApp, def: PlaylistDef, id: String, onPlay: (List<VodPlay>, Int, Long) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val s: Series? = remember(id) { app.vod.state.value.series.firstOrNull { it.id == id } }
+    val s: Series? = remember(id) { app.vod.series(def.id, id) }
     if (s == null) { onBack(); return }
     val eps by produceState<List<Episode>?>(null) { value = app.vod.episodes(def, id) }
     val tmS by produceState<com.urtv.player.core.Tmdb.Info?>(null, s.name) { value = app.tmdb.info(s.name, s.year ?: yearIn(s.name), true) }

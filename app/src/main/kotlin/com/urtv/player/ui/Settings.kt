@@ -230,7 +230,7 @@ fun HomeManage(app: UrtvApp, onBack: () -> Unit) {
     val isXtream = app.store.playlists.collectAsState().value.firstOrNull { it.id == cat.playlistId }?.isXtream == true
     val groups = remember(cat.channels) { Browse.groups(cat.channels).map { "group:$it" } }
     val vodS by app.vod.state.collectAsState()
-    val available = listOf("continue", "favs", "recent") + (if (isXtream || vodS.movies.isNotEmpty() || vodS.series.isNotEmpty()) listOf("added", "viewed", "trending", "movies", "series") else emptyList()) + groups
+    val available = listOf("continue", "favs", "recent") + (if (isXtream || vodS.any) listOf("added", "viewed", "trending", "movies", "series") else emptyList()) + groups
     val enabled = rows.filter { it in available }
     val full = enabled + available.filter { it !in enabled }
     @Composable fun name(id: String) = when (id) {

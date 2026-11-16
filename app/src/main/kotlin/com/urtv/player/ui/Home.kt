@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil3.compose.SubcomposeAsyncImage
 import com.urtv.player.R
+import com.urtv.player.data.VodRow
 import com.urtv.player.UrtvApp
 import com.urtv.player.core.Channel
 import com.urtv.player.core.Programme
@@ -146,7 +147,7 @@ fun HomeScreen(
             Spacer(Modifier.weight(1f))
             Row(Modifier.focusProperties { enter = { tabFocus } }.focusGroup().clip(RoundedCornerShape(50)).background(C.glass).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {     // UP from any page lands on the CURRENT tab, whichever pill was used last
                 val vodHere by app.vod.state.collectAsState()
-                for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true || vodHere.movies.isNotEmpty() || vodHere.series.isNotEmpty() }) {
+                for (t in Tab.entries.filter { (it != Tab.Movies && it != Tab.Series) || active?.isXtream == true || vodHere.any }) {
                     val label = stringResource(when (t) { Tab.Home -> R.string.tab_home; Tab.Live -> R.string.tab_live; Tab.Movies -> R.string.tab_movies; Tab.Series -> R.string.tab_series; Tab.Guide -> R.string.tab_guide; Tab.Settings -> R.string.tab_settings })
                     Tv({ onTab(t) }, Modifier.height(48.dp).focusProperties {
                         down = if (t == Tab.Live) (contentEntry.value ?: FocusRequester.Default) else FocusRequester.Default
@@ -214,18 +215,23 @@ private fun HomeRows(
     val byKeyL = remember(cat.channels) { lazy { cat.channels.associateBy { chKey(pid, it) } } }
     val first = remember { FocusRequester() }
     // «recently added», «most watched» (this TV's own counts) and «trending» (TMDB's week, shown only for what the provider really has); ids carry m: / s: for film or series
-    val added = remember(vod.movies, vod.series) { (vod.movies.map { Poster("m:" + it.id, it.name, it.poster, it.category, it.rating, it.added) } + vod.series.map { Poster("s:" + it.id, it.name, it.poster, it.category, it.rating, it.added) }).sortedByDescending { it.added }.take(24) }
-    val viewed = remember(vod.movies, vod.series, views) {
-        val mv = vod.movies.associateBy { vodKey(vod.playlistId.orEmpty(), it.id) }; val sr = vod.series.associateBy { vodKey(vod.playlistId.orEmpty(), it.id) }
-        views.entries.sortedByDescending { it.value }.mapNotNull { (k, _) -> mv[k]?.let { Poster("m:" + it.id, it.name, it.poster, it.category, it.rating) } ?: sr[k]?.let { Poster("s:" + it.id, it.name, it.poster, it.category, it.rating) } }.take(24)
-    }
+    // «recently added», «most watched» (this TV's own counts) and «trending» (TMDB's week, shown only for what the provider really has); ids carry m: / s: for film or series.
+    // They are read from the disk index off the main thread, a few rows each: the lists themselves are never in memory.
+    fun poster(r: VodRow, mixed: Boolean) = Poster((if (mixed) (if (r.kind == VodRow.SERIES) "s:" else "m:") else "") + r.id, r.name, r.poster, r.cat, r.rating, r.added, r.fresh())
     val trendingHits by produceState(emptyList<com.urtv.player.core.Tmdb.Hit>(), app.tmdb.enabled) { value = app.tmdb.trending() }
-    val trending = remember(vod.movies, vod.series, trendingHits) {
-        val byTitle = HashMap<String, Poster>()
-        for (m in vod.movies) byTitle.putIfAbsent(com.urtv.player.core.Tmdb.normalize(m.name), Poster("m:" + m.id, m.name, m.poster, m.category, m.rating))
-        for (s in vod.series) byTitle.putIfAbsent(com.urtv.player.core.Tmdb.normalize(s.name), Poster("s:" + s.id, s.name, s.poster, s.category, s.rating))
-        trendingHits.mapNotNull { byTitle[com.urtv.player.core.Tmdb.normalize(it.title)] }.distinctBy { it.id }.take(24)
+    val vodRows by produceState(VodRows(), vod.rev, vod.playlistId, views, trendingHits) {
+        val p = vod.playlistId ?: return@produceState
+        value = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val vk = views.entries.sortedByDescending { it.value }.map { it.key }
+            val viewed = ArrayList<Poster>()
+            for (k in vk) { if (viewed.size >= 24) break; val parts = k.split('|', limit = 3); if (parts.size == 3 && parts[0] == "vod" && parts[1] == p) (app.vod.db.get(p, VodRow.MOVIE, parts[2]) ?: app.vod.db.get(p, VodRow.SERIES, parts[2]))?.let { viewed += poster(it, true) } }
+            val titles = trendingHits.map { com.urtv.player.core.Tmdb.normalize(it.title) }
+            val byTitle = app.vod.db.byTitles(p, titles).associateBy { it.kind.toString() + com.urtv.player.core.Tmdb.normalize(it.name) }
+            val trend = titles.mapNotNull { t -> (byTitle["0$t"] ?: byTitle["1$t"])?.let { poster(it, true) } }.distinctBy { it.id }.take(24)
+            VodRows(app.vod.db.newest(p, 24).map { poster(it, true) }, viewed, trend, app.vod.db.first(p, VodRow.MOVIE, 24).map { poster(it, false) }, app.vod.db.first(p, VodRow.SERIES, 24).map { poster(it, false) })
+        }
     }
+    val added = vodRows.added; val viewed = vodRows.viewed; val trending = vodRows.trending
     val openMixed = { id: String -> if (id.startsWith("s:")) onOpenSeries(id.drop(2)) else onOpenMovie(id.drop(2)) }
     var firstTaken = false
 
@@ -269,8 +275,8 @@ private fun HomeRows(
             id == "added" -> added.isNotEmpty()
             id == "viewed" -> viewed.isNotEmpty()
             id == "trending" -> trending.isNotEmpty()
-            id == "movies" -> vod.movies.isNotEmpty()
-            id == "series" -> vod.series.isNotEmpty()
+            id == "movies" -> vod.movieCount > 0
+            id == "series" -> vod.seriesCount > 0
             else -> true
         }
     }
@@ -313,8 +319,8 @@ private fun HomeRows(
                     id == "added" -> posterRow(R.string.row_added, added, openMixed)
                     id == "viewed" -> posterRow(R.string.row_viewed, viewed, openMixed)
                     id == "trending" -> posterRow(R.string.row_trending, trending, openMixed)
-                    id == "movies" -> posterRow(R.string.tab_movies, vod.movies.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenMovie)
-                    id == "series" -> posterRow(R.string.tab_series, vod.series.take(24).map { Poster(it.id, it.name, it.poster, it.category, it.rating) }, onOpenSeries)
+                    id == "movies" -> posterRow(R.string.tab_movies, vodRows.movies, onOpenMovie)
+                    id == "series" -> posterRow(R.string.tab_series, vodRows.series, onOpenSeries)
                     id.startsWith("group:") -> {
                         val g = id.removePrefix("group:")
                         val gl = cat.channels.filter { g in Browse.groupsOf(it) }.take(24)
@@ -764,13 +770,16 @@ fun Logo(ch: Channel, size: Int) {
 }
 
 /** Poster/still with a stable tinted placeholder underneath (no flash while loading, nothing broken when it fails). */
+/** The few rows of the home taken from the disk index. */
+private data class VodRows(val added: List<Poster> = emptyList(), val viewed: List<Poster> = emptyList(), val trending: List<Poster> = emptyList(), val movies: List<Poster> = emptyList(), val series: List<Poster> = emptyList())
+
 /** Big banner on top of the home: title, year / age / rating chips, two lines of story, «watch now» and «add to favourites». Provider data only when there is no TMDB key. */
 @Composable
 private fun HeroBanner(app: UrtvApp, pid: String, p: Poster, focus: FocusRequester?, onOpen: (String) -> Unit) {
     val series = p.id.startsWith("s:"); val id = p.id.drop(2)
     val tm by produceState<com.urtv.player.core.Tmdb.Info?>(null, p.title) { value = app.tmdb.info(p.title, null, series) }
     val provPlot by produceState("", p.id) {
-        value = if (series) app.vod.state.value.series.firstOrNull { it.id == id }?.plot.orEmpty()
+        value = if (series) withContext(kotlinx.coroutines.Dispatchers.IO) { app.vod.series(pid, id)?.plot.orEmpty() }
         else app.store.playlists.value.firstOrNull { it.id == pid }?.let { runCatching { app.vod.movieInfo(it, id).plot }.getOrDefault("") }.orEmpty()
     }
     val plot = listOf(provPlot, tm?.overview.orEmpty()).maxByOrNull { it.length }.orEmpty()

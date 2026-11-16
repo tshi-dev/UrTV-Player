@@ -89,8 +89,8 @@ class ThemeShotsTest {
             listOf("s$i", "مسلسل تجريبي $i", cats[i % cats.size], "", "7.5", "2022", i.toString(), "وصف قصير للمسلسل.").joinToString("\t")
         } + "\n")
         app.catalog.open("xt"); app.vod.open(app.store.playlists.value.first { it.id == "xt" })
-        repeat(100) { if (app.vod.state.value.movies.isNotEmpty()) return@repeat; shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(50) }
-        check(app.vod.state.value.movies.isNotEmpty())
+        repeat(100) { if (app.vod.state.value.movieCount > 0) return@repeat; shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(50) }
+        check(app.vod.state.value.movieCount > 0)
     }
 
     private fun shot(name: String, look: Appearance, h: Int = 1080, content: @Composable () -> Unit) {

@@ -22,6 +22,8 @@ import com.urtv.player.UrtvApp
 import com.urtv.player.core.Channel
 import com.urtv.player.data.WatchItem
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 private enum class Screen { Home, Player, Add, Groups, HomeRows, Backup, Movie, Series, Vod, Server }
 
@@ -68,7 +70,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
     LaunchedEffect(cat.playlistId, def?.isXtream) { if (!homeOnly) app.vod.open(def, fetch = false) }
     LaunchedEffect(tab, cat.playlistId) { if (!homeOnly && (tab == Tab.Movies || tab == Tab.Series)) app.vod.open(def) }
     val vodNow by app.vod.state.collectAsState()
-    val hasVod = def?.isXtream == true || vodNow.movies.isNotEmpty() || vodNow.series.isNotEmpty()
+    val hasVod = def?.isXtream == true || vodNow.any
     if ((tab == Tab.Movies || tab == Tab.Series) && !hasVod && vodNow.playlistId == cat.playlistId && playlists.isNotEmpty() && cat.playlistId != null) tab = Tab.Home
 
     // Open the active playlist once per process; optionally resume the last channel ("last" start screen or the resume setting).
@@ -94,7 +96,7 @@ private fun AppContent(app: UrtvApp, onLanguageChanged: () -> Unit) {
             val eps = app.vod.episodes(d, w.seriesId)
             val i = eps.indexOfFirst { vodKey(d.id, it.id) == w.key }
             if (i >= 0) {
-                val s = app.vod.state.value.series.firstOrNull { it.id == w.seriesId }
+                val s = withContext(Dispatchers.IO) { app.vod.series(d.id, w.seriesId) }
                 playVod(eps.drop(i).map { VodPlay(w.title, it.url, vodKey(d.id, it.id), d.id, "episode", it.image ?: s?.poster, w.seriesId, it.season, it.number, it.title) }, 0, w.posMs, Screen.Home)
             } else playVod(listOf(single), 0, w.posMs, Screen.Home)
         } else playVod(listOf(single), 0, w.posMs, Screen.Home)

@@ -177,3 +177,29 @@ Causes found in the code, all from the zapping-first tuning: buffers of 4 s mini
 - TMDB (themoviedb.org): posters, stories (Arabic, else English), cast photos, age rating, TMDB rating and a trailer button (opens the YouTube app) on the film details page; chips and story on the series page; the attribution line is shown wherever its data is. It needs a free API key given at build time as the `TMDB_API_KEY` secret of the repository; without it the app shows only what the provider sends. Answers are cached on disk (details 30 days, trending 12 hours); the key is never logged.
 - Home rows «أُضيف حديثًا» (provider's added time), «الأكثر مشاهدة» (this TV's own start counts) and «الأكثر رواجًا» (TMDB's week, only titles the provider really has). They start on top once and can be switched off in Settings, Customize home.
 - EPG: Xtream accounts get xmltv.php automatically and M3U lists use their `url-tvg`, both read for the 2 h back to 14 h ahead window only (beta5); catch-up exists for Xtream channels that report `tv_archive`.
+
+### v0.9.16 beta13: scale (150 000 films + 55 000 channels)
+
+Measured with a made-up account (`SyntheticAccount`, no real provider data; `ScaleMeasureTest` and `VodScaleTest` print the numbers, JVM on a development machine, a TV is several times slower but the shape is what counts):
+
+| | before (lists in memory) | after (disk index) |
+|---|---|---|
+| 150k films + 20k series kept in memory | ~63 MB (films) + series/channels, ~97 MB with 55k channels | 2–3 MB (only a page of 60 cards) |
+| heap needed to load them | 2 GB test heap | passes with a 192 MB heap (Robolectric, test server and the app together) |
+| trending title index over the films, on the main thread | 408 ms | 2 ms (indexed lookup, off the main thread) |
+| «recently added» (sort of 170k items) | 19 ms + 170k poster objects | 1 ms (index) |
+| one search keystroke over the films | 44 ms on the main thread | 13–21 ms off the main thread |
+| category list with counts (300 categories) | built on the main thread from the list | 17–25 ms, off the main thread |
+| first page of a category / page at offset 100 000 | – | 4–10 ms / 5–6 ms |
+| first load of 150k films + 20k series | 0 % screen until all of it was parsed | the first category is on screen after ~40 ms; the whole load takes ~11 s here, with a bar and «تخطّي» |
+| refresh with nothing new | whole list rewritten | nothing rewritten (the time here is the test server making the data) |
+| 55k channels, cold start from the cache | – | 121 ms read + parse (off the main thread); while downloading, «N قناة» moves |
+
+How it works:
+- `VodDb` (SQLite, WAL) holds films and series, one row each: name, folded name (for search), TMDB-normalised title, category, poster, rating, year, added time, extension, plot. **No stream address and no login is stored** (addresses are built from the account and the extension when a film is played; the encrypted file stays for M3U lists, whose addresses are the list's own).
+- Screens read pages (60 cards) through `VodQuery`; only the pages near the screen are kept. Home rows (recently added, most watched, trending, films, series) are a few small queries off the main thread. A single row by key (details page) is read directly.
+- Refresh: the category list first, then every category on its own (`get_vod_streams&category_id=`), written as a diff: new items inserted (and marked «جديد» for three days, never on the very first load), known items updated in place, items the provider dropped deleted. An empty or cut-short answer never deletes anything. A provider that ignores the category filter is noticed from the first rows and read as one whole answer, still streamed into the index. The list on disk is shown at once; the refresh runs in the background at most every 6 hours, or on «تحديث كامل» in Settings.
+- Progress: «N من M» categories with the category name and a bar, or the number of items for a whole answer; «تخطّي» stops the refresh and keeps everything written so far.
+- Lists cached by older versions are read once into the index (streamed) and removed.
+- Memory/exit paths: database errors (full or damaged disk) answer «nothing» and are noted in the log instead of ending the app; all refresh work runs in `runCatching`, which also catches out-of-memory. The `UrTVPerf` memory line stays.
+- Not done: conditional HTTP (ETag) per category; fuzzy «skeleton» matching in film search (the folded-name search with aliases and the keyboard-layout swap stays); the live list (55k channels) is still held in memory (about 25 MB) because zapping, groups and the guide use it.

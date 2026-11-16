@@ -160,7 +160,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
         val left = if (dur > 0) dur - pos else Long.MAX_VALUE
         val showNext = nextItem != null && left in 1..12_000 && dismissedNext != idx && !options
         AnimatedVisibility(showNext, Modifier.align(Alignment.BottomEnd).padding(end = 84.dp, bottom = 110.dp), enter = fadeIn(), exit = fadeOut()) {
-            Column(Modifier.width(560.dp).background(Color(0xE6141619), Rd(18)).padding(22.dp)) {
+            Column(Modifier.width(560.dp).background(C.surface, Rd(18)).padding(22.dp)) {
                 Text(stringResource(R.string.next_ep_in, (left / 1000).toInt().coerceAtLeast(1)), style = T.small)
                 Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (nextItem != null && nextItem.season > 0) Chip(stringResource(R.string.se_badge, nextItem.season, nextItem.episode))

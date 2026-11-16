@@ -14,6 +14,9 @@ data class XtreamAccount(val server: String, val user: String, val pass: String)
     fun streamUrl(streamId: String, ext: String = "m3u8") = "$base/live/${enc(user)}/${enc(pass)}/$streamId.$ext"
     fun vodCategoriesUrl() = apiUrl("get_vod_categories")
     fun vodStreamsUrl() = apiUrl("get_vod_streams")
+    /** One category at a time (a big account answers in small pieces, and only what changed has to be written). */
+    fun vodStreamsUrl(categoryId: String) = apiUrl("get_vod_streams", "&category_id=${enc(categoryId)}")
+    fun seriesUrl(categoryId: String) = apiUrl("get_series", "&category_id=${enc(categoryId)}")
     fun vodInfoUrl(id: String) = apiUrl("get_vod_info", "&vod_id=${enc(id)}")
     fun seriesCategoriesUrl() = apiUrl("get_series_categories")
     fun seriesUrl() = apiUrl("get_series")
@@ -69,7 +72,7 @@ object XtreamParser {
 
     fun parseStreams(body: String, account: XtreamAccount, categories: Map<String, String> = emptyMap()) = parseStreams(body.byteInputStream(), account, categories)
 
-    fun parseStreams(input: java.io.InputStream, account: XtreamAccount, categories: Map<String, String> = emptyMap()): ParsedPlaylist {
+    fun parseStreams(input: java.io.InputStream, account: XtreamAccount, categories: Map<String, String> = emptyMap(), onCount: (Int) -> Unit = {}): ParsedPlaylist {
         val ch = ArrayList<Channel>(); var skipped = 0
         for (e in elements(input)) {
             val o = e as? JsonObject
@@ -84,6 +87,7 @@ object XtreamParser {
                 streamId = sid,
                 archiveDays = if (o.str("tv_archive") == "1") (o.str("tv_archive_duration")?.toIntOrNull() ?: 0) else 0,
             )
+            if (ch.size % 500 == 0) onCount(ch.size)       // the screen says «N channels» while a big list is still coming in
         }
         return ParsedPlaylist(ch, listOf(account.xmltvUrl()), if (ch.isEmpty() && skipped == 0) 1 else skipped)
     }
@@ -91,21 +95,29 @@ object XtreamParser {
     fun parseMovies(body: String, account: XtreamAccount, categories: Map<String, String> = emptyMap()): List<Movie> = parseMovies(body.byteInputStream(), account, categories)
 
     fun parseMovies(input: java.io.InputStream, account: XtreamAccount, categories: Map<String, String> = emptyMap()): List<Movie> =
+        movieSeq(input, account, categories).map { it.second }.toList()
+
+    /** Films one at a time, each with the provider's category id (never the whole answer in memory): [parseMovies] and the disk index are built on it. */
+    fun movieSeq(input: java.io.InputStream, account: XtreamAccount, categories: Map<String, String> = emptyMap()): Sequence<Pair<String, Movie>> =
         objects(input).mapNotNull { o ->
             val id = o.str("stream_id") ?: return@mapNotNull null
-            Movie(id, o.str("name") ?: id, account.movieUrl(id, o.str("container_extension") ?: ""),
-                o.str("category_id")?.let { categories[it] } ?: "", o.str("stream_icon")?.ifBlank { null },
+            val cid = o.str("category_id") ?: ""
+            cid to Movie(id, o.str("name") ?: id, account.movieUrl(id, o.str("container_extension") ?: ""),
+                categories[cid] ?: "", o.str("stream_icon")?.ifBlank { null },
                 o.str("rating")?.ifBlank { null }, null, o.str("added")?.toLongOrNull() ?: 0)
-        }.toList()
+        }
 
     fun parseSeriesList(body: String, categories: Map<String, String> = emptyMap()): List<Series> = parseSeriesList(body.byteInputStream(), categories)
 
-    fun parseSeriesList(input: java.io.InputStream, categories: Map<String, String> = emptyMap()): List<Series> =
+    fun parseSeriesList(input: java.io.InputStream, categories: Map<String, String> = emptyMap()): List<Series> = seriesSeq(input, categories).map { it.second }.toList()
+
+    fun seriesSeq(input: java.io.InputStream, categories: Map<String, String> = emptyMap()): Sequence<Pair<String, Series>> =
         objects(input).mapNotNull { o ->
             val id = o.str("series_id") ?: return@mapNotNull null
-            Series(id, o.str("name") ?: id, o.str("category_id")?.let { categories[it] } ?: "", o.str("cover")?.ifBlank { null },
+            val cid = o.str("category_id") ?: ""
+            cid to Series(id, o.str("name") ?: id, categories[cid] ?: "", o.str("cover")?.ifBlank { null },
                 o.str("plot") ?: "", o.str("rating")?.ifBlank { null }, o.str("releaseDate")?.take(4)?.ifBlank { null }, o.str("last_modified")?.toLongOrNull() ?: 0)
-        }.toList()
+        }
 
     fun parseVodInfo(body: String): VodInfo {
         val root = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return VodInfo()

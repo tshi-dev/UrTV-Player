@@ -285,9 +285,10 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
         state.scrollToItem((idx - 2).coerceAtLeast(0))
         repeat(12) { if (runCatching { fr.requestFocus(); true }.getOrDefault(false)) return@LaunchedEffect; delay(30) }
     }
-    // scrim fades toward the video from the start side. The list is on the start side; the quick actions are a FIXED column on the end side,
+    // The list is on the start side; the quick actions are a FIXED column on the end side,
     // one D-pad move (toward the video) from wherever the list is, however far down the current channel is.
-    Row(Modifier.fillMaxHeight().width(940.dp).background(Brush.horizontalGradient(listOf(Color(0xF2080909), Color(0xE6080909), Color.Transparent)))) {
+    // a solid card like every other panel over the video (the old gradient let the picture show through the rows and made names hard to read)
+    Row(Modifier.fillMaxHeight().padding(vertical = 40.dp, horizontal = 56.dp).width(940.dp).background(C.surface, Rd(22))) {
         LazyColumn(Modifier.weight(1f).fillMaxHeight(), state, contentPadding = PaddingValues(start = 40.dp, end = 12.dp, top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             itemsIndexed(list, key = { i, _ -> listKeys[i] }) { i, c ->
                 val (now, _) = epg.nowNext(c.epgId, nowMs)

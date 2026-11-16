@@ -100,7 +100,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
 
     private fun fetchXtream(acc: XtreamAccount): Pair<List<Channel>, List<String>> {
         val cats = Http.retrying { XtreamParser.parseCategories(Http.text(acc.categoriesUrl())) }
-        val parsed = Http.retrying { Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) } }
+        val parsed = Http.retrying { Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) { n -> _state.value = _state.value.copy(progress = n) } } }
         return parsed.channels to parsed.epgUrls
     }
 

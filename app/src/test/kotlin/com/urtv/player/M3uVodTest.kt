@@ -24,19 +24,20 @@ class M3uVodTest {
             c("Show X S01 E02", "http://h/series/u/p/4.mkv", "Drama"), c("Show X S01 E01", "http://h/series/u/p/3.mkv", "Drama"), c("Show X S02 E01", "http://h/series/u/p/5.mkv", "Drama"),
             c("Lonely episode", "http://h/series/u/p/6.mkv", "Drama")))
         app.vod.setFromM3u(def, split)
-        val st = app.vod.state.value
-        assertEquals(listOf("Film A"), st.movies.map { it.name })
-        assertEquals(2, st.series.size, "one show card for the three episodes, one flat entry for the one without a pattern")
-        val show = st.series.first { it.name == "Show X" }
+        val db = app.vod.db
+        assertEquals(listOf("Film A"), db.page(com.urtv.player.data.VodQuery("m1", 0), 0, 50).map { it.name })
+        assertEquals(2, db.count("m1", 1), "one show card for the three episodes, one flat entry for the one without a pattern")
+        val show = db.page(com.urtv.player.data.VodQuery("m1", 1), 0, 50).first { it.name == "Show X" }
         val eps = runBlocking { app.vod.episodes(def, show.id) }
         assertEquals(listOf(1 to 1, 1 to 2, 2 to 1), eps.map { it.season to it.number }, "sorted by season then number")
         app.vod.open(def, fetch = false)          // the start-up cache read must not wipe what is already showing
-        assertEquals(2, app.vod.state.value.series.size); assertEquals(1, app.vod.state.value.movies.size)
+        assertEquals(2, app.vod.db.count("m1", 1)); assertEquals(1, app.vod.db.count("m1", 0))
         // after a restart the cached copy is what comes back
         app.vod.open(def, fetch = false)
         val end = System.currentTimeMillis() + 5000
-        while (app.vod.state.value.series.size != 2 && System.currentTimeMillis() < end) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Thread.sleep(30) }
-        assertEquals(2, app.vod.state.value.series.size)
+        while (app.vod.state.value.seriesCount != 2 && System.currentTimeMillis() < end) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Thread.sleep(30) }
+        assertEquals(2, app.vod.state.value.seriesCount)
+        assertEquals(1, app.vod.movie(def, "m3u:0")?.let { 1 }, "the stream address of an M3U film comes from the encrypted file")
         assertEquals(3, runBlocking { app.vod.episodes(def, show.id) }.size)
     }
 }

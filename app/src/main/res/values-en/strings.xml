@@ -17,7 +17,7 @@
     <string name="err_format">The playlist format isn\'t recognised</string>
     <string name="err_empty">The playlist is empty</string>
     <string name="retry">Try again</string>
-    <string name="refresh_now">Refresh now</string>
+    <string name="refresh_now">Full refresh</string>
     <string name="empty_favs">Hold OK on any channel to add it to favourites</string>
     <string name="empty_recents">Channels you watch will show up here</string>
     <string name="empty_group">No channels here</string>
@@ -315,6 +315,11 @@
     <string name="opt_group_tools">Tools</string>
     <string name="vod_no_seek">The server does not allow seeking in this video</string>
     <string name="vod_latest">Recently added</string>
+    <string name="vod_new">New</string>
+    <string name="vod_skip">Skip</string>
+    <string name="vod_updating">Updating… %1$d of %2$d</string>
+    <string name="vod_updating_rows">Updating… %1$d items</string>
+    <string name="vod_fresh_n">New: %1$d</string>
     <string name="pick_all_groups">All channels</string>
     <string name="opt_speed">Playback speed</string>
     <string name="perf_log_title">Performance and error log</string>
