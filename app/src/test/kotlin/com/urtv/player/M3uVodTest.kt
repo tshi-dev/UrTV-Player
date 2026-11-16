@@ -40,3 +40,29 @@ class M3uVodTest {
         assertEquals(3, runBlocking { app.vod.episodes(def, show.id) }.size)
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = UrtvApp::class)
+class TrackPrefTest {
+    private val app get() = ApplicationProvider.getApplicationContext<UrtvApp>()
+
+    @Test fun theChoicesForAChannelOrFilmAreKeptAndTheSpeedCyclesAndIsRemembered() {
+        val c = app.player
+        c.trackKey("vod|p|1")
+        assertEquals(1f, c.speed.value)
+        c.cycleSpeed(); assertEquals(1.25f, c.speed.value); c.cycleSpeed(); assertEquals(1.5f, c.speed.value)
+        assertEquals(1.5f, app.store.trackPref("vod|p|1")?.speed, "remembered for this film")
+        c.trackKey("vod|p|2"); assertEquals(1f, c.speed.value, "another film starts normal")
+        c.trackKey("vod|p|1"); assertEquals(1.5f, c.speed.value, "and the first one comes back at its speed")
+        app.store.setTrackPref("ch|a", com.urtv.player.data.Store.TrackPref("English", "", 1f))
+        assertEquals("English", app.store.trackPref("ch|a")?.audio); assertEquals(null, app.store.trackPref("ch|unknown"))
+    }
+
+    @Test fun serverHiccupsAreRetriedButAWrongLoginIsFinal() {
+        var calls = 0
+        val r = com.urtv.player.data.Http.retrying { calls++; if (calls < 3) throw java.io.IOException("HTTP 503") else "ok" }
+        assertEquals("ok", r); assertEquals(3, calls)
+        calls = 0
+        try { com.urtv.player.data.Http.retrying { calls++; throw java.io.IOException("HTTP 401") }; error("should have thrown") } catch (e: java.io.IOException) { assertEquals(1, calls, "no retry on a 4xx") }
+    }
+}

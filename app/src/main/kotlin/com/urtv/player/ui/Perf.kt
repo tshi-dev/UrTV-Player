@@ -8,7 +8,9 @@ import android.util.Log
  */
 object Perf {
     const val TAG = "UrTVPerf"
-    fun log(what: String, ms: Long, note: String = "") { Log.i(TAG, "$what ${ms} ms" + if (note.isEmpty()) "" else " ($note)") }
+    fun log(what: String, ms: Long, note: String = "") { val l = "$what ${ms} ms" + if (note.isEmpty()) "" else " ($note)"; Log.i(TAG, l); PerfLogBuffer.add(l) }
+    /** A free-form line (also shown in the in-app log). */
+    fun line(text: String) { Log.i(TAG, text); PerfLogBuffer.add(text) }
     /** Logs how long it takes until the second frame is drawn after now. Uses the platform Choreographer, not Compose's frame clock: a pending Compose frame request would keep the UI tests from ever being idle. */
     /** The unit-test environment has no real frames: a pending Choreographer callback there keeps the UI tests from ever being idle. */
     val inTests: Boolean get() = android.os.Build.FINGERPRINT == "robolectric"

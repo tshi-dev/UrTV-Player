@@ -67,12 +67,12 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             val acc = account(def)
             val mr = withContext(Dispatchers.IO) { runCatching {
                 val mc = runCatching { XtreamParser.parseCategories(Http.text(acc.vodCategoriesUrl())) }.getOrDefault(emptyMap())
-                Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) }.also { writeMovies(mf, it); writeCats(File(dir, "mcats_${def.id}.txt"), mc.values.toList()) }     // the provider's own order, never re-sorted
+                Http.retrying { Http.open(acc.vodStreamsUrl()).use { XtreamParser.parseMovies(it, acc, mc) } }.also { writeMovies(mf, it); writeCats(File(dir, "mcats_${def.id}.txt"), mc.values.toList()) }     // the provider's own order, never re-sorted
             } }
             if (mr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, movies = mr.getOrThrow(), movieCats = readCats(File(dir, "mcats_${def.id}.txt")))
             val sr = withContext(Dispatchers.IO) { runCatching {
                 val sc = runCatching { XtreamParser.parseCategories(Http.text(acc.seriesCategoriesUrl())) }.getOrDefault(emptyMap())
-                Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) }.also { writeSeries(sf, it); writeCats(File(dir, "scats_${def.id}.txt"), sc.values.toList()) }
+                Http.retrying { Http.open(acc.seriesUrl()).use { XtreamParser.parseSeriesList(it, sc) } }.also { writeSeries(sf, it); writeCats(File(dir, "scats_${def.id}.txt"), sc.values.toList()) }
             } }
             if (sr.isSuccess) _state.value = _state.value.copy(playlistId = def.id, series = sr.getOrThrow(), seriesCats = readCats(File(dir, "scats_${def.id}.txt")))
             (mr.exceptionOrNull() ?: sr.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }

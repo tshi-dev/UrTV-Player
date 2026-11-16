@@ -74,7 +74,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
     val ended by ctrl.ended.collectAsState()
     val attempt by ctrl.attempt.collectAsState()
 
-    LaunchedEffect(item.url) { ctrl.playVod(item.title, item.url, firstStart); firstStart = 0; bar = true; tick++ }
+    LaunchedEffect(item.url) { ctrl.trackKey(item.key); ctrl.playVod(item.title, item.url, firstStart); firstStart = 0; bar = true; tick++ }
     LaunchedEffect(item.url) {
         var n = 0
         while (true) {
@@ -170,7 +170,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
             }
         }
         AnimatedVisibility(options, Modifier.align(Alignment.CenterEnd), enter = fadeIn(), exit = fadeOut()) {
-            OptionsPanel(app, item.title, null, {}, null, onReload = { ctrl.retryNow() }, onClose = { options = false }, sleepMin = sleepMin, onSleep = { sleepMin = SLEEP_STEPS[(SLEEP_STEPS.indexOf(sleepMin) + 1) % SLEEP_STEPS.size] })
+            OptionsPanel(app, item.title, null, {}, null, speed = ctrl.speed.collectAsState().value, onSpeed = { ctrl.cycleSpeed() }, onReload = { ctrl.retryNow() }, onClose = { options = false }, sleepMin = sleepMin, onSleep = { sleepMin = SLEEP_STEPS[(SLEEP_STEPS.indexOf(sleepMin) + 1) % SLEEP_STEPS.size] })
         }
     }
 }

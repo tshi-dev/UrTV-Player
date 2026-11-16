@@ -233,7 +233,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             _firstFrame.value = true; _videoBlock.value = ""
             LoadTrace.finish()?.let { b -> _stats.value = _stats.value.copy(trace = b.line) }
             val t = System.currentTimeMillis() - loadStartMs
-            if (loadStartMs > 0 && t in 1..60_000) { android.util.Log.i("UrTVPerf", "first_frame ${t} ms${if (preview) " (preview)" else ""}"); ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
+            if (loadStartMs > 0 && t in 1..60_000) { com.urtv.player.ui.Perf.line("first_frame ${t} ms${if (preview) " (preview)" else ""}"); ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
         }
         override fun onPlaybackStateChanged(state: Int) {
             // a stall after playback had started: after 3 in a minute, switch to a lower variant
@@ -252,6 +252,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) _status.value = PlayStatus.Playing }
         override fun onTracksChanged(tracks: Tracks) {
             _tracks.value = readTracks(tracks)
+            applyPrefs(_tracks.value)
             // a video track the TV has no decoder for is dropped silently by the player: say so instead of playing sound alone
             val vids = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO && it.length > 0 }.map { g -> g.getTrackFormat(0).let { f -> com.urtv.player.core.VideoSupport.Track(f.sampleMimeType, f.width, f.height, g.isSelected) } }
             val b = com.urtv.player.core.VideoSupport.blocked(vids)
@@ -266,6 +267,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         override fun onVideoSizeChanged(v: VideoSize) { _video.value = if (v.width > 0 && v.height > 0) v.width * v.pixelWidthHeightRatio / v.height else 0f }
         override fun onPlayerError(e: PlaybackException) {
             com.urtv.player.data.Diag.playerError(e.errorCodeName, e)
+            com.urtv.player.ui.Perf.line("player error ${e.errorCodeName} http=${lastHttpStatus} attempt=${_attempt.value}")
             errorKind = errorKindOf(e)
             // Playlists often serve HLS from extension-less URLs: retry once as HLS before treating it as an outage.
             val c = current
@@ -293,7 +295,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         perfDropped += droppedPerSec.toInt()
         if (++perfSecs < 10) return
         val f = p.videoFormat
-        android.util.Log.i("UrTVPerf", "playback 10s: rebuffers=$perfRebuffers dropped=$perfDropped decoder=${lastDecoder.ifEmpty { "none" }} ${f?.sampleMimeType?.removePrefix("video/") ?: "audio"} ${f?.width ?: 0}x${f?.height ?: 0}@${(f?.frameRate ?: measuredFps).toInt()}fps stream=${((f?.bitrate ?: 0) / 1000)}kbps received=${((meter?.bitrateEstimate ?: 0L) / 1000)}kbps buffered=${p.totalBufferedDuration}ms")
+        com.urtv.player.ui.Perf.line("playback 10s: rebuffers=$perfRebuffers dropped=$perfDropped decoder=${lastDecoder.ifEmpty { "none" }} ${f?.sampleMimeType?.removePrefix("video/") ?: "audio"} ${f?.width ?: 0}x${f?.height ?: 0}@${(f?.frameRate ?: measuredFps).toInt()}fps stream=${((f?.bitrate ?: 0) / 1000)}kbps received=${((meter?.bitrateEstimate ?: 0L) / 1000)}kbps buffered=${p.totalBufferedDuration}ms")
         perfRebuffers = 0; perfDropped = 0; perfSecs = 0
     }
 
@@ -360,12 +362,36 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         return TrackState(opts(C.TRACK_TYPE_AUDIO), text, text.any { it.selected })
     }
 
-    fun selectAudio(o: TrackOption) {
+    // ---- what the person chose for this channel or film is remembered and applied the next time it plays
+    private var prefKey: String? = null
+    private var prefApplied = true
+    private var prefAudio = ""; private var prefText = ""
+    private val _speed = MutableStateFlow(1f)
+    val speed: StateFlow<Float> = _speed
+    /** Call right before playing: [key] names the channel or film the choices belong to. */
+    fun trackKey(key: String?) { prefKey = key; prefApplied = key == null; _speed.value = 1f; prefAudio = ""; prefText = ""; key?.let { k -> store.trackPref(k)?.let { prefAudio = it.audio; prefText = it.text; _speed.value = it.speed } } }
+    private fun savePref() { prefKey?.let { store.setTrackPref(it, com.urtv.player.data.Store.TrackPref(prefAudio, prefText, _speed.value)) } }
+    fun cycleSpeed() {
+        val steps = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
+        _speed.value = steps[(steps.indexOfFirst { it >= _speed.value - 0.001f }.coerceAtLeast(0) + 1) % steps.size]
+        player?.setPlaybackSpeed(_speed.value); savePref()
+    }
+    private fun applyPrefs(t: TrackState) {
+        if (prefApplied || t.audio.isEmpty()) return
+        prefApplied = true
+        t.audio.firstOrNull { it.label == prefAudio && !it.selected }?.let { selectAudioNoSave(it) }
+        if (prefText.isNotEmpty()) t.text.firstOrNull { it.label == prefText }?.let { selectTextNoSave(it) }
+        player?.setPlaybackSpeed(_speed.value)
+    }
+
+    fun selectAudio(o: TrackOption) { prefAudio = o.label; savePref(); selectAudioNoSave(o) }
+    private fun selectAudioNoSave(o: TrackOption) {
         val p = player ?: return; val g = o.group ?: return
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, o.index)).build()
     }
 
-    fun selectText(o: TrackOption?) {
+    fun selectText(o: TrackOption?) { prefText = o?.label ?: ""; savePref(); selectTextNoSave(o) }
+    private fun selectTextNoSave(o: TrackOption?) {
         val p = player ?: return
         val b = p.trackSelectionParameters.buildUpon()
         if (o?.group == null) { b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true); _cue.value = "" }

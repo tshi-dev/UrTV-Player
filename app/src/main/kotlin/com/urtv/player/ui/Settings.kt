@@ -65,6 +65,8 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     var appearance by remember { mutableStateOf(false) }
     if (appearance) { AppearanceScreen(store) { appearance = false }; return }
     var listTest by remember { mutableStateOf(false) }
+    var perfLog by remember { mutableStateOf(false) }
+    if (perfLog) { PerfLogScreen { perfLog = false }; return }
     if (listTest) { ListTestScreen(app) { listTest = false }; return }
     var selfOffer by remember { mutableStateOf<com.urtv.player.data.Update.Offer?>(null) }
     selfOffer?.let { o -> SelfUpdateScreen(app, o) { selfOffer = null }; return }
@@ -116,6 +118,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                         }
                         item { Setting(stringResource(R.string.set_groups), "", stringResource(R.string.set_groups_hint)) { onManageGroups() } }
                         item { Setting(stringResource(R.string.lt_row), "", stringResource(R.string.lt_row_hint)) { listTest = true } }
+                        item { Setting(stringResource(R.string.perf_log_title), "", stringResource(R.string.perf_log_hint)) { perfLog = true } }
                         item { val hid by store.hiddenChannels.collectAsState(); val n = hid.count { it.startsWith("$active|") }; if (n > 0) Setting(stringResource(R.string.menu_hidden_row), "$n") { store.clearHiddenChannels(active!!) } }
                     }
                 }

@@ -163,3 +163,10 @@ Also fixed: the movie and series lists could vanish after loading (the cache-onl
 ### v0.9.16 beta6: live stutter
 
 Causes found in the code, all from the zapping-first tuning: buffers of 4 s minimum and 15 s maximum (too thin for a provider with jittery delivery; now 8 s and 30 s, picture after 1 s, 48 MB cap), a playback speed of up to 1.04 to catch the live edge (it eats the buffer; now exactly 1.0), and a jump to the live edge when more than 25 s behind (the jump empties the buffer and the stutter starts again; now only beyond 60 s). A film stream stalls for up to 40 s before a reconnect (a seek on a big file can take a while), and asks for the file as it is (no compression), which range requests need.
+
+### v0.9.16 beta7
+
+- Measuring: `adb logcat -s UrTVPerf` (also on the TV: Settings, «سجل الأداء والأخطاء», the last 300 lines, numbers only) prints cold start, tab open, list build, search, first frame, a playback line every 10 s, player errors, and every 30 s the memory (PSS, Java heap, channel count). Scroll jank per list is the frame meter of the bisect switches (see above).
+- Player: playback speed for films (0.75 to 2), and the audio track, subtitle track and speed chosen for a channel or a film are remembered and applied the next time it plays.
+- Films and series can be favourites (button on the details page, «المفضّلة» entry in the Movies and Series lists).
+- Server hiccups (5xx, timeouts, refused or dropped connections) are retried twice (0.8 s, 1.6 s) when a list, a category list or the movie and series lists are fetched; a wrong login (4xx) is final at once.

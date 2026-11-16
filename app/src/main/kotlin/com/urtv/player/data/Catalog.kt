@@ -99,8 +99,8 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     private fun epgFile(id: String) = File(dir, "epg_$id.xml")
 
     private fun fetchXtream(acc: XtreamAccount): Pair<List<Channel>, List<String>> {
-        val cats = XtreamParser.parseCategories(Http.text(acc.categoriesUrl()))
-        val parsed = Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) }
+        val cats = Http.retrying { XtreamParser.parseCategories(Http.text(acc.categoriesUrl())) }
+        val parsed = Http.retrying { Http.open(acc.streamsUrl()).use { XtreamParser.parseStreams(it, acc, cats) } }
         return parsed.channels to parsed.epgUrls
     }
 
@@ -121,10 +121,10 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
         }
         detected = null; vodSplit = null
         var seen = 0
-        val parsed = Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r ->
+        val parsed = Http.retrying { Http.open(def.url).bufferedReader(Charsets.UTF_8).use { r ->
             // count entries as they stream in so the screen can say "N channels" instead of an empty wait
             M3uParser.parse(r.lineSequence().onEach { l -> if (l.startsWith("#EXTINF")) { seen++; if (seen % 25 == 0) _state.value = _state.value.copy(progress = seen) } })
-        }
+        } }
         val sp = com.urtv.player.core.M3uVod.split(parsed.channels)
         vodSplit = sp.takeIf { it.movies.isNotEmpty() || it.episodes.isNotEmpty() }
         return sp.live to parsed.epgUrls

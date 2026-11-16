@@ -114,8 +114,8 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         val gk = Browse.groupsOf(shown).map { groupKey(pid, it) }.firstOrNull { it in locked && it !in app.unlocked } ?: groupKey(pid, Browse.groupOf(shown))
         if (gk in locked && gk !in app.unlocked) {
             blocked = true; ctrl.stop()
-            pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gk; blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
-        } else { blocked = false; ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
+            pinReq = PinRequest.Verify { app.unlocked = app.unlocked + gk; blocked = false; ctrl.trackKey(chKey(pid, shown)); ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
+        } else { blocked = false; ctrl.trackKey(chKey(pid, shown)); ctrl.play(shown); store.pushRecent(chKey(pid, shown)) }
     }
     // Zap ahead: resolve the host names of the next two channels each way (cheap), and, unless the TV is low on memory or the link is
     // metered, fetch the manifests of the two nearest neighbours (at most 2 requests) so the next zap skips DNS, connect and manifest.
@@ -331,7 +331,7 @@ internal fun MiniGuide(list: List<Channel>, current: Channel, epg: com.urtv.play
 }
 
 @Composable
-internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit, sleepMin: Int = 0, onSleep: () -> Unit = {}, onLists: (() -> Unit)? = null) {
+internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () -> Unit, onGuide: (() -> Unit)?, onReload: () -> Unit, onClose: () -> Unit, sleepMin: Int = 0, onSleep: () -> Unit = {}, onLists: (() -> Unit)? = null, speed: Float? = null, onSpeed: () -> Unit = {}) {
     val ctrl = app.player
     val tracks by ctrl.tracks.collectAsState()
     val aspect by ctrl.aspect.collectAsState()
@@ -350,6 +350,7 @@ internal fun OptionsPanel(app: UrtvApp, title: String, fav: Boolean?, onFav: () 
             if (l.isNotEmpty()) { val i = if (text == null) -1 else l.indexOf(text); ctrl.selectText(if (i + 1 >= l.size) null else l[i + 1]) }
         }
         OptRow(stringResource(R.string.opt_aspect), stringResource(when (aspect) { AspectMode.Fit -> R.string.aspect_fit; AspectMode.Fill -> R.string.aspect_fill; AspectMode.Stretch -> R.string.aspect_stretch; AspectMode.R16x9 -> R.string.aspect_169; AspectMode.R4x3 -> R.string.aspect_43 })) { ctrl.cycleAspect() }
+        if (speed != null) OptRow(stringResource(R.string.opt_speed), "${if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()}x") { onSpeed() }
         GroupTitle(stringResource(R.string.opt_group_channel))
         if (fav != null) OptRow(stringResource(R.string.opt_fav), stringResource(if (fav) R.string.on else R.string.off)) { onFav() }
         if (onGuide != null) OptRow(stringResource(R.string.opt_list), "") { onGuide() }

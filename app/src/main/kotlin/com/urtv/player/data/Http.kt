@@ -47,6 +47,24 @@ object Http {
         throw IOException("too many redirects")
     }
 
+    /**
+     * Runs [block] (a download and its parse) again after a short pause when the server or the link hiccups: a 5xx answer, a timeout, a refused or
+     * dropped connection. Three tries, 0.8 s and 1.6 s apart. A 4xx answer (wrong login, no such file) or an oversize answer is final at once.
+     * Call it off the main thread.
+     */
+    fun <T> retrying(tries: Int = 3, block: () -> T): T {
+        var n = 0
+        while (true) {
+            try { return block() } catch (e: IOException) {
+                n++
+                val m = e.message.orEmpty()
+                val again = e is java.net.SocketTimeoutException || e is java.net.ConnectException || e is java.net.SocketException || m.startsWith("HTTP 5") || m.contains("unexpected end of stream")
+                if (n >= tries || !again) throw e
+                Thread.sleep(800L * n)
+            }
+        }
+    }
+
     fun text(url: String, maxBytes: Long = MAX_TEXT): String = open(url, maxBytes = maxBytes).use { it.readBytes().toString(Charsets.UTF_8) }
 
     /** Throws once more than [max] bytes have been produced. */

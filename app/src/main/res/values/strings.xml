@@ -316,4 +316,7 @@
     <string name="vod_no_seek">هذا الفيديو لا يدعم التقديم والإرجاع من السيرفر</string>
     <string name="vod_latest">آخر ما أُضيف</string>
     <string name="pick_all_groups">كل القنوات</string>
+    <string name="opt_speed">سرعة التشغيل</string>
+    <string name="perf_log_title">سجل الأداء والأخطاء</string>
+    <string name="perf_log_hint">آخر ما سجّله التطبيق: أزمنة الفتح والتشغيل والأخطاء (أرقام فقط)</string>
 </resources>

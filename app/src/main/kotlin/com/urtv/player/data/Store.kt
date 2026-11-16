@@ -93,6 +93,11 @@ class Store(ctx: Context) {
     fun setMatchPick(comp: String, channelKey: String) { if (comp.isNotEmpty()) sp.edit().putString("mpick_${comp.take(60)}", channelKey).apply() }
 
     // ---- playback positions for movies/episodes/catch-up ("resume where you stopped")
+    /** The audio track, subtitle track (empty = off) and speed the person chose for one channel or film, kept for next time. */
+    data class TrackPref(val audio: String, val text: String, val speed: Float)
+    fun trackPref(key: String): TrackPref? = sp.getString("tp_$key", null)?.split('\t')?.takeIf { it.size >= 3 }?.let { TrackPref(it[0], it[1], it[2].toFloatOrNull() ?: 1f) }
+    fun setTrackPref(key: String, p: TrackPref) { sp.edit().putString("tp_$key", listOf(p.audio, p.text, p.speed.toString()).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ') }).apply() }
+
     fun position(key: String): Long = sp.getLong("pos_$key", 0L)
     fun savePosition(key: String, ms: Long, durationMs: Long) {
         val e = sp.edit()
