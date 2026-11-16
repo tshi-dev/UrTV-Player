@@ -149,6 +149,9 @@ jobs:
           echo "PLAYER_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
       - name: Build the signed release
         run: gradle :app:assembleRelease --no-daemon
+      - name: TMDB live check (a few real titles; prints numbers and titles, never the key)
+        continue-on-error: true
+        run: gradle :app:testDebugUnitTest --tests '*TmdbLiveCheckTest' --no-daemon -i 2>&1 | grep -E '^\s*TMDBCHECK' || true
       - name: Verify signature (v2 and v3) and size
         run: |
           apk=app/build/outputs/apk/release/app-release.apk

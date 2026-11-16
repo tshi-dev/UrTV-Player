@@ -42,4 +42,14 @@ class WorkflowHygieneTest {
         assertTrue(t.contains("if: \${{ env.FONTS_TOKEN == '' }}"), "debug artifacts are uploaded only when no private font was injected")
         assertTrue(t.contains("retention-days: 3"))
     }
+
+    @Test fun theTmdbKeyIsOnlyReadByTheReleaseJobAndNeverLogged() {
+        val build = files.first { it.name == "build.yml" }.readText()
+        assertEquals(1, Regex("""secrets\.TMDB_API_KEY""").findAll(build).count(), "one place gives the secret to a job")
+        assertTrue(build.indexOf("secrets.TMDB_API_KEY") > build.indexOf("  release:"), "only the release job, never the pull request test job")
+        val src = listOf("src/main", "app/src/main").map(::File).first { it.exists() }
+        val client = src.walkTopDown().first { it.name == "TmdbClient.kt" }.readText()
+        assertFalse(Regex("""Log\.|println|Diag\.""").containsMatchIn(client), "the client never writes anything that could hold its URL")
+        assertTrue(src.walkTopDown().filter { it.extension == "kt" }.none { f -> Regex("""[0-9a-f]{32}""").containsMatchIn(f.readText().lines().filter { it.contains("api_key") }.joinToString()) }, "no key in the sources")
+    }
 }
