@@ -292,9 +292,9 @@ class FlowTest {
         val cur = all[2]                                                     // "قناة تجريبية 3"
         show { androidx.compose.runtime.CompositionLocalProvider(com.urtv.player.ui.LocalAutoLeaveEdit provides false) { com.urtv.player.ui.CommentaryPanel(app, all, cur) {} } }
         settle(); settle()
-        until(10_000) { texts().any { it == app.getString(R.string.cm_pick) } }
+        until(10_000) { texts().any { it == "+ " + app.getString(R.string.cm_choose) } }
         assertTrue(texts().any { it == app.getString(R.string.cm_original) } && texts().any { it.contains(cur.name) }, "the original sound is the first choice and names the current channel")
-        rule.onNode(hasText(app.getString(R.string.cm_pick), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        rule.onNode(hasText("+ " + app.getString(R.string.cm_choose), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         settle(); settle(); settle()
         settle(); settle()
         until(10_000) { texts().any { it == "أخبار" } }                       // the subscription's groups first
@@ -322,7 +322,7 @@ class FlowTest {
         assertTrue(texts().any { it == app.getString(R.string.cm_small_msg) } && texts().none { it == app.getString(R.string.cm_pick) }, "the question first, not the panel")
         rule.onNode(hasText(app.getString(R.string.cm_try), substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         settle(); settle(); settle()
-        until(10_000) { settle(); texts().any { it == app.getString(R.string.cm_pick) } }
+        until(10_000) { settle(); texts().any { it == "+ " + app.getString(R.string.cm_choose) } }
     }
 
     @Test fun theOkPanelRowOnASmallTvCarriesTheSubLine() {
@@ -331,5 +331,44 @@ class FlowTest {
         show { com.urtv.player.ui.MiniGuide(ch, ch[0], com.urtv.player.data.EpgIndex.EMPTY, 0L, ch, fav = false, onFav = {}, statsOn = false, onStats = {}, cause = com.urtv.player.core.Diagnosis.Cause.None, httpStatus = 0, onCommentary = {}, commentaryNote = true) {} }
         until(10_000) { texts().any { it == app.getString(R.string.cm_small_tv) } }
         assertTrue(texts().any { it == app.getString(R.string.cm_entry) }, "the row is not hidden")
+    }
+
+    private fun commentaryPanel(onClose: () -> Unit): Pair<com.urtv.player.core.Channel, com.urtv.player.core.Channel> {
+        seedPlaylist()
+        val all = app.catalog.state.value.channels
+        show { androidx.compose.runtime.CompositionLocalProvider(com.urtv.player.ui.LocalAutoLeaveEdit provides false) { com.urtv.player.ui.CommentaryPanel(app, all, all[2], onClose = onClose) } }
+        settle(); settle()
+        until(10_000) { texts().any { it == app.getString(R.string.cm_apply) } }
+        return all[2] to all[6]
+    }
+    private fun clickButton(text: String) = rule.onNode(hasText(text, substring = false) and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+
+    @Test fun a6_theCommentaryCardsCancelPutsBackTheSourceThatWasActiveWhenItOpened() {
+        var closed = false
+        val (_, audio) = commentaryPanel { closed = true }
+        app.commentary.start(audio)                                       // a source chosen while the card is open is heard at once
+        settle(); settle()
+        assertEquals(audio.url, app.commentary.state.value.audio?.url)
+        clickButton(app.getString(R.string.cm_cancel)); settle(); settle()
+        assertEquals(null, app.commentary.state.value.audio, "cancel restores the original sound"); assertTrue(closed)
+        assertEquals(false, app.commentary.audioPlayerAlive, "and the second player is gone")
+    }
+
+    @Test fun a7_theCommentaryCardsApplyKeepsTheChoiceAndRemembersThePairing() {
+        var closed = false
+        val (_, audio) = commentaryPanel { closed = true }
+        app.commentary.start(audio); settle(); settle()
+        clickButton(app.getString(R.string.cm_apply)); settle(); settle()
+        assertEquals(audio.url, app.commentary.state.value.audio?.url, "apply keeps the source"); assertTrue(closed)
+        assertEquals(true, app.commentary.audioPlayerAlive)
+        app.commentary.stop()
+    }
+
+    @Test fun a8_backIsCancelOnTheCommentaryCard() {
+        var closed = false
+        val (_, audio) = commentaryPanel { closed = true }
+        app.commentary.start(audio); settle(); settle()
+        scenario!!.onActivity { a -> a.onBackPressedDispatcher.onBackPressed() }; settle(); settle()
+        assertEquals(null, app.commentary.state.value.audio, "Back restores the original sound"); assertTrue(closed)
     }
 }

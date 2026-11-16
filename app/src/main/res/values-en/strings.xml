@@ -319,4 +319,9 @@
     <string name="opt_speed">Playback speed</string>
     <string name="perf_log_title">Performance and error log</string>
     <string name="perf_log_hint">What the app recorded last: open and play times and errors (numbers only)</string>
+    <string name="cm_apply">Apply</string>
+    <string name="cm_source">Sound source</string>
+    <string name="cm_choose">Choose a channel</string>
+    <string name="cm_audio_from_short">Commentary</string>
+    <string name="cm_preview_tag">Sound preview</string>
 </resources>

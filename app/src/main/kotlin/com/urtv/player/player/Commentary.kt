@@ -32,7 +32,7 @@ data class CommentaryState(val audio: Channel? = null, val delayMs: Long = 0L, v
  * Any failure restores the original sound. The second player stops when the channel changes, on stop and in the background.
  * Never touches the system volume or mute.
  */
-class CommentaryController(private val ctx: Context, private val main: PlayerController, private val lightest: Boolean = false) {
+class CommentaryController(private val ctx: Context, private val main: PlayerController, private val lightest: Boolean = false, private val store: com.urtv.player.data.Store? = null) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val _state = MutableStateFlow(CommentaryState())
     val state: StateFlow<CommentaryState> = _state
@@ -41,8 +41,10 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
     /** True only while a second player exists: it lives exactly as long as the merge is on, nothing is kept warm. */
     val audioPlayerAlive: Boolean get() = audio != null
     private var watch: Job? = null
-    /** The delay chosen for each audio channel, kept for the session (the process), not on disk. */
-    private val delays = HashMap<String, Long>()
+    private fun pairKey(audio: Channel) = Integer.toHexString(((main.currentChannel?.url ?: "") + "|" + audio.url).hashCode())
+    /** The sound channels used so far in this run (newest first, at most three), offered again as source cards. */
+    private val _recent = MutableStateFlow<List<Channel>>(emptyList())
+    val recent: StateFlow<List<Channel>> = _recent
 
     init {
         main.onSessionEnd = { stop() }
@@ -54,9 +56,10 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
         } }
     }
 
-    fun start(ch: Channel) {
+    fun start(ch: Channel, initialDelayMs: Long? = null) {
         endAudio(keepFailure = false)
-        val keep = delays[ch.url] ?: 0L
+        _recent.value = (listOf(ch) + _recent.value.filter { it.url != ch.url }).take(3)
+        val keep = initialDelayMs ?: store?.commentaryDelay(pairKey(ch)) ?: 0L
         _state.value = CommentaryState(audio = ch, delayMs = 0L)
         val http = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(Net.client).setUserAgent(Http.UA)
         // small devices: the smallest buffers that still play (a few seconds, a couple of MB)
@@ -104,8 +107,21 @@ class CommentaryController(private val ctx: Context, private val main: PlayerCon
         val okA = m.audioBackMs == 0L || (a.isCurrentMediaItemSeekable.also { if (it) a.seekTo((a.currentPosition - m.audioBackMs).coerceAtLeast(0L)) })
         val okV = main.seekBackBy(m.videoBackMs)
         if (!okA || !okV) { fail(Commentary.Failure.NotSeekable); return }
-        st.audio?.let { delays[it.url] = new }
         _state.value = st.copy(delayMs = new)
+    }
+
+    /** Keeps what is playing now: the delay is remembered for this picture + sound pairing. */
+    fun applyCurrent() { val st = _state.value; st.audio?.let { store?.setCommentaryDelay(pairKey(it), st.delayMs) } }
+
+    /** Puts back the source and delay that were active when the panel was opened (the panel's «cancel» and Back). */
+    fun cancelTo(before: CommentaryState) {
+        val now = _state.value
+        when {
+            before.audio == null -> stop()
+            now.audio?.url != before.audio.url -> start(before.audio, before.delayMs)
+            now.delayMs != before.delayMs -> setDelay(before.delayMs)
+        }
+        if (_state.value.failure != null) clearFailure()
     }
 
     /** Back to the original sound; the second channel is dropped. */

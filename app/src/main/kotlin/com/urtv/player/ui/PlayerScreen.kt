@@ -237,7 +237,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
             MiniGuide(list, shown, epg, nowMs, all, fav = chKey(pid, shown) in favs, onFav = { store.toggleFav(chKey(pid, shown)) }, statsOn = store.statsOverlay.collectAsState().value, onStats = { store.setStatsOverlay(!store.statsOverlay.value) }, cause = cause, httpStatus = ctrl.lastHttpStatus, onCommentary = if (!shown.url.startsWith("file:", true)) ({ overlay = Overlay.Commentary }) else null, commentaryNote = app.commentaryTier == com.urtv.player.core.Commentary.Tier.Warn) { goTo(it); overlay = Overlay.None }
         }
         // «دمج التعليق»: the second channel's sound
-        AnimatedVisibility(overlay == Overlay.Commentary, Modifier.align(Alignment.CenterEnd).padding(end = 56.dp), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(overlay == Overlay.Commentary, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
             CommentaryPanel(app, all, shown, warn = app.commentaryTier == com.urtv.player.core.Commentary.Tier.Warn) { overlay = Overlay.None }
         }
         // my lists picker

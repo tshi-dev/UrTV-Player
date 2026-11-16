@@ -39,89 +39,97 @@ import com.urtv.player.core.Commentary
 import com.urtv.player.data.Browse
 
 /**
- * «دمج التعليق» panel, opened from one row of the OK panel. Three states: the original sound (and the way to pick a second channel),
- * the second channel with the live delay row, and the honest failure. Delay presses take effect at once; there is no «apply».
+ * «دمج التعليق»: a bottom card opened from one row of the OK panel. Source and delay changes are heard at once while it is open;
+ * «تطبيق» keeps them (the delay is remembered for this picture + sound pairing) and closes; «إلغاء» and Back put back the source and
+ * delay that were active when the card was opened, then close. Small TVs are asked «try it?» first.
  */
 @Composable
 internal fun CommentaryPanel(app: UrtvApp, all: List<Channel>, current: Channel, warn: Boolean = false, onClose: () -> Unit) {
     val cm = app.commentary
     val st by cm.state.collectAsState()
+    val recent by cm.recent.collectAsState()
+    val opened = remember { cm.state.value }                                   // what to go back to on «cancel»
+    fun cancel() { cm.cancelTo(opened); onClose() }
+    fun apply() { cm.applyCurrent(); onClose() }
     var picking by remember { mutableStateOf(false) }
-    var asked by remember { mutableStateOf(!warn) }       // small TVs: «try it?» comes first, the focus on «cancel»
-    var pickGroup by remember { mutableStateOf<String?>(null) }     // the folder (a group of the subscription) opened in the picker
-    BackHandler(picking) { if (pickGroup != null) pickGroup = null else picking = false }
+    var asked by remember { mutableStateOf(!warn) }                            // small TVs: «try it?» comes first, the focus on «cancel»
+    var pickGroup by remember { mutableStateOf<String?>(null) }                // the folder (a group of the subscription) opened in the picker
+    BackHandler { if (asked) cancel() else onClose() }
+    BackHandler(picking) { if (pickGroup != null) pickGroup = null else picking = false }     // registered later: wins while picking
     val first = remember { FocusRequester() }
     LaunchedEffect(asked, picking, st.audio?.url, st.failure) { repeat(10) { if (runCatching { first.requestFocus(); true }.getOrDefault(false)) return@LaunchedEffect; kotlinx.coroutines.delay(30) } }
-    Column(Modifier.fillMaxHeight().width(700.dp).padding(vertical = 56.dp).background(C.surface, Rd(22)).padding(40.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(stringResource(R.string.cm_title), style = T.title.copy(fontSize = 34.sp))
-        if (!asked) {
-            Text(stringResource(R.string.cm_small_msg), style = T.body, modifier = Modifier.padding(top = 8.dp))
-            Spacer(Modifier.weight(1f))
+    val card = Modifier.fillMaxWidth().padding(horizontal = 56.dp).padding(bottom = 48.dp).background(C.surface, Rd(22)).padding(horizontal = 36.dp, vertical = 30.dp)
+    when {
+        !asked -> Column(card, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(stringResource(R.string.cm_title), style = T.title.copy(fontSize = 32.sp))
+            Text(stringResource(R.string.cm_small_msg), style = T.body)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Tv({ asked = true }, Modifier.weight(1f).height(72.dp), Rd(14), restColor = C.surfaceHi) { Text(stringResource(R.string.cm_try), style = T.bodyBold, modifier = Modifier.align(Alignment.Center)) }
                 Tv(onClose, Modifier.weight(1f).height(72.dp), Rd(14), focusRequester = first, restColor = C.surfaceHi) { Text(stringResource(R.string.cm_cancel), style = T.bodyBold, modifier = Modifier.align(Alignment.Center)) }
             }
-            return@Column
         }
-        if (picking) { Picker(all, current, first, app.catalog.state.collectAsState().value.index, pickGroup, { pickGroup = it }, onPick = { cm.start(it); picking = false; pickGroup = null }) ; return@Column }
-        val f = st.failure
-        if (f != null) {
-            Column(Modifier.fillMaxWidth().background(Color(0xFF2A1D1F), Rd(14)).padding(26.dp)) {
-                Text(stringResource(when (f) { Commentary.Failure.OneConnection -> R.string.cm_fail_one; Commentary.Failure.NotSeekable -> R.string.cm_fail_seek; Commentary.Failure.Unreachable -> R.string.cm_fail_unreach }), style = T.bodyBold)
-                Text(stringResource(R.string.cm_fail_kept), style = T.small, modifier = Modifier.padding(top = 10.dp))
-            }
-            OriginalRow(current, selected = true, first) { cm.clearFailure() }
-        } else if (st.audio == null) {
-            Text(stringResource(R.string.cm_sub), style = T.small)
-            OriginalRow(current, selected = true, first) { }
-            Tv({ picking = true }, Modifier.fillMaxWidth().height(92.dp), Rd(14), restColor = C.surfaceHi) {
-                Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 26.dp)) {
-                    Text(stringResource(R.string.cm_pick), style = T.body); Text(stringResource(R.string.cm_pick_sub), style = T.small)
+        picking -> Column(card.fillMaxHeight(0.8f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(stringResource(R.string.cm_title), style = T.title.copy(fontSize = 32.sp))
+            Picker(all, current, first, app.catalog.state.collectAsState().value.index, pickGroup, { pickGroup = it }, onPick = { cm.start(it); picking = false; pickGroup = null })
+        }
+        else -> Row(card, horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(stringResource(R.string.cm_title), style = T.title.copy(fontSize = 32.sp))
+                val f = st.failure
+                if (f != null) Column(Modifier.fillMaxWidth().background(Color(0xFF2A1D1F), Rd(14)).padding(22.dp)) {
+                    Text(stringResource(when (f) { Commentary.Failure.OneConnection -> R.string.cm_fail_one; Commentary.Failure.NotSeekable -> R.string.cm_fail_seek; Commentary.Failure.Unreachable -> R.string.cm_fail_unreach }), style = T.bodyBold)
+                    Text(stringResource(R.string.cm_fail_kept), style = T.small, modifier = Modifier.padding(top = 8.dp))
                 }
-            }
-        } else {
-            val a = st.audio!!
-            Text(stringResource(R.string.cm_video, current.name), style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Tv({ picking = true }, Modifier.fillMaxWidth().height(92.dp), Rd(14), restColor = C.surfaceHi) {
-                Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 26.dp)) {
-                    Text(a.name, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(stringResource(if (st.ready) R.string.cm_audio_from else R.string.cm_loading), style = T.small)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.cm_source), style = T.small)
+                    Text(stringResource(R.string.cm_video, current.name), style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                Text(stringResource(R.string.cm_delay), style = T.small)
-                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Text(Commentary.label(st.delayMs) + " " + stringResource(R.string.cm_sec), style = T.title.copy(fontSize = 44.sp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SourceCard(stringResource(R.string.cm_original), current.name, st.audio == null, Modifier.weight(1f), if (st.audio == null) first else null) { if (st.audio != null) cm.original() else cm.clearFailure() }
+                    for (c in recent.take(2)) SourceCard(c.name, stringResource(if (st.audio?.url == c.url && !st.ready) R.string.cm_loading else R.string.cm_audio_from_short), st.audio?.url == c.url, Modifier.weight(1f), if (st.audio?.url == c.url) first else null) { if (st.audio?.url != c.url) cm.start(c) }
+                    SourceCard("+ " + stringResource(R.string.cm_choose), stringResource(R.string.cm_pick_sub), false, Modifier.weight(1f), null) { picking = true }
                 }
-            }
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for (step in Commentary.STEPS) {
-                        Tv({ cm.press(step) }, Modifier.weight(1f).height(80.dp), Rd(12), restColor = C.surfaceHi, focusRequester = if (step == 0L) first else null) {
-                            Text(if (step == 0L) "0" else Commentary.label(step), style = T.bodyBold, maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center))
+                if (st.audio != null) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                        Text(stringResource(R.string.cm_delay), style = T.small)
+                        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            Text(Commentary.label(st.delayMs) + " " + stringResource(R.string.cm_sec), style = T.title.copy(fontSize = 40.sp))
                         }
                     }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.cm_earlier), style = T.small)      // the − side: the sound comes earlier
-                    Text(stringResource(R.string.cm_later), style = T.small)        // the + side: the sound comes later
-                }
+                    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            for (step in Commentary.STEPS) Tv({ cm.press(step) }, Modifier.weight(1f).height(72.dp), Rd(12), restColor = C.surfaceHi) {
+                                Text(if (step == 0L) "0" else Commentary.label(step), style = T.bodyBold, maxLines = 1, softWrap = false, modifier = Modifier.align(Alignment.Center))
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(stringResource(R.string.cm_earlier), style = T.small)      // the − side: the sound comes earlier
+                            Text(stringResource(R.string.cm_later), style = T.small)        // the + side: the sound comes later
+                        }
+                    }
+                } else if (f == null) Text(stringResource(R.string.cm_sub), style = T.small)
             }
-            Tv({ cm.original() }, Modifier.fillMaxWidth().height(80.dp), Rd(14), restColor = C.surfaceHi) {
-                Text(stringResource(R.string.cm_back_orig), style = T.body, modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 26.dp))
+            Column(Modifier.width(360.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.fillMaxWidth().height(190.dp).background(C.surfaceHi, Rd(14)), contentAlignment = Alignment.Center) {
+                    Logo(st.audio ?: current, 96)
+                    if (st.audio != null) Text(stringResource(R.string.cm_preview_tag), style = T.tiny.copy(color = Color.White), modifier = Modifier.align(Alignment.TopStart).padding(10.dp).background(Color(0x99000000), Rd(8)).padding(horizontal = 10.dp, vertical = 3.dp))
+                    Text((st.audio ?: current).name, style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TvButton(stringResource(R.string.cm_apply), { apply() }, Modifier.weight(1f), primary = true)
+                    TvButton(stringResource(R.string.cm_cancel), { cancel() }, Modifier.weight(1f))
+                }
             }
         }
-        Spacer(Modifier.weight(1f))
-        TvButton(stringResource(R.string.cm_close), onClose, Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun OriginalRow(current: Channel, selected: Boolean, focus: FocusRequester, onClick: () -> Unit) {
-    Tv(onClick, Modifier.fillMaxWidth().height(92.dp), Rd(14), selected = selected, focusRequester = focus, restColor = C.surfaceHi) {
-        Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 26.dp)) {
-            Text(stringResource(R.string.cm_original), style = T.body)
-            Text(stringResource(R.string.cm_original_sub, current.name), style = T.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun SourceCard(title: String, sub: String, selected: Boolean, modifier: Modifier, focus: FocusRequester?, onClick: () -> Unit) {
+    Tv(onClick, modifier.height(84.dp), Rd(14), selected = selected, focusRequester = focus, restColor = C.surfaceHi) {
+        Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 20.dp)) {
+            Text(title, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sub, style = T.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

@@ -98,6 +98,10 @@ class Store(ctx: Context) {
     fun trackPref(key: String): TrackPref? = sp.getString("tp_$key", null)?.split('\t')?.takeIf { it.size >= 3 }?.let { TrackPref(it[0], it[1], it[2].toFloatOrNull() ?: 1f) }
     fun setTrackPref(key: String, p: TrackPref) { sp.edit().putString("tp_$key", listOf(p.audio, p.text, p.speed.toString()).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ') }).apply() }
 
+    /** The delay applied for one pairing (the picture channel together with the sound channel), kept for next time. */
+    fun commentaryDelay(pair: String): Long? = if (sp.contains("cmd_$pair")) sp.getLong("cmd_$pair", 0L) else null
+    fun setCommentaryDelay(pair: String, ms: Long) { sp.edit().putLong("cmd_$pair", ms).apply() }
+
     fun position(key: String): Long = sp.getLong("pos_$key", 0L)
     fun savePosition(key: String, ms: Long, durationMs: Long) {
         val e = sp.edit()

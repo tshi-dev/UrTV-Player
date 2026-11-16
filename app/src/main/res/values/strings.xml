@@ -319,4 +319,9 @@
     <string name="opt_speed">سرعة التشغيل</string>
     <string name="perf_log_title">سجل الأداء والأخطاء</string>
     <string name="perf_log_hint">آخر ما سجّله التطبيق: أزمنة الفتح والتشغيل والأخطاء (أرقام فقط)</string>
+    <string name="cm_apply">تطبيق</string>
+    <string name="cm_source">مصدر الصوت</string>
+    <string name="cm_choose">اختر قناة</string>
+    <string name="cm_audio_from_short">تعليق</string>
+    <string name="cm_preview_tag">معاينة الصوت</string>
 </resources>
