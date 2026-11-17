@@ -25,6 +25,12 @@ class ChannelIndex(val channels: List<Channel>, pid: String = "") {
         groups = g.keys.toList(); byGroup = g; numbers = nums
     }
 
+    /** The first [n] channels of a group: a lookup, not a pass over the whole list (the home rows asked this for every group on every recomposition). */
+    fun head(group: String, n: Int): List<Channel> = byGroup[group]?.let { if (it.size <= n) it else it.subList(0, n) } ?: emptyList()
+
+    /** The favourites among the channels, from the keys computed once (no per-channel hashing on the main thread). */
+    fun favourites(favs: Set<String>): List<Channel> = if (favs.isEmpty()) emptyList() else channels.filterIndexed { i, _ -> keys[i] in favs }
+
     /** Channels whose name matches [query] (Arabic/Latin, keyboard-layout slips), in list order. */
     fun search(query: String): List<Channel> = if (query.isBlank()) channels else SearchFold.search(names, query).map { channels[it] }
 

@@ -212,7 +212,8 @@ private fun HomeRows(
     val vod by app.vod.state.collectAsState()
     val views by store.views.collectAsState()
     val epg by app.catalog.epg.collectAsState()
-    val byKeyL = remember(cat.channels) { lazy { cat.channels.associateBy { chKey(pid, it) } } }
+    val idx = cat.index.takeIf { it.channels === cat.channels } ?: remember(cat.channels) { com.urtv.player.data.ChannelIndex(cat.channels, pid) }
+    val byKeyL = remember(idx) { lazy { HashMap<String, Channel>(cat.channels.size * 2).also { m -> cat.channels.forEachIndexed { i, c -> m[idx.keys[i]] = c } } } }
     val first = remember { FocusRequester() }
     // «recently added», «most watched» (this TV's own counts) and «trending» (TMDB's week, shown only for what the provider really has); ids carry m: / s: for film or series
     // «recently added», «most watched» (this TV's own counts) and «trending» (TMDB's week, shown only for what the provider really has); ids carry m: / s: for film or series.
@@ -314,7 +315,7 @@ private fun HomeRows(
                         }
                         Text(stringResource(R.string.cont_hint), style = T.tiny, modifier = Modifier.padding(horizontal = 4.dp))
                     }
-                    id == "favs" -> channelRow(R.string.tab_favs, cat.channels.filter { chKey(pid, it) in favs })
+                    id == "favs" -> channelRow(R.string.tab_favs, remember(idx, favs) { idx.favourites(favs) })
                     id == "recent" -> channelRow(R.string.recent_channels, recents.mapNotNull { byKeyL.value[it] }.take(20))
                     id == "added" -> posterRow(R.string.row_added, added, openMixed)
                     id == "viewed" -> posterRow(R.string.row_viewed, viewed, openMixed)
@@ -323,7 +324,7 @@ private fun HomeRows(
                     id == "series" -> posterRow(R.string.tab_series, vodRows.series, onOpenSeries)
                     id.startsWith("group:") -> {
                         val g = id.removePrefix("group:")
-                        val gl = cat.channels.filter { g in Browse.groupsOf(it) }.take(24)
+                        val gl = remember(idx, g) { idx.head(g, 24) }
                         if (gl.isNotEmpty()) {
                             val fr = if (!firstTaken) { firstTaken = true; first } else null
                             Text(if (g == Browse.OTHER) stringResource(R.string.group_other) else g, style = T.title.copy(fontSize = 26.sp), modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
@@ -419,7 +420,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
             else -> if (nothingHidden) (index.byGroup[group] ?: emptyList()) else Browse.filter(visibleChannels, group, "")
         }
     } }
-    val counts = remember(cat.channels) { HashMap<String, Int>().also { m -> for (c in cat.channels) for (g in Browse.groupsOf(c)) m[g] = (m[g] ?: 0) + 1 } }
+    val counts = remember(index) { index.byGroup.mapValues { it.value.size } }
     val arabicUi = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language == "ar"
 
     // focus bookkeeping: remember the focused row; put focus on the nearest row when it disappears or after the player
@@ -806,5 +807,5 @@ private fun HeroBanner(app: UrtvApp, pid: String, p: Poster, focus: FocusRequest
 fun PosterArt(image: String?, title: String) {
     val h = (title.fold(0) { a, c -> (a * 31 + c.code) and 0xFFFF } % 360).toFloat()
     Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.hsv(h, 0.30f, 0.30f), Color.hsv((h + 40) % 360, 0.40f, 0.17f)))))
-    if (!image.isNullOrBlank()) SubcomposeAsyncImage(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, loading = {}, error = {})
+    if (!image.isNullOrBlank()) coil3.compose.AsyncImage(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)      // no sub-composition per card (a poster row has dozens); the tinted plate underneath is the placeholder and the fallback
 }
