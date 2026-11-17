@@ -216,6 +216,9 @@ class Store(ctx: Context) {
 
     private val _steady = MutableStateFlow(sp.getBoolean("steady", false)); val steadyQuality: StateFlow<Boolean> = _steady
     fun setSteadyQuality(v: Boolean) { _steady.value = v; sp.edit().putBoolean("steady", v).apply() }
+    // the beta channel (in-app updates to beta builds): off by default, never touched by a restore or an update
+    private val _beta = MutableStateFlow(sp.getBoolean("betaChannel", false)); val betaChannel: StateFlow<Boolean> = _beta
+    fun setBetaChannel(v: Boolean) { _beta.value = v; sp.edit().putBoolean("betaChannel", v).apply() }
     private val _autoAlt = MutableStateFlow(sp.getBoolean("autoalt", false)); val autoAlt: StateFlow<Boolean> = _autoAlt
     fun setAutoAlt(v: Boolean) { _autoAlt.value = v; sp.edit().putBoolean("autoalt", v).apply() }
     fun setStatsOverlay(v: Boolean) { _stats.value = v; sp.edit().putBoolean("stats", v).apply() }
