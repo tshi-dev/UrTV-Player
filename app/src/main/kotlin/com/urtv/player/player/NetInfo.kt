@@ -9,6 +9,9 @@ import android.os.Build
 object NetInfo {
     data class Link(val kbps: Int, val signalDbm: Int?, val wifi: Boolean)
 
+    /** True when the system has a network that reaches the internet (not only Wi-Fi attached to nothing). */
+    fun online(ctx: Context): Boolean = runCatching { val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager; val c = cm.getNetworkCapabilities(cm.activeNetwork); c != null && c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) }.getOrDefault(true)
+
     fun read(ctx: Context): Link = runCatching {
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return Link(0, null, false)

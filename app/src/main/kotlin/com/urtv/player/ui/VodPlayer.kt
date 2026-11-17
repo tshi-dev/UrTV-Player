@@ -140,7 +140,7 @@ fun VodPlayerScreen(app: UrtvApp, items: List<VodPlay>, start: Int, startMs: Lon
         if (sub.isNotBlank()) SubtitleText(sub, app.store, Modifier.align(Alignment.BottomCenter).padding(bottom = 260.dp, start = 240.dp, end = 240.dp))
         Box(Modifier.align(Alignment.Center)) {
             when {
-                status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); Text(stringResource(R.string.press_ok_retry), style = T.small) }
+                status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); val fr by ctrl.failure.collectAsState(); FailureText(fr, Modifier.padding(top = 8.dp)); Text(stringResource(R.string.press_ok_retry), style = T.small) }
                 status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Text(stringResource(R.string.reconnecting, attempt, com.urtv.player.player.PlayerController.MAX_ATTEMPTS), style = T.body) }
                 status == PlayStatus.Loading -> Spinner()
                 paused -> Text("❚❚", style = T.display)

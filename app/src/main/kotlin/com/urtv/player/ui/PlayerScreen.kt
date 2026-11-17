@@ -190,7 +190,7 @@ fun PlayerScreen(app: UrtvApp, queue: List<Channel>, start: Channel, onExit: (Ch
         Box(Modifier.align(Alignment.Center)) {
             when {
                 blocked -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Glyph.Lock, C.muted, 72); Spacer(Modifier.height(12.dp)); Text(stringResource(R.string.group_locked), style = T.title); Text(stringResource(R.string.press_ok_unlock), style = T.small) }
-                status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); WhyLine(cause, ctrl.lastHttpStatus); Text(stringResource(R.string.press_ok_retry), style = T.small) }
+                status == PlayStatus.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(R.string.play_failed), style = T.title); val fr by ctrl.failure.collectAsState(); FailureText(fr, Modifier.padding(top = 8.dp)); if (fr == com.urtv.player.core.FailureReason.Reason.None) WhyLine(cause, ctrl.lastHttpStatus); Text(stringResource(R.string.press_ok_retry), style = T.small) }
                 status == PlayStatus.Reconnecting -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); Spacer(Modifier.height(10.dp)); WhyLine(cause, ctrl.lastHttpStatus) }
                 status == PlayStatus.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Spinner(); WhyLine(cause, ctrl.lastHttpStatus) }
                 paused -> Text("❚❚", style = T.display)
@@ -406,6 +406,24 @@ private fun ListsPicker(app: UrtvApp, pid: String, key: String, onBack: () -> Un
 }
 
 /** One careful sentence naming the likely cause of choppy playback (nothing when there is none). */
+/** The reason a stream or a list failed, as one clear sentence and the next step (Arabic first). */
+@Composable
+fun FailureText(r: com.urtv.player.core.FailureReason.Reason, modifier: Modifier = Modifier) {
+    val (t, h) = when (r) {
+        com.urtv.player.core.FailureReason.Reason.Rejected -> R.string.fail_rejected to R.string.fail_rejected_h
+        com.urtv.player.core.FailureReason.Reason.Missing -> R.string.fail_missing to R.string.fail_missing_h
+        com.urtv.player.core.FailureReason.Reason.Busy -> R.string.fail_busy to R.string.fail_busy_h
+        com.urtv.player.core.FailureReason.Reason.Server -> R.string.fail_server to R.string.fail_server_h
+        com.urtv.player.core.FailureReason.Reason.Slow -> R.string.fail_slow to R.string.fail_slow_h
+        com.urtv.player.core.FailureReason.Reason.Offline -> R.string.fail_offline to R.string.fail_offline_h
+        com.urtv.player.core.FailureReason.Reason.Unreachable -> R.string.fail_unreachable to R.string.fail_unreachable_h
+        com.urtv.player.core.FailureReason.Reason.Format -> R.string.fail_format to R.string.fail_format_h
+        com.urtv.player.core.FailureReason.Reason.Decoder -> R.string.fail_decoder to R.string.fail_decoder_h
+        com.urtv.player.core.FailureReason.Reason.None -> return
+    }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) { Text(stringResource(t), style = T.bodyBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center); Text(stringResource(h), style = T.small, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+}
+
 @Composable
 fun WhyLine(cause: com.urtv.player.core.Diagnosis.Cause, httpStatus: Int, inline: Boolean = false) {
     val t = when (cause) {

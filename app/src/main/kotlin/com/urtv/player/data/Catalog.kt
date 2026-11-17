@@ -23,6 +23,8 @@ data class CatalogState(
     val index: ChannelIndex = ChannelIndex.EMPTY,
     val loading: Boolean = false,
     val error: LoadError? = null,
+    /** Why the last load failed (login rejected, server fault, no network…): the screen says it in words. */
+    val errorReason: com.urtv.player.core.FailureReason.Reason = com.urtv.player.core.FailureReason.Reason.None,
     val epgLoading: Boolean = false,
     /** True once the first answer is in (cache read or network try finished). Until then the UI shows skeleton rows, never an empty-state flash. */
     val settled: Boolean = false,
@@ -35,6 +37,7 @@ data class CatalogState(
 data class LoadTimings(val fetchParseMs: Long = 0, val cacheWriteMs: Long = 0, val channels: Int = 0)
 
 class Catalog(ctx: Context, private val store: Store, private val scope: CoroutineScope) {
+    private val ctxApp = ctx.applicationContext
     @Volatile var timings = LoadTimings(); private set
     private val dir = File(ctx.filesDir, "cache").apply { mkdirs() }
     private val _state = MutableStateFlow(CatalogState())
@@ -57,7 +60,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
             val stale = !cacheFile.exists() || cached.isEmpty() || (maxAgeMs > 0 && System.currentTimeMillis() - cacheFile.lastModified() > maxAgeMs)
             var epgUrls = emptyList<String>()
             if (force || stale) {
-                _state.value = _state.value.copy(loading = true, error = null)
+                _state.value = _state.value.copy(loading = true, error = null, errorReason = com.urtv.player.core.FailureReason.Reason.None)
                 val t0 = System.currentTimeMillis()
                 val r = withContext(Dispatchers.IO) { runCatching { fetch(def) } }
                 r.onSuccess { (list, urls) ->
@@ -75,7 +78,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     Diag.record(it)
-                    _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Network else null)
+                    _state.value = _state.value.copy(loading = false, settled = true, error = if (cached.isEmpty()) LoadError.Network else null, errorReason = com.urtv.player.core.FailureReason.ofError(it, com.urtv.player.player.NetInfo.online(ctxApp)))
                 }
             } else _state.value = _state.value.copy(loading = false, settled = true)
             if (android.os.Build.FINGERPRINT != "robolectric") kotlinx.coroutines.delay(3_000)       // the guide waits until the screen has settled: it is the heaviest background job

@@ -32,6 +32,8 @@ data class VodState(
     val rows: Int = 0,
     /** Films and series first seen in the last days (not on the very first load): the «جديد» badge. */
     val fresh: Int = 0,
+    /** Why the last refresh failed, in terms a person can act on. */
+    val reason: com.urtv.player.core.FailureReason.Reason = com.urtv.player.core.FailureReason.Reason.None,
 ) { val any get() = movieCount > 0 || seriesCount > 0 }
 
 /**
@@ -39,6 +41,8 @@ data class VodState(
  * diff, so a 150 000-film account never sits in memory and never shows a 0 % screen. Details load on demand.
  */
 class Vod(ctx: Context, private val store: Store, private val scope: CoroutineScope, val db: VodDb = VodDb(ctx)) {
+    private val ctxApp = ctx.applicationContext
+    @Volatile private var lastError: Throwable? = null
     private val dir = File(ctx.filesDir, "cache").apply { mkdirs() }
     private val _state = MutableStateFlow(VodState())
     val state: StateFlow<VodState> = _state
@@ -77,13 +81,13 @@ class Vod(ctx: Context, private val store: Store, private val scope: CoroutineSc
             val ok = withContext(Dispatchers.IO) {
                 val m = if (VodRow.MOVIE in kinds) runCatching { refreshKind(def, acc, VodRow.MOVIE) { skipped || !isActive } } else null
                 val sr = if (VodRow.SERIES in kinds) runCatching { refreshKind(def, acc, VodRow.SERIES) { skipped || !isActive } } else null
-                (m?.exceptionOrNull() ?: sr?.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it) }
+                (m?.exceptionOrNull() ?: sr?.exceptionOrNull())?.let { if (it is kotlinx.coroutines.CancellationException) throw it; Diag.record(it); lastError = it }
                 val good = m?.isSuccess == true || sr?.isSuccess == true
                 if (good && kinds.size == 2) db.setMeta(def.id, "checked", System.currentTimeMillis().toString())
                 good
             }
             if (!ok) fetched -= def.id      // nothing came: the next visit to the tab asks again
-            _state.value = snap(def.id).copy(loading = false, failed = !ok && !_state.value.any, doneCats = 0, totalCats = 0, current = "")
+            _state.value = snap(def.id).copy(loading = false, failed = !ok && !_state.value.any, doneCats = 0, totalCats = 0, current = "", reason = if (ok) com.urtv.player.core.FailureReason.Reason.None else com.urtv.player.core.FailureReason.ofError(lastError, com.urtv.player.player.NetInfo.online(ctxApp)))
         }
     }
 
