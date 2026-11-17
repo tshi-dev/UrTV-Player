@@ -392,6 +392,7 @@
     <string name="assess_send">Send a report</string>
     <string name="assess_reset">Reset measurements</string>
     <string name="assess_privacy">Numbers only: no links, list names or account data. Nothing is sent unless you scan the report code</string>
+    <string name="assess_note">The rating thresholds are first estimates and will be tuned from beta reports</string>
     <string name="rate_good">Good</string>
     <string name="rate_fair">Fair</string>
     <string name="rate_poor">Poor</string>

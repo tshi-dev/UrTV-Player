@@ -213,3 +213,9 @@ Live stability (what UrTVPerf separates: `rebuffers=` is the network or the prov
 - Settings «جودة أثبت»: up to 720p, quality only goes up after 25 s and only to what half of the measured bandwidth carries, and a deeper base buffer.
 
 Films and series player: seeking moves a marker on the bar (with the offset), the picture jumps once a moment after the last press or at OK (no seek per key press); hold OK on a remote card (or press Menu) is read as a long press; subtitle size is a real setting (small/normal/large/huge) and follows the TV's caption scale (the old fixed 34 sp title size was the «huge» subtitle).
+
+### v0.9.16 beta16 and beta17: the beta channel
+
+- Beta builds (a version name with a suffix) measure themselves on the device: timings, buffering, dropped frames, decoder errors, failure types, memory, crashes and ANRs. Settings > About > «تقييم الأداء» rates each area good / fair / poor; «أرسل تقرير» shows a QR with `Channel: beta`. Numbers and fixed words only, passed through an allow-list.
+- The first thresholds (core `Assessment`): cold start good up to 1.5 s, fair up to 3 s; tab open p90 150 / 400 ms; first picture p90 1.5 / 3 s; stalls per hour 2 / 8; dropped frames per minute 5 / 30; stream failures per 100 plays 2 / 8; memory 60 / 80 percent of the heap limit. They are estimates: they will be tuned from beta reports.
+- In-app updates: Settings > About > «النسخ التجريبية» (off by default) also reads the rolling `beta` pre-release (urtv-player-beta.apk, .apk.sha256, .version). Never a downgrade: only a higher versionCode is offered.

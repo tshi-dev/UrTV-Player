@@ -392,6 +392,7 @@
     <string name="assess_send">أرسل تقرير</string>
     <string name="assess_reset">تصفير القياسات</string>
     <string name="assess_privacy">أرقام فقط: لا روابط ولا أسماء قوائم ولا بيانات حساب. لا يُرسَل شيء إلا إذا مسحتَ رمز التقرير</string>
+    <string name="assess_note">حدود التقييم أولية وسنضبطها من تقارير النسخ التجريبية</string>
     <string name="rate_good">جيد</string>
     <string name="rate_fair">مقبول</string>
     <string name="rate_poor">ضعيف</string>

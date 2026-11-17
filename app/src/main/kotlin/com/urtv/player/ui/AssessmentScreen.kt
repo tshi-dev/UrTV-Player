@@ -70,6 +70,7 @@ fun AssessmentScreen(app: UrtvApp, onReport: () -> Unit, onBack: () -> Unit) {
             TvButton(stringResource(R.string.fm_back), onBack)
         }
         Text(stringResource(R.string.assess_privacy), style = T.tiny, modifier = Modifier.padding(top = 12.dp))
+        Text(stringResource(R.string.assess_note), style = T.tiny, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
