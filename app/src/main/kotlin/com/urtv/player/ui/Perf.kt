@@ -8,7 +8,7 @@ import android.util.Log
  */
 object Perf {
     const val TAG = "UrTVPerf"
-    fun log(what: String, ms: Long, note: String = "") { val l = "$what ${ms} ms" + if (note.isEmpty()) "" else " ($note)"; Log.i(TAG, l); PerfLogBuffer.add(l) }
+    fun log(what: String, ms: Long, note: String = "") { val l = "$what ${ms} ms" + if (note.isEmpty()) "" else " ($note)"; Log.i(TAG, l); PerfLogBuffer.add(l); com.urtv.player.data.Metrics.timing(what, ms) }
     /** A free-form line (also shown in the in-app log). */
     fun line(text: String) { Log.i(TAG, text); PerfLogBuffer.add(text) }
     /** Logs how long it takes until the second frame is drawn after now. Uses the platform Choreographer, not Compose's frame clock: a pending Compose frame request would keep the UI tests from ever being idle. */

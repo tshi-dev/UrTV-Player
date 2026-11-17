@@ -51,10 +51,18 @@ private fun collect(app: UrtvApp): Report.Info {
     )
 }
 
+/** The beta build's performance report (numbers and fixed words only, `Channel: beta`): the same QR page as the other reports. */
+private fun betaStep(app: UrtvApp): ShareStep.Code {
+    val lowRam = (app.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    val text = com.urtv.player.core.BetaReport.build(com.urtv.player.data.Metrics.snapshot(), com.urtv.player.core.BetaReport.Device(com.urtv.player.BuildConfig.VERSION_NAME.removeSuffix("-debug"),
+        when (app.integrity) { Integrity.Status.Official -> "official"; Integrity.Status.Debug -> "debug"; else -> "unofficial" }, android.os.Build.VERSION.RELEASE.orEmpty(), android.os.Build.VERSION.SDK_INT, android.os.Build.MODEL.orEmpty(), if (lowRam) "low" else "normal"))
+    return ShareStep.Code(text, Report.link(text))
+}
+
 /** Settings > About > «Report or suggestion»: choose, pick a topic, then a QR. No typing, no network call from the Player. */
 @Composable
-fun ShareScreen(app: UrtvApp, onDone: () -> Unit) {
-    var step by remember { mutableStateOf<ShareStep>(ShareStep.Choice) }
+fun ShareScreen(app: UrtvApp, beta: Boolean = false, onDone: () -> Unit) {
+    var step by remember { mutableStateOf<ShareStep>(if (beta) betaStep(app) else ShareStep.Choice) }
     var kind by remember { mutableStateOf(Report.Kind.Problem) }
     BackHandler { if (step is ShareStep.Choice) onDone() else step = if (step is ShareStep.Code && kind == Report.Kind.Problem) ShareStep.Topic else ShareStep.Choice }
     fun show(topic: String) {

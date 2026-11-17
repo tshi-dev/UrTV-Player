@@ -52,4 +52,14 @@ class WorkflowHygieneTest {
         assertFalse(Regex("""Log\.|println|Diag\.""").containsMatchIn(client), "the client never writes anything that could hold its URL")
         assertTrue(src.walkTopDown().filter { it.extension == "kt" }.none { f -> Regex("""[0-9a-f]{32}""").containsMatchIn(f.readText().lines().filter { it.contains("api_key") }.joinToString()) }, "no key in the sources")
     }
+
+    @Test fun theRollingBetaChannelIsAPreReleaseFilledOnlyByBetaBuildsAndKeptWhenOldReleasesAreCleaned() {
+        val w = files.first { it.name == "build.yml" }.readText()
+        val step = w.substringAfter("name: Update the rolling beta channel").substringBefore("- name: Keep only the newest release")
+        assertTrue("contains(env.TAG, '-')" in step, "only a tag with a suffix (a beta) fills it")
+        assertTrue("--prerelease" in step && "--latest" !in step, "never «latest»")
+        assertTrue("urtv-player-beta.apk" in step && "urtv-player-beta.apk.sha256" in step && "urtv-player-beta.version" in step && "--clobber" in step)
+        assertTrue("secrets." !in step, "the step needs no secret")
+        assertTrue("[ \"\$t\" = \"beta\" ] && continue" in w.substringAfter("name: Keep only the newest release"), "a stable release must not delete the beta channel")
+    }
 }

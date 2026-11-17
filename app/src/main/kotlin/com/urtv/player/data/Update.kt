@@ -61,7 +61,11 @@ object Update {
      * UrTV is the authority when it is installed and answers. Only when it is NOT there does the Player look for its own update, and
      * only if this build may self-update (official, release-signed). [lookup] is never called otherwise. Pure, unit-tested.
      */
-    fun decide(urtv: State, selfAllowed: Boolean, lookup: () -> com.urtv.player.core.SelfUpdate.Release?): State {
+    fun decide(urtv: State, selfAllowed: Boolean, lookup: () -> com.urtv.player.core.SelfUpdate.Release?): State = decide(urtv, selfAllowed, false, lookup)
+
+    fun decide(urtv: State, selfAllowed: Boolean, beta: Boolean, lookup: () -> com.urtv.player.core.SelfUpdate.Release?): State {
+        // the beta channel is the Player's own path even when UrTV is installed (UrTV only knows the stable release)
+        if (beta && selfAllowed) lookup()?.let { rel -> return State(Kind.Available, Offer(rel.code.toInt(), rel.version, "", Via.Self, rel.apkUrl, rel.shaUrl)) }
         if (urtv.kind != Kind.NoUrtv) return urtv
         if (!selfAllowed) return State(Kind.UpToDate)
         val rel = lookup() ?: return State(Kind.UpToDate)

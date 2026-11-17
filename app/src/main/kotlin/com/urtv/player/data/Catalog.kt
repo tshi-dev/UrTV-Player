@@ -71,6 +71,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                         val t1 = System.currentTimeMillis()
                         withContext(Dispatchers.IO) { writeCache(cacheFile, list) }
                         timings = LoadTimings(t1 - t0, System.currentTimeMillis() - t1, list.size)
+                        Metrics.playlist(t1 - t0, list.size)
                     }
                 }.onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
@@ -137,6 +138,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
     }
 
     private suspend fun loadEpg(def: PlaylistDef, fetchNew: Boolean, urlsFromPlaylist: List<String>) {
+        val epgT0 = System.currentTimeMillis()
         val file = epgFile(def.id)
         val urlFile = File(dir, "epgurls_${def.id}.txt")
         if (urlsFromPlaylist.isNotEmpty()) runCatching { Secrets.writeText(urlFile, urlsFromPlaylist.joinToString("\n")) }
@@ -167,6 +169,7 @@ class Catalog(ctx: Context, private val store: Store, private val scope: Corouti
                 }
             }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Throwable) { /* guide is optional (also when memory runs out: the app keeps running without it) */ }
+        if (_epg.value !== EpgIndex.EMPTY) Metrics.epg(System.currentTimeMillis() - epgT0)
         _state.value = _state.value.copy(epgLoading = false)
     }
 

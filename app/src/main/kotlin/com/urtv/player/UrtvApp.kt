@@ -43,6 +43,19 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     var schemaTooNew by mutableStateOf(false)
     /** What UrTV last said about a newer Player (cached; asked at most once a day). */
     var update by mutableStateOf(com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.UpToDate))
+    /** Why the last check offered nothing (shown under «check for updates»); null before the first check. */
+    var updateReason by mutableStateOf<com.urtv.player.core.SelfUpdate.Reason?>(null)
+
+    /** One update check (the daily one and the manual one): the beta switch decides whether the rolling beta counts. Blocking: off the main thread. */
+    fun checkForUpdate() {
+        val sp = getSharedPreferences("urtv", MODE_PRIVATE)
+        val beta = store.betaChannel.value
+        var reason: com.urtv.player.core.SelfUpdate.Reason? = null
+        val s = com.urtv.player.data.Update.decide(com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE), com.urtv.player.data.SelfUpdater.allowed(true), beta) {
+            val c = com.urtv.player.data.SelfUpdater.check(BuildConfig.VERSION_CODE.toLong(), BuildConfig.VERSION_NAME, beta); reason = c.reason; c.release
+        }
+        com.urtv.player.data.Update.save(sp, s, System.currentTimeMillis()); update = s; updateReason = reason
+    }
     /** True only on the very first start in Auto language, until UrTV's answer (or a short timeout) is in: the content stays behind a static splash. */
     var langGate by mutableStateOf(false)
     /** Text to put in the channel search when the app is brought up (FIND_MATCH's «search channels»); in-process only, never from an intent. */
@@ -72,7 +85,10 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         com.urtv.player.phone.PhoneServer.logger = { android.util.Log.i("UrtvPhone", it) }
-        Thread.getDefaultUncaughtExceptionHandler().let { prev -> Thread.setDefaultUncaughtExceptionHandler { t, e -> com.urtv.player.data.Diag.record(e); prev?.uncaughtException(t, e) } }   // class names only, kept in memory
+        // beta builds measure themselves (numbers only, on the device): see Metrics
+        com.urtv.player.data.Metrics.enabled = com.urtv.player.core.SelfUpdate.isPre(BuildConfig.VERSION_NAME.removeSuffix("-debug"))
+        com.urtv.player.data.Metrics.load(this)
+        Thread.getDefaultUncaughtExceptionHandler().let { prev -> Thread.setDefaultUncaughtExceptionHandler { t, e -> com.urtv.player.data.Diag.record(e); com.urtv.player.data.Metrics.crash(this, e); prev?.uncaughtException(t, e) } }   // class names only, kept in memory
         store = Store(this)                                    // preferences only: cheap
         val sp = getSharedPreferences("urtv", MODE_PRIVATE)
         schemaTooNew = com.urtv.player.data.Schema.check(sp) == com.urtv.player.data.Schema.Status.TooNew
@@ -82,14 +98,14 @@ class UrtvApp : Application(), coil3.SingletonImageLoader.Factory {
         Thread({
             store.loadHeavy(); integrity = com.urtv.player.data.Integrity.check(this)
             com.urtv.player.data.SelfUpdater.cleanup(this)
+            com.urtv.player.data.Metrics.readExits(this)
             // updates: only the official build, at most once a day, a few seconds after start, never while something plays
             if (integrity == com.urtv.player.data.Integrity.Status.Official && !schemaTooNew) {
                 Thread.sleep(5000)
                 val now = System.currentTimeMillis()
                 if (com.urtv.player.data.Update.due(sp.getLong("upd_last", 0), now) && !PlayerController.active) {
                     // UrTV answers: it is the authority. UrTV absent: the Player looks for its own update on GitHub's release host (same daily limit)
-                    val s = com.urtv.player.data.Update.decide(com.urtv.player.data.Update.read(this, BuildConfig.VERSION_CODE), com.urtv.player.data.SelfUpdater.allowed(true)) { com.urtv.player.data.SelfUpdater.lookup(BuildConfig.VERSION_CODE.toLong(), BuildConfig.VERSION_NAME) }
-                    com.urtv.player.data.Update.save(sp, s, now); update = s
+                    checkForUpdate()
                 }
             }
         }, "load-store").start()     // Keystore, encrypted files, the certificate check and the daily update question, off the main thread     // Keystore, encrypted files and the certificate check, off the main thread

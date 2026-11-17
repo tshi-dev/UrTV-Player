@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -72,6 +73,10 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
     var selfOffer by remember { mutableStateOf<com.urtv.player.data.Update.Offer?>(null) }
     selfOffer?.let { o -> SelfUpdateScreen(app, o) { selfOffer = null }; return }
     var share by remember { mutableStateOf(false) }
+    var assess by remember { mutableStateOf(false) }
+    var shareBeta by remember { mutableStateOf(false) }
+    if (shareBeta) { ShareScreen(app, beta = true) { shareBeta = false }; return }
+    if (assess) { AssessmentScreen(app, onReport = { shareBeta = true }) { assess = false }; return }
     if (share) { ShareScreen(app) { share = false }; return }
     val offsets by store.epgOffsetMin.collectAsState()
     val start by store.startScreen.collectAsState()
@@ -178,7 +183,9 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                         Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted))
                         Text(stringResource(R.string.about_version, com.urtv.player.BuildConfig.VERSION_NAME), style = T.bodyBold)
                         UpdateRow(app) { selfOffer = it }
+                        if (app.integrity == com.urtv.player.data.Integrity.Status.Official) BetaRows(app)
                         Setting(stringResource(R.string.share_row), "", stringResource(R.string.share_row_hint)) { share = true }
+                        if (com.urtv.player.data.Metrics.enabled) Setting(stringResource(R.string.assess_title), "", stringResource(R.string.assess_hint)) { assess = true }
                         Setting(stringResource(R.string.perf_log_title), "", stringResource(R.string.perf_log_hint)) { perfLog = true }
                         when (app.integrity) {
                             com.urtv.player.data.Integrity.Status.Official -> Text(stringResource(R.string.about_official), style = T.body.copy(color = C.accent))
@@ -310,3 +317,26 @@ private fun UpdateRow(app: UrtvApp, onSelf: (com.urtv.player.data.Update.Offer) 
         else -> Unit
     }
 }
+
+/** «النسخ التجريبية»: off by default; on = the Player also looks at the rolling beta release. «تحقق الآن» says plainly why nothing is offered. */
+@Composable
+private fun BetaRows(app: UrtvApp) {
+    val on by app.store.betaChannel.collectAsState()
+    var busy by remember { mutableStateOf(false) }
+    val sc = androidx.compose.runtime.rememberCoroutineScope()
+    fun check() { if (busy) return; busy = true; sc.launch { withContext(kotlinx.coroutines.Dispatchers.IO) { app.checkForUpdate() }; busy = false } }
+    Setting(stringResource(R.string.beta_channel), stringResource(if (on) R.string.on else R.string.off), stringResource(R.string.beta_channel_hint)) { app.store.setBetaChannel(!on); check() }
+    Setting(stringResource(R.string.upd_check), "", if (busy) stringResource(R.string.upd_checking) else updateReasonText(app.updateReason, on)) { check() }
+}
+
+@Composable
+private fun updateReasonText(r: com.urtv.player.core.SelfUpdate.Reason?, beta: Boolean): String = stringResource(when (r) {
+    null -> R.string.upd_check_hint
+    com.urtv.player.core.SelfUpdate.Reason.Newer -> R.string.upd_reason_newer
+    com.urtv.player.core.SelfUpdate.Reason.UpToDate -> R.string.upd_reason_uptodate
+    com.urtv.player.core.SelfUpdate.Reason.OnNewestBeta -> R.string.upd_reason_newest_beta
+    com.urtv.player.core.SelfUpdate.Reason.NoBetaYet -> R.string.upd_reason_no_beta
+    com.urtv.player.core.SelfUpdate.Reason.NoDowngrade -> R.string.upd_reason_no_downgrade
+    com.urtv.player.core.SelfUpdate.Reason.Network -> R.string.upd_reason_network
+    com.urtv.player.core.SelfUpdate.Reason.Unreadable -> R.string.upd_reason_unreadable
+})

@@ -107,6 +107,13 @@ object SelfUpdater {
     /** Leftovers of an interrupted update (call at start, off the main thread). */
     fun cleanup(ctx: Context) { runCatching { dir(ctx).listFiles()?.forEach { it.delete() } } }
 
+    private fun fetched(dl: SelfDownloader, url: String): SelfUpdate.Fetched = try { SelfUpdate.Fetched(text = dl.text(url, SelfUpdate.MAX_VERSION_BYTES)) }
+        catch (e: IOException) { if (e.message == "http 404") SelfUpdate.Fetched(notFound = true) else SelfUpdate.Fetched(failed = true) } catch (_: Throwable) { SelfUpdate.Fetched(failed = true) }
+
+    /** The decision with its reason: the stable release and, with the beta switch on, the rolling beta; never a downgrade. Blocking. */
+    fun check(installedCode: Long, installedName: String, beta: Boolean, dl: SelfDownloader = SelfDownloader(), stableUrl: String = SelfUpdate.VERSION_URL, betaUrl: String = SelfUpdate.BETA_VERSION_URL): SelfUpdate.Choice =
+        SelfUpdate.choose(fetched(dl, stableUrl), if (beta) fetched(dl, betaUrl) else null, installedCode, installedName)
+
     /** The daily question: the version asset of the latest release says something newer, or null (also on any failure: quiet, asked again tomorrow). Blocking. */
     fun lookup(installedCode: Long, installedName: String, dl: SelfDownloader = SelfDownloader()): SelfUpdate.Release? = runCatching {
         SelfUpdate.parseVersion(dl.text(SelfUpdate.VERSION_URL, SelfUpdate.MAX_VERSION_BYTES), installedCode, installedName)

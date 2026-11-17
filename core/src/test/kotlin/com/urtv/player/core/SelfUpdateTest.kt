@@ -53,4 +53,33 @@ class SelfUpdateTest {
         assertEquals(Check.NoSigner, c(signers = emptyList()))
         assertEquals(Check.WrongSigner, c(pin = ""), "a build without a pinned certificate never accepts an update")
     }
+
+    // ---- the beta channel
+    @Test fun aFinalVersionIsNewerThanItsOwnBetaAndBetaNamesParse() {
+        assertTrue(SelfUpdate.isNewer("0.9.16", "0.9.16-beta15")); assertFalse(SelfUpdate.isNewer("0.9.16-beta15", "0.9.16")); assertFalse(SelfUpdate.isNewer("0.9.16-beta16", "0.9.16-beta15"), "betas are ordered by code, not name")
+        assertEquals("0.9.16-beta15" to 172L, SelfUpdate.peek("172 0.9.16-beta15")?.let { it.second to it.first }); assertNull(SelfUpdate.peek("172 0.9.16-be ta")); assertNull(SelfUpdate.peek("<html>"))
+        assertEquals(SelfUpdate.BETA_APK_URL, SelfUpdate.parseBeta("173 0.9.16-beta16", 172)?.apkUrl); assertNull(SelfUpdate.parseBeta("172 0.9.16-beta15", 172)); assertNull(SelfUpdate.parseBeta("170 0.9.16-beta14", 172))
+        assertTrue(SelfUpdate.hostAllowed(SelfUpdate.BETA_APK_URL) && SelfUpdate.hostAllowed(SelfUpdate.BETA_VERSION_URL) && SelfUpdate.hostAllowed(SelfUpdate.BETA_SHA_URL))
+    }
+
+    private fun f(t: String?, notFound: Boolean = false, failed: Boolean = false) = SelfUpdate.Fetched(t, notFound, failed)
+    @Test fun theNewestOfStableAndBetaWinsAndNothingEverDowngrades() {
+        // beta on, beta newer than stable
+        assertEquals(173L, SelfUpdate.choose(f("150 0.9.15"), f("173 0.9.16-beta16"), 172, "0.9.16-beta15").release?.code)
+        // beta on, a stable that is newer than the beta
+        assertEquals(180L, SelfUpdate.choose(f("180 0.9.16"), f("173 0.9.16-beta16"), 172, "0.9.16-beta15").release?.code)
+        // beta off: only stable is looked at, and a stable older than the installed beta is never offered
+        val off = SelfUpdate.choose(f("150 0.9.15"), null, 172, "0.9.16-beta15")
+        assertNull(off.release); assertEquals(SelfUpdate.Reason.NoDowngrade, off.reason)
+        // beta off while a beta is installed and a newer stable exists: offered (code and name both higher)
+        assertEquals(180L, SelfUpdate.choose(f("180 0.9.16"), null, 172, "0.9.16-beta15").release?.code)
+    }
+    @Test fun nothingNewerSaysWhy() {
+        assertEquals(SelfUpdate.Reason.UpToDate, SelfUpdate.choose(f("150 0.9.15"), null, 150, "0.9.15").reason)
+        assertEquals(SelfUpdate.Reason.OnNewestBeta, SelfUpdate.choose(f("150 0.9.15"), f("172 0.9.16-beta15"), 172, "0.9.16-beta15").reason)
+        assertEquals(SelfUpdate.Reason.NoBetaYet, SelfUpdate.choose(f("150 0.9.15"), f(null, notFound = true), 150, "0.9.15").reason, "the beta release has not been published yet")
+        assertEquals(SelfUpdate.Reason.Network, SelfUpdate.choose(f(null, failed = true), f(null, failed = true), 150, "0.9.15").reason)
+        assertEquals(SelfUpdate.Reason.Unreadable, SelfUpdate.choose(f("<html>error</html>"), null, 150, "0.9.15").reason)
+        assertEquals(SelfUpdate.Reason.Unreadable, SelfUpdate.choose(f("150 0.9.15"), f("garbage"), 150, "0.9.15").reason)
+    }
 }

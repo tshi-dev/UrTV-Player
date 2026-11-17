@@ -115,6 +115,8 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     /** Name of the backup entry being played instead of the chosen channel, or null. */
     val altNote: StateFlow<String?> = _altNote
 
+    private fun isOnlineNow(): Boolean = runCatching { val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager; val c = cm.getNetworkCapabilities(cm.activeNetwork); c != null && c.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) }.getOrDefault(true)
+
     private fun chanKey(c: Channel?) = c?.url?.hashCode()?.toString() ?: ""
 
     private fun errorKindOf(e: PlaybackException): Diagnosis.ErrorKind {
@@ -239,7 +241,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             _firstFrame.value = true; _videoBlock.value = ""
             LoadTrace.finish()?.let { b -> _stats.value = _stats.value.copy(trace = b.line) }
             val t = System.currentTimeMillis() - loadStartMs
-            if (loadStartMs > 0 && t in 1..60_000) { com.urtv.player.ui.Perf.line("first_frame ${t} ms${if (preview) " (preview)" else ""}"); ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
+            if (loadStartMs > 0 && t in 1..60_000) { if (!preview && !vod) com.urtv.player.data.Metrics.zap(t); com.urtv.player.ui.Perf.line("first_frame ${t} ms${if (preview) " (preview)" else ""}"); ttffAvg = (ttffAvg * ttffN + t) / (ttffN + 1); ttffN++; _stats.value = _stats.value.copy(ttffMs = t, ttffAvgMs = ttffAvg) }
         }
         override fun onPlaybackStateChanged(state: Int) {
             // a stall after playback had started: after 3 in a minute, switch to a lower variant
@@ -276,6 +278,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             com.urtv.player.data.Diag.playerError(e.errorCodeName, e)
             com.urtv.player.ui.Perf.line("player error ${e.errorCodeName} http=${lastHttpStatus} attempt=${_attempt.value}")
             errorKind = errorKindOf(e)
+            if (errorKind == Diagnosis.ErrorKind.Decoder && !preview) com.urtv.player.data.Metrics.decoderError()
             // Playlists often serve HLS from extension-less URLs: retry once as HLS before treating it as an outage.
             val c = current
             if (c != null && !forceHls && e.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) { forceHls = true; load(c); return }
@@ -297,9 +300,10 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private fun perfSecond(p: ExoPlayer) {
         if (preview) return
         val buffering = p.playbackState == Player.STATE_BUFFERING && readySince
-        if (buffering && !perfLastBuffering) perfRebuffers++
+        if (buffering && !perfLastBuffering) { perfRebuffers++; com.urtv.player.data.Metrics.rebuffer() }
         perfLastBuffering = buffering
         perfDropped += droppedPerSec.toInt()
+        if (buffering || p.isPlaying) com.urtv.player.data.Metrics.second(buffering, droppedPerSec.toInt())
         if (++perfSecs < 10) return
         val f = p.videoFormat
         com.urtv.player.ui.Perf.line("playback 10s: rebuffers=$perfRebuffers dropped=$perfDropped decoder=${lastDecoder.ifEmpty { "none" }} ${f?.sampleMimeType?.removePrefix("video/") ?: "audio"} ${f?.width ?: 0}x${f?.height ?: 0}@${(f?.frameRate ?: measuredFps).toInt()}fps stream=${((f?.bitrate ?: 0) / 1000)}kbps received=${((meter?.bitrateEstimate ?: 0L) / 1000)}kbps buffered=${p.totalBufferedDuration}ms")
@@ -449,6 +453,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         val p = player!!
         active = true
         loadStartMs = System.currentTimeMillis(); readySince = false
+        if (_attempt.value == 0 && !preview) com.urtv.player.data.Metrics.play()
         if (_attempt.value == 0) { rebuffers.reset(); p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoBitrate(Int.MAX_VALUE).build(); _stats.value = _stats.value.copy(capped = false) }
         p.volume = if (preview || commentaryMuted) 0f else 1f
         _status.value = if (_attempt.value > 0) PlayStatus.Reconnecting else PlayStatus.Loading
@@ -483,7 +488,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
         if (vod) player?.currentPosition?.takeIf { it > 0 }?.let { startAtMs = it }
         val n = _attempt.value + 1
         _attempt.value = n
-        if (n > (if (preview) 1 else MAX_ATTEMPTS)) { _status.value = PlayStatus.Failed; player?.stop(); return }
+        if (n > (if (preview) 1 else MAX_ATTEMPTS)) { if (!preview) com.urtv.player.data.Metrics.failure(let { com.urtv.player.core.FailureReason.of(errorKind, lastHttpStatus, isOnlineNow()).name }); _status.value = PlayStatus.Failed; player?.stop(); return }
         _status.value = PlayStatus.Reconnecting
         retryJob?.cancel()
         // first retry of a live stream: ask the same source again on the same player (new connection, decoder and picture kept) before tearing everything down

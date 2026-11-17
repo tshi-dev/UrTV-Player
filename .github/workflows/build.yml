@@ -183,6 +183,23 @@ jobs:
           printf '%s\n\n%s\n\nالتوقيع: %s\n' "$ar" "$en" "$sig" > release-notes.txt
           gh release create "$TAG" urtv-player.apk urtv-player.apk.sha256 urtv-player.version "urtv-player-${ver}.apk" "urtv-player-${ver}.apk.sha256" \
             $flag --target "$GITHUB_SHA" --title "UrTV Player ${ver}" --notes-file release-notes.txt
+      - name: Update the rolling beta channel (beta builds only)
+        if: ${{ contains(env.TAG, '-') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # ONE pre-release called «beta» whose three assets every beta build replaces: the Player's «النسخ التجريبية» switch reads them (a version line, the apk and its sha256).
+          # It is a pre-release, so it never becomes "latest" and nothing that reads the stable link ever sees it.
+          ver="${TAG#v}"
+          cp urtv-player.apk urtv-player-beta.apk
+          sha256sum urtv-player-beta.apk > urtv-player-beta.apk.sha256
+          echo "${PLAYER_VERSION_CODE} ${ver}" > urtv-player-beta.version
+          if gh release view beta >/dev/null 2>&1; then
+            gh release upload beta urtv-player-beta.apk urtv-player-beta.apk.sha256 urtv-player-beta.version --clobber
+          else
+            gh release create beta urtv-player-beta.apk urtv-player-beta.apk.sha256 urtv-player-beta.version --prerelease --target "$GITHUB_SHA" \
+              --title "UrTV Player beta channel (rolling)" --notes "The newest beta build, replaced by every beta release. The Player's in-app «Beta versions» switch reads this; install the stable release from Releases otherwise."
+          fi
       - name: Keep only the newest release
         if: ${{ !contains(env.TAG, '-') }}
         env:
@@ -191,6 +208,7 @@ jobs:
           # the new plain version is published: remove every older release together with its tag
           for t in $(gh release list --limit 200 --json tagName --jq '.[].tagName'); do
             [ "$t" = "$TAG" ] && continue
+            [ "$t" = "beta" ] && continue          # the rolling beta channel stays
             gh release delete "$t" --cleanup-tag -y || echo "::warning::could not delete $t"
           done
       - name: Remove the key
