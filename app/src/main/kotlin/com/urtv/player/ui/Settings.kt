@@ -181,7 +181,7 @@ fun SettingsScreen(app: UrtvApp, onAdd: () -> Unit, onLanguage: () -> Unit, onMa
                 Section.About -> item {
                     Column(Modifier.padding(horizontal = 12.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(stringResource(R.string.about_text), style = T.body.copy(color = C.muted))
-                        Text(stringResource(R.string.about_version, com.urtv.player.BuildConfig.VERSION_NAME), style = T.bodyBold)
+                        Text(stringResource(R.string.about_version, ltr(com.urtv.player.BuildConfig.VERSION_NAME)), style = T.bodyBold)
                         UpdateRow(app) { selfOffer = it }
                         if (app.integrity == com.urtv.player.data.Integrity.Status.Official) BetaRows(app)
                         Setting(stringResource(R.string.share_row), "", stringResource(R.string.share_row_hint)) { share = true }
@@ -309,7 +309,7 @@ private fun UpdateRow(app: UrtvApp, onSelf: (com.urtv.player.data.Update.Offer) 
     when {
         handed -> Text(stringResource(R.string.upd_handed), style = T.body.copy(color = C.accent))
         u.kind == com.urtv.player.data.Update.Kind.Available && offer != null && app.integrity == com.urtv.player.data.Integrity.Status.Official ->
-            Setting(stringResource(R.string.upd_available, offer.name), "", offer.notes.ifBlank { stringResource(if (offer.via == com.urtv.player.data.Update.Via.Self) R.string.upd_hint_self else R.string.upd_hint) }) {
+            Setting(stringResource(R.string.upd_available, ltr(offer.name)), "", offer.notes.ifBlank { stringResource(if (offer.via == com.urtv.player.data.Update.Via.Self) R.string.upd_hint_self else R.string.upd_hint) }) {
                 if (offer.via == com.urtv.player.data.Update.Via.Self) { onSelf(offer); return@Setting }
                 val i = android.content.Intent(com.urtv.player.data.Update.ACTION_INSTALL).setPackage(com.urtv.player.data.Update.UPDATE_PACKAGE).putExtra("version_code", offer.code)
                 try { launcher.launch(i) } catch (_: Exception) { app.update = com.urtv.player.data.Update.State(com.urtv.player.data.Update.Kind.NoUrtv) }   // UrTV missing or too old to answer

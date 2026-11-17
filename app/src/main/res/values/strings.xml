@@ -370,7 +370,7 @@
     <string name="upd_reason_unreadable">ملف الإصدار غير مفهوم: حاول لاحقًا</string>
     <string name="assess_title">تقييم الأداء</string>
     <string name="assess_hint">ما قاسته هذه النسخة التجريبية على تلفازك، مع تقييم: جيد / مقبول / ضعيف</string>
-    <string name="assess_sub">النسخة %1$s · %2$s · أندرويد %3$s</string>
+    <string name="assess_sub">النسخة %1$s، %2$s، أندرويد %3$s</string>
     <string name="assess_send">أرسل تقرير</string>
     <string name="assess_reset">تصفير القياسات</string>
     <string name="assess_privacy">أرقام فقط: لا روابط ولا أسماء قوائم ولا بيانات حساب. لا يُرسَل شيء إلا إذا مسحتَ رمز التقرير</string>
@@ -390,13 +390,13 @@
     <string name="as_memory">الذاكرة</string>
     <string name="as_stability">الثبات (انهيار / تجمّد)</string>
     <string name="as_nodata">لا بيانات بعد: استخدم التطبيق قليلًا</string>
-    <string name="as_ms">%1$d مللي ثانية</string>
-    <string name="as_ms_n">%1$d مللي ثانية (%2$d قناة)</string>
-    <string name="as_zap_v">90 من كل 100 أسرع من %1$d م.ث · الوسيط %2$d م.ث</string>
-    <string name="as_buf_v">%1$d انقطاع/ساعة · من كل 100 ثانية: %2$d ثانية انتظار</string>
-    <string name="as_dropped_v">%1$d إطار/دقيقة</string>
+    <string name="as_sec">%1$s ث</string>
+    <string name="as_sec_n">%1$s ث، %2$d قناة</string>
+    <string name="as_zap_v">9 من كل 10 مرات أسرع من %1$s ث، والوسيط %2$s ث</string>
+    <string name="as_buf_v">%1$d انقطاعات في الساعة، والانتظار %2$d ثانية من كل 100 ثانية</string>
+    <string name="as_dropped_v">%1$d إطارات في الدقيقة</string>
     <string name="as_count">%1$d</string>
-    <string name="as_fail_v">%1$d لكل 100 تشغيل (%2$d إجمالًا)</string>
-    <string name="as_mem_v">%1$d من 100 من حد الذاكرة · الذروة %2$d م.ب</string>
-    <string name="as_stab_v">%1$d (تجمّد %2$d)</string>
+    <string name="as_fail_v">%1$d لكل 100 تشغيل، %2$d إجمالًا</string>
+    <string name="as_mem_v">%1$d من 100 من حد الذاكرة، والذروة %2$d ميغابايت</string>
+    <string name="as_stab_v">%1$d، منها تجمّد %2$d</string>
 </resources>
