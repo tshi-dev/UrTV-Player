@@ -54,8 +54,9 @@ class BetaChannelTest {
         assertNull(SelfUpdater.check(172, "0.9.16-beta15", true, localDl, "$base/stable", "$base/oldbeta").release)
         // no beta published: said so; server unreachable: said so
         assertEquals(SelfUpdate.Reason.NoBetaYet, SelfUpdater.check(150, "0.9.15", true, localDl, "$base/stable", "$base/missing").reason)
-        srv?.close()
-        assertEquals(SelfUpdate.Reason.Network, SelfUpdater.check(150, "0.9.15", true, localDl, "$base/stable", "$base/beta").reason)
+        // nothing listens on this port (it was opened and closed just now): the lookup fails to connect, which is «network»
+        val dead = "http://127.0.0.1:" + ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
+        assertEquals(SelfUpdate.Reason.Network, SelfUpdater.check(150, "0.9.15", true, localDl, "$dead/stable", "$dead/beta").reason)
     }
 
     @Test fun withTheBetaSwitchOnTheBetaIsOfferedEvenWhenUrtvIsInstalledAndOffIsUnchanged() {
