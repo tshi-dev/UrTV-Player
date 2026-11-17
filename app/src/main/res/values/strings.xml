@@ -392,11 +392,11 @@
     <string name="as_nodata">لا بيانات بعد: استخدم التطبيق قليلًا</string>
     <string name="as_ms">%1$d مللي ثانية</string>
     <string name="as_ms_n">%1$d مللي ثانية (%2$d قناة)</string>
-    <string name="as_zap_v">90%% أقل من %1$d م.ث · الوسيط %2$d م.ث</string>
-    <string name="as_buf_v">%1$d انقطاع/ساعة · %2$d%% من الوقت انتظار</string>
+    <string name="as_zap_v">90 من كل 100 أسرع من %1$d م.ث · الوسيط %2$d م.ث</string>
+    <string name="as_buf_v">%1$d انقطاع/ساعة · من كل 100 ثانية: %2$d ثانية انتظار</string>
     <string name="as_dropped_v">%1$d إطار/دقيقة</string>
     <string name="as_count">%1$d</string>
     <string name="as_fail_v">%1$d لكل 100 تشغيل (%2$d إجمالًا)</string>
-    <string name="as_mem_v">%1$d%% من حد الذاكرة · الذروة %2$d م.ب</string>
+    <string name="as_mem_v">%1$d من 100 من حد الذاكرة · الذروة %2$d م.ب</string>
     <string name="as_stab_v">%1$d (تجمّد %2$d)</string>
 </resources>
