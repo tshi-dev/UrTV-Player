@@ -495,6 +495,7 @@ private fun LiveTab(app: UrtvApp, cat: CatalogState, nowMs: Long, onPlay: (List<
                         if (false) { }
                         else if (cat.error != null && cat.channels.isEmpty()) {
                             Text(stringResource(when (cat.error) { LoadError.Network -> R.string.err_network; LoadError.Format -> R.string.err_format; else -> R.string.err_empty }), style = T.title)
+                            if (cat.error == LoadError.Network) FailureText(cat.errorReason, Modifier.padding(top = 8.dp))
                             Spacer(Modifier.height(20.dp)); TvButton(stringResource(R.string.retry), { app.catalog.refreshActive() }, primary = true)
                         } else Text(stringResource(when { query.isNotBlank() -> R.string.no_results; group == Browse.FAV -> R.string.empty_favs; group == Browse.RECENT -> R.string.empty_recents; else -> R.string.empty_group }), style = T.body.copy(color = C.muted), modifier = Modifier.width(520.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }

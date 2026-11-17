@@ -356,4 +356,22 @@
     <string name="pos_bl">أسفل اليسار</string>
     <string name="pos_bc">أسفل الوسط</string>
     <string name="pos_br">أسفل اليمين</string>
+    <string name="fail_rejected">رفض الخادم الدخول</string>
+    <string name="fail_rejected_h">تحقّق من أن الاشتراك ساري ومن عدد الأجهزة المتصلة بالحساب</string>
+    <string name="fail_missing">هذا العنصر غير موجود على الخادم</string>
+    <string name="fail_missing_h">ربما حُذف من القائمة: جرّب تحديثها أو اختر غيره</string>
+    <string name="fail_busy">الخادم مشغول الآن</string>
+    <string name="fail_busy_h">انتظر قليلًا ثم اضغط OK</string>
+    <string name="fail_server">عطل عند الخادم وليس من جهازك</string>
+    <string name="fail_server_h">جرّب بعد قليل أو اختر قناة أو عنصرًا آخر</string>
+    <string name="fail_slow">الخادم بطيء في الرد</string>
+    <string name="fail_slow_h">تحقّق من سرعة الإنترنت ثم اضغط OK</string>
+    <string name="fail_offline">لا يوجد اتصال بالإنترنت</string>
+    <string name="fail_offline_h">تحقّق من الشبكة: يُعاد التشغيل تلقائيًا عند عودتها</string>
+    <string name="fail_unreachable">تعذّر الوصول إلى الخادم</string>
+    <string name="fail_unreachable_h">تحقّق من عنوان الخادم ومن الشبكة</string>
+    <string name="fail_format">الملف تالف أو بصيغة غير مدعومة</string>
+    <string name="fail_format_h">جرّب عنصرًا آخر</string>
+    <string name="fail_decoder">جهازك لا يستطيع تشغيل هذه الصيغة</string>
+    <string name="fail_decoder_h">جرّب عنصرًا آخر أو جودة أخرى</string>
 </resources>

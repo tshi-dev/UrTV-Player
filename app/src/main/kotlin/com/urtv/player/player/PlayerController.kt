@@ -99,6 +99,18 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
     private var lastRendered = 0; private var lastRenderedAt = 0L; private var measuredFps = 0f
 
     // ---- «ليش يقطّع؟»: likely cause from what is measured; opt-in backup channels
+    /** Why playback failed, for the failure screen (the last error's reason; none while it plays). */
+    private val _failure = MutableStateFlow(com.urtv.player.core.FailureReason.Reason.None)
+    val failure: StateFlow<com.urtv.player.core.FailureReason.Reason> = _failure
+    private fun online(): Boolean = NetInfo.online(ctx)
+    // the network came back while a stream was failing or reconnecting (a router restart, Wi-Fi dropping): start again by itself, from the same place for films
+    init {
+        runCatching {
+            (ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) { scope.launch { if (active && current != null && !preview && (_status.value == PlayStatus.Failed || _status.value == PlayStatus.Reconnecting)) { com.urtv.player.ui.Perf.line("network back: retry"); retryNow() } } }
+            })
+        }
+    }
     private val _cause = MutableStateFlow(Diagnosis.Cause.None)
     val cause: StateFlow<Diagnosis.Cause> = _cause
     /** HTTP status of the last failure (0 if none), shown next to a dead channel. */
@@ -256,7 +268,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
                 else -> Unit
             }
         }
-        override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) _status.value = PlayStatus.Playing }
+        override fun onIsPlayingChanged(isPlaying: Boolean) { if (isPlaying) { _status.value = PlayStatus.Playing; _failure.value = com.urtv.player.core.FailureReason.Reason.None } }
         override fun onTracksChanged(tracks: Tracks) {
             _tracks.value = readTracks(tracks)
             applyPrefs(_tracks.value)
@@ -276,6 +288,7 @@ class PlayerController(private val ctx: Context, private val store: com.urtv.pla
             com.urtv.player.data.Diag.playerError(e.errorCodeName, e)
             com.urtv.player.ui.Perf.line("player error ${e.errorCodeName} http=${lastHttpStatus} attempt=${_attempt.value}")
             errorKind = errorKindOf(e)
+            _failure.value = com.urtv.player.core.FailureReason.of(errorKind, lastHttpStatus, online())
             // Playlists often serve HLS from extension-less URLs: retry once as HLS before treating it as an outage.
             val c = current
             if (c != null && !forceHls && e.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) { forceHls = true; load(c); return }

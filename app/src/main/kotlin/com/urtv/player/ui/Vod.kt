@@ -146,7 +146,7 @@ fun PosterBrowse(app: UrtvApp, movies: Boolean, onOpen: (String) -> Unit) {
                 when {
                     list == null || (shown == 0 && vod.loading) -> androidx.compose.foundation.lazy.grid.LazyVerticalGrid(GridCells.Adaptive(180.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), userScrollEnabled = false) { items(10) { SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(0.68f), 14) } }
                     shown == 0 && vod.failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.err_network), style = T.title); Spacer(Modifier.height(16.dp))
+                        Text(stringResource(R.string.err_network), style = T.title); FailureText(vod.reason, Modifier.padding(top = 8.dp)); Spacer(Modifier.height(16.dp))
                         TvButton(stringResource(R.string.retry), { app.vod.open(app.store.playlists.value.firstOrNull { it.id == vod.playlistId }, true) }, primary = true) }
                     shown == 0 -> Text(stringResource(if (query.isBlank()) R.string.empty_group else R.string.no_results), style = T.body.copy(color = C.muted), modifier = Modifier.align(Alignment.Center))
                     else -> {

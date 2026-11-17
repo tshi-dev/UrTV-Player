@@ -356,4 +356,22 @@
     <string name="pos_bl">Bottom left</string>
     <string name="pos_bc">Bottom centre</string>
     <string name="pos_br">Bottom right</string>
+    <string name="fail_rejected">The server refused the login</string>
+    <string name="fail_rejected_h">Check that the subscription is active and how many devices use the account</string>
+    <string name="fail_missing">This item is not on the server</string>
+    <string name="fail_missing_h">It may have been removed: refresh the list or pick another</string>
+    <string name="fail_busy">The server is busy right now</string>
+    <string name="fail_busy_h">Wait a moment, then press OK</string>
+    <string name="fail_server">The server has a fault, not your TV</string>
+    <string name="fail_server_h">Try again soon or pick another channel or title</string>
+    <string name="fail_slow">The server is slow to answer</string>
+    <string name="fail_slow_h">Check your internet speed, then press OK</string>
+    <string name="fail_offline">No internet connection</string>
+    <string name="fail_offline_h">Check the network: playback restarts by itself when it is back</string>
+    <string name="fail_unreachable">The server cannot be reached</string>
+    <string name="fail_unreachable_h">Check the server address and the network</string>
+    <string name="fail_format">The file is damaged or in an unsupported format</string>
+    <string name="fail_format_h">Try another title</string>
+    <string name="fail_decoder">Your TV cannot play this format</string>
+    <string name="fail_decoder_h">Try another title or another quality</string>
 </resources>
