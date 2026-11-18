@@ -83,7 +83,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
     // Screenshots: Compose UI rendered on the JVM (Robolectric native graphics), no emulator needed.
-    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.test.espresso:espresso-core:3.6.1")     // IdlingPolicies: a short idle wait for closing a screen in tests
