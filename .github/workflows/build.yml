@@ -33,10 +33,10 @@ jobs:
       # optional secret: a token that can read tshi-dev/urtv-fonts (empty on forks and PRs, then Plex is used)
       FONTS_TOKEN: ${{ secrets.FONTS_TOKEN }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Thmanyah's licence allows its files only inside a built product: they live in the private tshi-dev/urtv-fonts
       # and are put in place here, never committed to this repository. Without the secret the open IBM Plex Sans Arabic is used.
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.FONTS_TOKEN != '' }}
         with:
           repository: tshi-dev/urtv-fonts
@@ -49,16 +49,16 @@ jobs:
           cp .fonts-private/android/*.otf app/src/main/assets/fonts/
           echo "Thmanyah pulled: $(ls app/src/main/assets/fonts | tr '\n' ' ')"
           rm -rf .fonts-private
-      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '17'
       # ubuntu-latest already ships the Android SDK (ANDROID_HOME).
-      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           gradle-version: '8.9'
       # Robolectric downloads Android jars from Maven Central, which sometimes answers 429: keep them between runs.
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ hashFiles('app/build.gradle.kts') }}
@@ -88,7 +88,7 @@ jobs:
           "$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)" dump permissions app/build/outputs/apk/debug/app-debug.apk || true
       # A debug APK built with the private fonts would carry them, and anyone signed in can download artifacts of a public repository:
       # upload only builds without the private fonts (forks, pull requests), and keep them briefly.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ env.FONTS_TOKEN == '' }}
         with:
           name: urtv-player-debug
@@ -114,8 +114,8 @@ jobs:
       - name: Tag must look like vMAJOR.MINOR.PATCH (optionally -suffix)
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::bad release tag"; exit 1; }
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ env.FONTS_TOKEN != '' }}
         with:
           repository: tshi-dev/urtv-fonts
@@ -128,11 +128,11 @@ jobs:
           cp .fonts-private/android/*.otf app/src/main/assets/fonts/
           echo "Thmanyah pulled: $(ls app/src/main/assets/fonts | tr '\n' ' ')"
           rm -rf .fonts-private
-      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           gradle-version: '8.9'
       - name: Signing key from secrets
